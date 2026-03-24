@@ -33,8 +33,7 @@ export default function DashboardPage() {
     setLoading(false);
   };
 
-
-  
+ 
   //const checkSession = async () => {
     //try {
       // Read the non-httpOnly appUsername cookie set by login/page.tsx.
@@ -60,15 +59,22 @@ export default function DashboardPage() {
    // }
   //};
 
-  const handleLogout = async () => {
-    try {
-      await fetch('/api/auth/logout', { method: 'POST' });
-      document.cookie = 'appUsername=; max-age=0; path=/';
-      router.push('/login');
-    } catch (error) {
-      console.error('Logout failed:', error);
-    }
+
+  const handleLogout = () => {
+    alert('Logout clicked (auth not wired yet)');
   };
+
+
+  
+  // const handleLogout = async () => {
+  //   try {
+  //     await fetch('/api/auth/logout', { method: 'POST' });
+  //     document.cookie = 'appUsername=; max-age=0; path=/';
+  //     router.push('/login');
+  //   } catch (error) {
+  //     console.error('Logout failed:', error);
+  //   }
+  // };
 
   if (loading) {
     return (
