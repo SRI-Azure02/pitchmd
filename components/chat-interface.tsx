@@ -26,23 +26,6 @@ function isEvaluationResponse(text: string): boolean {
   return EVAL_KEYWORDS.some((kw) => text.includes(kw));
 }
 
-function parseDurationFromText(text: string): number | null {
-  const match = text.match(/\[SESSION_DURATION:(\d+)\]/);
-  return match ? parseInt(match[1], 10) : null;
-}
-
-function parseVoiceModelFromText(text: string): string | null {
-  const match = text.match(/\[VOICE_MODEL:([^\]]+)\]/);
-  return match ? match[1].trim() : null;
-}
-
-function stripHiddenTags(text: string): string {
-  return text
-    .replace(/\[SESSION_DURATION:\d+\]/g, '')
-    .replace(/\[VOICE_MODEL:[^\]]+\]/g, '')
-    .trim();
-}
-
 function getTimerBarColor(timeRemaining: number, sessionDuration: number): string {
   const ratio = timeRemaining / sessionDuration;
   if (ratio > 2 / 3) return '#4e9e6b';
@@ -66,13 +49,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   // ── Session state ─────────────────────────────────────────────────────────
   const [sessionStarted, setSessionStarted] = useState(false);
   const [sessionEnded, setSessionEnded] = useState(false);
-
-  // FIX 1: roleplaying becomes true only when the physician persona goes live
-  // (first response that contains [SESSION_DURATION:] or [VOICE_MODEL:] tags).
-  // The timer does NOT start until this is true, so it stays off while the
-  // physician-list is being shown.
   const [roleplaying, setRoleplaying] = useState(false);
-
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [loading, setLoading] = useState(false);
@@ -83,8 +60,6 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   const [userTyping, setUserTyping] = useState(false);
   const [sessionDuration, setSessionDuration] = useState<number | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
-
-  // FIX 3: surface TTS failures so the user knows voice is unavailable
   const [ttsAvailable, setTtsAvailable] = useState(true);
 
   // ── Refs ──────────────────────────────────────────────────────────────────
@@ -93,18 +68,9 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   const inputRef = useRef('');
   const hasStarted = useRef(false);
   const autoEndedRef = useRef(false);
-
-  // Ref mirror of sessionEnded — always current inside async callbacks/effects
   const sessionEndedRef = useRef(false);
-
-  // Ref mirror of roleplaying — set synchronously in sendMessage to prevent a
-  // race where two rapid responses both think they are the first roleplay turn
   const roleplayingRef = useRef(false);
-
   const currentVoiceRef = useRef<string | null>(null);
-
-  // Stable ref so timer-expiry and turn-limit effects always call the latest
-  // sendMessage closure without putting sendMessage in their dep arrays
   const sendMessageRef = useRef<(text: string, history: Message[]) => Promise<void>>(
     async () => { },
   );
@@ -117,20 +83,9 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, statusMessage]);
 
-  // ── FIX 2a: Timer countdown via useEffect ────────────────────────────────
-  //
-  // The interval is owned entirely by this effect — never created inside a
-  // setState updater or the message handler.
-  //
-  // Pause/resume: when `loading` becomes true (waiting for the agent) the
-  // cleanup fires and clears the interval. When `loading` becomes false the
-  // effect re-runs and restarts from the current timeRemaining value. This
-  // gives automatic pause-during-fetch / resume-after-response with no manual
-  // clearInterval calls needed anywhere else.
-  //
-  // `timeRemaining` is intentionally NOT in the dep array. The functional form
-  // of setTimeRemaining means the callback always sees the freshest value, and
-  // excluding it prevents the interval from restarting on every tick.
+  // ── Countdown timer ───────────────────────────────────────────────────────
+  // Pauses automatically when loading=true (waiting for agent response).
+  // Resumes when loading flips back to false.
   useEffect(() => {
     if (
       !roleplaying ||
@@ -151,12 +106,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roleplaying, sessionEnded, loading]);
 
-  // ── FIX 2b: Timer expiry — fire evaluation when countdown reaches zero ────
-  //
-  // Calling sendMessage here (outside any setState updater) is the correct
-  // React pattern. The `loading` guard prevents a race where the timer hits 0
-  // at the exact moment the user sends a message — in that case we wait for
-  // the in-flight response to finish before ending the session.
+  // ── Timer expiry → auto-end session ──────────────────────────────────────
   useEffect(() => {
     if (
       timeRemaining === 0 &&
@@ -179,8 +129,6 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
       text.trim().toLowerCase(),
     );
     if (isDone) {
-      // Set ref synchronously so concurrent effects/callbacks see the flag
-      // before the batched state update propagates
       sessionEndedRef.current = true;
       setSessionEnded(true);
       setTimeRemaining(null);
@@ -201,8 +149,6 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     setCountdown(null);
     setLoading(true);
     setStatusMessage('Connecting...');
-    // Pause any playing audio. Timer interval pauses automatically via the
-    // countdown useEffect reacting to loading=true — no manual work needed.
     stopCurrentAudio();
 
     try {
@@ -248,9 +194,15 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
 
             } else if (event.type === 'done') {
               const isEval = isEvaluationResponse(event.text);
-              const duration = parseDurationFromText(event.text);
-              const voiceModel = parseVoiceModelFromText(event.text);
-              const cleanText = stripHiddenTags(event.text);
+
+              // ── FIX: Read metadata from event fields, not from stripped text ──
+              // The route strips [SESSION_DURATION:] and [VOICE_MODEL:] from the
+              // display text (they appear before [EMOTION:] and extractRoleplay()
+              // discards everything before the first emotion tag). We now pass
+              // these values explicitly as event.sessionDuration and event.voiceModel
+              // so they survive the text-processing pipeline intact.
+              const duration: number | null = event.sessionDuration ?? null;
+              const voiceModel: string | null = event.voiceModel ?? null;
 
               // Capture voice model on first occurrence
               if (voiceModel && !currentVoiceRef.current) {
@@ -258,32 +210,26 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                 console.log('[tts] voice model assigned:', voiceModel);
               }
 
-              // ── FIX 1: Gate timer on roleplay start ───────────────────────
-              // [SESSION_DURATION:] and [VOICE_MODEL:] only appear in the first
-              // in-character physician message. Physician-list responses contain
-              // neither tag, so the timer stays off until the physician is
-              // chosen and the agent has entered character.
-              //
-              // roleplayingRef is set synchronously here to prevent a race
-              // condition where two rapid responses could both satisfy the check
-              // before the React state update for setRoleplaying propagates.
+              // Start timer on first roleplay message (identified by presence of
+              // sessionDuration or voiceModel — neither appears in physician-list responses)
               if (!roleplayingRef.current && (duration !== null || voiceModel !== null)) {
                 roleplayingRef.current = true;
                 const resolvedDuration =
-                  duration && duration >= 30 && duration <= 300
+                  duration !== null && duration >= 30 && duration <= 300
                     ? duration
                     : targetDurationRef.current;
+
+                console.log('[timer] roleplay started — duration:', resolvedDuration, 's');
+
                 setRoleplaying(true);
                 setSessionDuration(resolvedDuration);
                 setTimeRemaining(resolvedDuration);
-                // The countdown useEffect will start the interval automatically
-                // once loading becomes false and roleplaying becomes true.
               }
 
-              const { emotion, cleanText: emotionStripped } = parseEmotion(cleanText);
+              const { emotion, cleanText: emotionStripped } = parseEmotion(event.text);
 
               if (isEval) {
-                setEvalContent(cleanText);
+                setEvalContent(event.text);
                 setMessages((prev) => [
                   ...prev,
                   {
@@ -307,13 +253,9 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
 
                 if (currentVoiceRef.current) {
                   console.log(
-                    '[tts] speaking | voice:',
-                    currentVoiceRef.current,
-                    '| emotion:',
-                    emotion,
+                    '[tts] speaking | voice:', currentVoiceRef.current,
+                    '| emotion:', emotion,
                   );
-                  // FIX 3: speakText now throws on HTTP error (see lib/elevenlabs.ts)
-                  // so we can catch it here and show a visible badge in the UI.
                   speakText(emotionStripped, currentVoiceRef.current, emotion).catch(
                     (err) => {
                       console.error('[tts] failed:', err);
@@ -325,8 +267,6 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
 
               setStatusMessage('');
               setLoading(false);
-              // Timer resumes automatically: loading→false causes the countdown
-              // useEffect to re-run and restart the interval from timeRemaining.
 
             } else if (event.type === 'error') {
               throw new Error(event.message);
@@ -350,7 +290,6 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     }
   };
 
-  // Keep the ref current every render so effects always call the latest closure
   sendMessageRef.current = sendMessage;
 
   // ── Session controls ──────────────────────────────────────────────────────
@@ -376,7 +315,6 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   const handleNewSession = () => {
     stopCurrentAudio();
 
-    // Reset refs synchronously before state batching
     sessionEndedRef.current = false;
     autoEndedRef.current = false;
     hasStarted.current = false;
@@ -385,7 +323,6 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     targetDurationRef.current = randomSessionDuration();
     messagesRef.current = [];
 
-    // Reset all state
     setMessages([]);
     setStatusMessage('');
     setEvalContent(null);
@@ -401,14 +338,13 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     setTtsAvailable(true);
   };
 
-  // Filter the internal greeting from the visible chat
   const visibleMessages = messages.filter(
     (m, i) =>
       !(i === 0 && m.role === 'user' && m.content.startsWith("Hello! I'm ready to begin")),
   );
   const turnLimitReached = visibleMessages.length >= MAX_TURNS;
 
-  // Turn-limit auto-end — uses sendMessageRef to avoid stale-closure risk
+  // Turn-limit auto-end
   useEffect(() => {
     if (
       turnLimitReached &&
@@ -540,7 +476,6 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
       <div className="absolute bottom-0 left-0 right-0 bg-white pt-2 pb-1">
         <div className="mb-1 px-1">
           <div className="flex items-center justify-between mb-1">
-            {/* Left side: status / timer label */}
             {turnLimitReached ? (
               <p className="text-xs text-amber-600 font-medium">
                 Session limit reached — generating your evaluation...
@@ -567,7 +502,6 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
               </p>
             )}
 
-            {/* Right side: TTS error badge — shown only after a failure */}
             {!ttsAvailable && (
               <span
                 className="text-xs text-amber-600 font-medium ml-2"
@@ -610,7 +544,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                     ? 'Session ended'
                     : turnLimitReached
                       ? 'Session limit reached...'
-                      : 'Type your message...'
+                      : 'Type your response...'
                 }
                 value={inputValue}
                 onChange={(e) => {
