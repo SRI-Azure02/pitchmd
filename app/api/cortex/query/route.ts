@@ -9,6 +9,12 @@ const EMOTION_TAG_REGEX =
 const SESSION_DURATION_REGEX = /\[SESSION_DURATION:(\d+)\]/;
 const VOICE_MODEL_REGEX = /\[VOICE_MODEL:([^\]]+)\]/;
 
+const EVAL_KEYWORDS = [
+  'OVERALL_SCORE', 'CLINICAL_KNOWLEDGE_SCORE', 'OBJECTION_HANDLING_SCORE',
+  'FIELD_READINESS', 'COACHING_PRIORITY', 'RepEval', 'REPEVAL',
+  'overall_score', 'field_ready',
+];
+
 /**
  * Extract physician list / selection text (no agent planning)
  */
@@ -82,6 +88,10 @@ export async function POST(request: NextRequest) {
           messages: Array<{ role: string; content: string }>;
         };
 
+        // Emit immediately so Next.js flushes HTTP headers to the client
+        // before the (potentially slow) Snowflake call begins.
+        safeEnqueue({ type: 'status', message: 'Connecting...' });
+
         const account = process.env.SNOWFLAKE_ACCOUNT!;
         const pat =
           process.env.SNOWFLAKE_PAT ||
@@ -108,9 +118,24 @@ export async function POST(request: NextRequest) {
             stream: true,
             role: 'APP_SVC_ROLE',
           }),
+          signal: AbortSignal.timeout(120_000), // 2-minute hard timeout
         });
 
-        const reader = res.body!.getReader();
+        if (!res.ok) {
+          const errText = await res.text().catch(() => '');
+          console.error(`[cortex] Snowflake returned ${res.status}:`, errText.slice(0, 300));
+          safeEnqueue({ type: 'error', message: `Snowflake error ${res.status}` });
+          safeClose();
+          return;
+        }
+
+        if (!res.body) {
+          safeEnqueue({ type: 'error', message: 'Empty response from Snowflake' });
+          safeClose();
+          return;
+        }
+
+        const reader = res.body.getReader();
         const decoder = new TextDecoder();
 
         let buffer = '';
@@ -151,9 +176,18 @@ export async function POST(request: NextRequest) {
         const voiceModelMatch = fullText.match(VOICE_MODEL_REGEX);
         const voiceModel = voiceModelMatch ? voiceModelMatch[1].trim() : null;
 
+        // ── Detect evaluation response BEFORE stripping ───────────────────────
+        // Keyword-matching on the stripped output would miss all eval fields
+        // because extractSelectionContent / shortenRoleplay discard them.
+        const isEvaluation = EVAL_KEYWORDS.some((kw) => fullText.includes(kw));
+
         // ── Build display text ────────────────────────────────────────────────
         let output: string;
-        if (EMOTION_TAG_REGEX.test(fullText)) {
+        if (isEvaluation) {
+          // EvaluationPanel fetches fresh data from Snowflake; the text value
+          // is only shown as a chat bubble, so keep it short.
+          output = 'Your evaluation is ready.';
+        } else if (EMOTION_TAG_REGEX.test(fullText)) {
           output = extractRoleplay(fullText);
           if (!EMOTION_TAG_REGEX.test(output)) {
             output = `[EMOTION:neutral] ${output}`;
@@ -171,6 +205,7 @@ export async function POST(request: NextRequest) {
           text: output,
           sessionDuration,   // number | null — drives countdown timer
           voiceModel,        // string | null — drives ElevenLabs voice ID
+          isEvaluation,      // boolean — detected before stripping
         });
         safeClose();
       } catch (err: any) {

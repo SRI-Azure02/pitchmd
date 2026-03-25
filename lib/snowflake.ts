@@ -56,16 +56,20 @@ export class SnowflakeClient {
 
   async executeQuery(
     sql: string,
+    bindings?: Record<string, { type: string; value: string }>,
     options: SnowflakeQueryOptions = {}
   ): Promise<any[]> {
+    const body: Record<string, any> = {
+      statement: sql,
+      database: options.database || 'CORTEX_TESTING',
+      schema: options.schema || 'PUBLIC',
+      warehouse: options.warehouse || this.warehouse,
+    };
+    if (bindings) body.bindings = bindings;
+
     const response = await axios.post(
       `${this.baseURL}/statements`,
-      {
-        statement: sql,
-        database: options.database || 'CORTEX_TESTING',
-        schema: options.schema || 'PUBLIC',
-        warehouse: options.warehouse || this.warehouse,
-      },
+      body,
       { headers: this.headers }
     );
 
@@ -108,6 +112,37 @@ export class SnowflakeClient {
     throw new Error('Query execution timeout');
   }
 
+  // ─── Auth Queries ────────────────────────────────────────────────────
+
+  async getUserByUsername(username: string): Promise<any> {
+    const sql = `
+      SELECT USER_ID, USERNAME, EMAIL, PASSWORD_HASH
+      FROM CORTEX_TESTING.PUBLIC.USERS
+      WHERE USERNAME = ?
+      LIMIT 1
+    `;
+    const results = await this.executeQuery(sql, {
+      '1': { type: 'TEXT', value: username },
+    });
+    return results?.[0] ?? null;
+  }
+
+  // ─── Physician Queries ───────────────────────────────────────────────
+
+  async queryAllPhysicians(): Promise<any[]> {
+    const sql = `
+      SELECT
+        PHYSICIAN_ID,
+        FIRST_NAME,
+        LAST_NAME,
+        SPECIALTY,
+        SEGMENT_NAME
+      FROM CORTEX_TESTING.PUBLIC.PHYSICIANS
+      ORDER BY LAST_NAME, FIRST_NAME ASC
+    `;
+    return await this.executeQuery(sql);
+  }
+
   // ─── Evaluation Queries ─────────────────────────────────────────────
 
   async queryLatestEvaluationByAppUser(
@@ -116,11 +151,13 @@ export class SnowflakeClient {
     const sql = `
       SELECT *
       FROM CORTEX_TESTING.ML.REPEVAL_RESULTS
-      WHERE APP_USER_ID = '${appUserId}'
+      WHERE APP_USER_ID = ?
       ORDER BY EVALUATED_AT DESC
       LIMIT 1
     `;
-    const results = await this.executeQuery(sql);
+    const results = await this.executeQuery(sql, {
+      '1': { type: 'TEXT', value: appUserId },
+    });
     return results?.[0] ?? null;
   }
 
@@ -130,7 +167,7 @@ export class SnowflakeClient {
   ): Promise<any[]> {
     const sql = `
       SELECT
-        TO_DATE(CONVERT_TIMEZONE('UTC', 'America/New_York', EVALUATED_AT)) AS EVALUATED_AT,
+        CONVERT_TIMEZONE('UTC', 'America/New_York', EVALUATED_AT) AS EVALUATED_AT,
         OVERALL_SCORE,
         CLINICAL_KNOWLEDGE_SCORE,
         OBJECTION_HANDLING_SCORE,
@@ -138,11 +175,14 @@ export class SnowflakeClient {
         TONE_RAPPORT_SCORE,
         CLOSING_SCORE
       FROM CORTEX_TESTING.ML.REPEVAL_RESULTS
-      WHERE APP_USER_ID = '${appUserId}'
-        AND PHYSICIAN_ID = '${physicianId}'
+      WHERE APP_USER_ID = ?
+        AND PHYSICIAN_ID = ?
       ORDER BY EVALUATED_AT ASC
     `;
-    return await this.executeQuery(sql);
+    return await this.executeQuery(sql, {
+      '1': { type: 'TEXT', value: appUserId },
+      '2': { type: 'TEXT', value: physicianId },
+    });
   }
 
   async queryEvaluationHistoryAllPhysicians(
@@ -158,11 +198,13 @@ export class SnowflakeClient {
         MEDIAN(TONE_RAPPORT_SCORE) AS TONE_RAPPORT_SCORE,
         MEDIAN(CLOSING_SCORE) AS CLOSING_SCORE
       FROM CORTEX_TESTING.ML.REPEVAL_RESULTS
-      WHERE APP_USER_ID = '${appUserId}'
+      WHERE APP_USER_ID = ?
       GROUP BY EVALUATED_AT::DATE
       ORDER BY EVALUATED_AT::DATE ASC
     `;
-    return await this.executeQuery(sql);
+    return await this.executeQuery(sql, {
+      '1': { type: 'TEXT', value: appUserId },
+    });
   }
 
   // ✅ Segment median for THIS USER across physicians in same segment
@@ -180,12 +222,15 @@ export class SnowflakeClient {
         MEDIAN(TONE_RAPPORT_SCORE) AS TONE_RAPPORT_SCORE,
         MEDIAN(CLOSING_SCORE) AS CLOSING_SCORE
       FROM CORTEX_TESTING.ML.REPEVAL_RESULTS
-      WHERE APP_USER_ID = '${appUserId}'
-        AND SEGMENT_NAME = '${segmentName}'
+      WHERE APP_USER_ID = ?
+        AND SEGMENT_NAME = ?
       GROUP BY EVALUATED_AT::DATE
       ORDER BY EVALUATED_AT::DATE ASC
     `;
-    return await this.executeQuery(sql);
+    return await this.executeQuery(sql, {
+      '1': { type: 'TEXT', value: appUserId },
+      '2': { type: 'TEXT', value: segmentName },
+    });
   }
 }
 

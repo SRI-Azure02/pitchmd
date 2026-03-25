@@ -24,57 +24,30 @@ export default function DashboardPage() {
 
 
   const checkSession = async () => {
-    // TEMPORARY: bypass auth so dashboard can render
-    setSession({
-      userId: 'demo',
-      username: 'Demo User',
-      email: '',
-    });
-    setLoading(false);
-  };
-
- 
-  //const checkSession = async () => {
-    //try {
-      // Read the non-httpOnly appUsername cookie set by login/page.tsx.
-      // This avoids using /api/physicians as a session probe — that call was
-      // returning 401 in v0.dev's iframe environment because the httpOnly
-      // sess_ cookie wasn't being forwarded, causing an immediate redirect loop.
-      //const raw = document.cookie
-        //.split('; ')
-        //.find(row => row.startsWith('appUsername='))
-        //?.split('=')[1];
-
-      //if (!raw) {
-        //router.push('/login');
-        //return;
-      //}
-
-      //const username = decodeURIComponent(raw);
-      //setSession({ userId: username, username, email: '' });
-    //} catch {
-    //  router.push('/login');
-    //} finally {
-    //  setLoading(false);
-   // }
-  //};
-
-
-  const handleLogout = () => {
-    alert('Logout clicked (auth not wired yet)');
+    try {
+      const res = await fetch('/api/auth/me');
+      if (!res.ok) {
+        router.push('/login');
+        return;
+      }
+      const data = await res.json();
+      setSession({ userId: data.userId, username: data.username, email: '' });
+    } catch {
+      router.push('/login');
+    } finally {
+      setLoading(false);
+    }
   };
 
 
-  
-  // const handleLogout = async () => {
-  //   try {
-  //     await fetch('/api/auth/logout', { method: 'POST' });
-  //     document.cookie = 'appUsername=; max-age=0; path=/';
-  //     router.push('/login');
-  //   } catch (error) {
-  //     console.error('Logout failed:', error);
-  //   }
-  // };
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      router.push('/login');
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
 
   if (loading) {
     return (

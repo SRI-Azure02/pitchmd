@@ -16,22 +16,6 @@ interface Message {
   isEvaluation?: boolean;
 }
 
-const EVAL_KEYWORDS = [
-  'overall_score', 'clinical_knowledge', 'objection_handling',
-  'field_ready', 'coaching_priority', 'Overall Score', 'Field Readiness',
-  'RepEval', 'REPEVAL', 'evaluation report', 'Evaluation Report',
-];
-
-function isEvaluationResponse(text: string): boolean {
-  return EVAL_KEYWORDS.some((kw) => text.includes(kw));
-}
-
-function getTimerBarColor(timeRemaining: number, sessionDuration: number): string {
-  const ratio = timeRemaining / sessionDuration;
-  if (ratio > 2 / 3) return '#4e9e6b';
-  if (ratio > 1 / 3) return '#c07c3a';
-  return '#b04848';
-}
 
 function randomSessionDuration(min = 60, max = 150): number {
   const r1 = Math.random();
@@ -54,9 +38,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   const [inputValue, setInputValue] = useState('');
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
-  const [evalContent, setEvalContent] = useState<string | null>(null);
   const [evalOpen, setEvalOpen] = useState(false);
-  const [countdown, setCountdown] = useState<number | null>(null);
   const [userTyping, setUserTyping] = useState(false);
   const [sessionDuration, setSessionDuration] = useState<number | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
@@ -146,7 +128,6 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     setInputValue('');
     inputRef.current = '';
     setUserTyping(false);
-    setCountdown(null);
     setLoading(true);
     setStatusMessage('Connecting...');
     stopCurrentAudio();
@@ -193,7 +174,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
               setStatusMessage(event.message);
 
             } else if (event.type === 'done') {
-              const isEval = isEvaluationResponse(event.text);
+              const isEval = event.isEvaluation === true;
 
               // ── FIX: Read metadata from event fields, not from stripped text ──
               // The route strips [SESSION_DURATION:] and [VOICE_MODEL:] from the
@@ -229,7 +210,6 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
               const { emotion, cleanText: emotionStripped } = parseEmotion(event.text);
 
               if (isEval) {
-                setEvalContent(event.text);
                 setMessages((prev) => [
                   ...prev,
                   {
@@ -325,8 +305,6 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
 
     setMessages([]);
     setStatusMessage('');
-    setEvalContent(null);
-    setCountdown(null);
     setUserTyping(false);
     setInputValue('');
     setSessionEnded(false);
@@ -404,7 +382,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
         <EvaluationPanel
           open={evalOpen}
           onClose={() => setEvalOpen(false)}
-          content={evalContent ?? ''}
+          content=""
           username={username}
         />
       </div>
@@ -443,7 +421,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                 }`}
             >
               {message.content}
-              {message.isEvaluation && evalContent && (
+              {message.isEvaluation && (
                 <button
                   onClick={() => setEvalOpen(true)}
                   className="mt-2 flex items-center gap-1.5 text-blue-600 hover:text-blue-700 font-medium text-xs"
@@ -518,7 +496,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                 style={{
                   width: `${(timeRemaining / sessionDuration) * 100}%`,
                   height: '100%',
-                  background: getTimerBarColor(timeRemaining, sessionDuration),
+                  background: timerRatio !== null && timerRatio > 2/3 ? '#4e9e6b' : timerRatio !== null && timerRatio > 1/3 ? '#c07c3a' : '#b04848',
                   transition: 'width 1s linear, background 1s ease',
                 }}
               />
@@ -533,48 +511,27 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                 setInputValue((prev) => prev + (prev ? ' ' : '') + text)
               }
               onAutoSubmit={handleAutoSubmit}
-              onCountdown={setCountdown}
               userTyping={userTyping}
               disabled={loading || turnLimitReached || sessionEnded}
             />
-            <div className="relative flex-1">
-              <Input
-                placeholder={
-                  sessionEnded
-                    ? 'Session ended'
-                    : turnLimitReached
-                      ? 'Session limit reached...'
-                      : 'Type your response...'
-                }
-                value={inputValue}
-                onChange={(e) => {
-                  setInputValue(e.target.value);
-                  setUserTyping(true);
-                  setCountdown(null);
-                }}
-                onFocus={() => setUserTyping(true)}
-                onBlur={() => setUserTyping(false)}
-                disabled={loading || turnLimitReached || sessionEnded}
-                className="w-full"
-              />
-              {countdown !== null && (
-                <div
-                  className="absolute left-0 right-0 h-1 bg-slate-200 rounded-full overflow-hidden"
-                  style={{ top: '100%', marginTop: '3px' }}
-                >
-                  <div
-                    style={{
-                      width: `${countdown}%`,
-                      height: '100%',
-                      background: 'linear-gradient(90deg, #FF6B00, #00C8FF, #FF6B00)',
-                      backgroundSize: '300% 300%',
-                      animation: 'gradientShift 6s ease infinite',
-                      transition: 'width 80ms linear',
-                    }}
-                  />
-                </div>
-              )}
-            </div>
+            <Input
+              placeholder={
+                sessionEnded
+                  ? 'Session ended'
+                  : turnLimitReached
+                    ? 'Session limit reached...'
+                    : 'Type your response...'
+              }
+              value={inputValue}
+              onChange={(e) => {
+                setInputValue(e.target.value);
+                setUserTyping(true);
+              }}
+              onFocus={() => setUserTyping(true)}
+              onBlur={() => setUserTyping(false)}
+              disabled={loading || turnLimitReached || sessionEnded}
+              className="flex-1"
+            />
             <Button
               type="submit"
               disabled={loading || !inputValue.trim() || turnLimitReached || sessionEnded}
@@ -614,7 +571,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
       <EvaluationPanel
         open={evalOpen}
         onClose={() => setEvalOpen(false)}
-        content={evalContent ?? ''}
+        content=""
         username={username}
       />
     </div>

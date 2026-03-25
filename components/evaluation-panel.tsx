@@ -63,7 +63,10 @@ function formatDate(val: any): string {
 function formatDateTime(val: any): string {
   const d = parseSnowflakeDate(val);
   if (!d) return '';
-  return `${d.getMonth() + 1}/${d.getDate()}/${String(d.getFullYear()).slice(2)} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  const h = d.getHours();
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 || 12;
+  return `${d.getMonth() + 1}/${d.getDate()}/${String(d.getFullYear()).slice(2)} ${h12}:${String(d.getMinutes()).padStart(2, '0')} ${ampm}`;
 }
 
 function Dot({ value }: { value: boolean | null }) {
@@ -144,8 +147,7 @@ export default function EvaluationPanel({ open, onClose, content, username }: Ev
     setError(null);
     setNoData(false);
     try {
-      const url = username ? `/api/evaluation?userId=${encodeURIComponent(username)}` : '/api/evaluation';
-      const res = await fetch(url);
+      const res = await fetch('/api/evaluation');
       if (res.status === 404) { setNoData(true); setEvaluation(null); return; }
       if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Could not load evaluation'); }
       const data = await res.json();
@@ -193,16 +195,22 @@ export default function EvaluationPanel({ open, onClose, content, username }: Ev
     CO: r.COMPLIANCE_SCORE, TR: r.TONE_RAPPORT_SCORE, CL: r.CLOSING_SCORE,
   }));
 
-  function HistoryChart({ data, title }: { data: any[]; title: string }) {
+  function HistoryChart({ data, title, subtitle }: { data: any[]; title: string; subtitle?: string }) {
     if (!data.length) return (
       <div className="border border-slate-200 rounded-lg p-4 bg-white">
-        <p className="text-sm font-bold text-slate-800 mb-2">{title}</p>
+        <div className="mb-2">
+          <p className="text-sm font-bold text-slate-800">{title}</p>
+          {subtitle && <p className="text-xs text-slate-500">{subtitle}</p>}
+        </div>
         <p className="text-sm text-slate-400">Not enough data yet</p>
       </div>
     );
     return (
       <div className="border border-slate-200 rounded-lg p-4 bg-white">
-        <p className="text-sm font-bold text-slate-800 mb-4">{title}</p>
+        <div className="mb-4">
+          <p className="text-sm font-bold text-slate-800">{title}</p>
+          {subtitle && <p className="text-xs text-slate-500">{subtitle}</p>}
+        </div>
         <ResponsiveContainer width="100%" height={280}>
           <ComposedChart data={data} margin={{ top: 5, right: 5, left: 0, bottom: 60 }}>
             <XAxis
@@ -212,6 +220,8 @@ export default function EvaluationPanel({ open, onClose, content, username }: Ev
               textAnchor="end"
               interval={0}
               height={60}
+              scale="point"
+              padding={{ left: 0, right: 20 }}
             />
             <Tooltip />
             <Legend verticalAlign="top" wrapperStyle={{ fontSize: 11, paddingBottom: 8 }} />
@@ -334,8 +344,12 @@ export default function EvaluationPanel({ open, onClose, content, username }: Ev
               { label: 'Established follow-up timeline', value: e.CL_L6 },
             ]} />
             <div className="grid grid-cols-3 gap-4">
-              <HistoryChart data={histPhysicianData} title={`${e.PHYSICIAN_ID ?? ''} · ${physicianName ?? ''}`} />
-              <HistoryChart data={segmentData} title={`Segment Median — ${e.SEGMENT_NAME ?? 'Same Segment'}`} />
+              <HistoryChart
+                data={histPhysicianData}
+                title={physicianName ?? e.PHYSICIAN_ID ?? ''}
+                subtitle={[e.PHYSICIAN_SPECIALTY, e.PHYSICIAN_ID].filter(Boolean).join(' — ')}
+              />
+              <HistoryChart data={segmentData} title={`Median — ${e.SEGMENT_NAME ?? 'Same Segment'}`} />
               <HistoryChart data={histAllData} title="Median — All Physicians" />
             </div>
             {Array.isArray(e.RECOMMENDATIONS) && e.RECOMMENDATIONS.length > 0 && (

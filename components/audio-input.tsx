@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Mic, Square } from 'lucide-react';
+import { Mic } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface AudioInputProps {
@@ -13,10 +13,13 @@ interface AudioInputProps {
 }
 
 const SILENCE_TIMEOUT = 3000;
+const RING_R = 20;
+const CIRCUMFERENCE = 2 * Math.PI * RING_R;
 
 export default function AudioInput({ onTranscript, onAutoSubmit, onCountdown, disabled, userTyping }: AudioInputProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [supported, setSupported] = useState(false);
+  const [countdownPct, setCountdownPct] = useState<number | null>(null);
   const recognitionRef = useRef<any>(null);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -66,6 +69,7 @@ export default function AudioInput({ onTranscript, onAutoSubmit, onCountdown, di
     if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
     silenceTimerRef.current = null;
     progressIntervalRef.current = null;
+    setCountdownPct(null);
     onCountdown?.(null);
   };
 
@@ -74,11 +78,13 @@ export default function AudioInput({ onTranscript, onAutoSubmit, onCountdown, di
     if (!hasTranscriptRef.current) return;
 
     const start = Date.now();
+    setCountdownPct(100);
     onCountdown?.(100);
 
     progressIntervalRef.current = setInterval(() => {
       const elapsed = Date.now() - start;
       const remaining = Math.max(0, 100 - (elapsed / SILENCE_TIMEOUT) * 100);
+      setCountdownPct(remaining);
       onCountdown?.(remaining);
     }, 50);
 
@@ -131,17 +137,55 @@ export default function AudioInput({ onTranscript, onAutoSubmit, onCountdown, di
 
   if (!supported) return null;
 
+  // Button background: solid red when recording
+  const buttonBg: React.CSSProperties = isRecording
+    ? { background: '#ef4444', border: 'none', color: 'white' }
+    : {};
+
+  const dashOffset = countdownPct !== null
+    ? CIRCUMFERENCE * (1 - countdownPct / 100)
+    : CIRCUMFERENCE;
+
   return (
-    <Button
-      type="button"
-      size="icon"
-      variant={isRecording ? 'destructive' : 'outline'}
-      onClick={isRecording ? stopRecording : startRecording}
-      disabled={disabled}
-      className={`rounded-full shrink-0 ${isRecording ? 'animate-pulse' : ''}`}
-      title={isRecording ? 'Stop recording' : 'Speak your message'}
-    >
-      {isRecording ? <Square className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-    </Button>
+    <div className="relative shrink-0 w-9 h-9">
+      <Button
+        type="button"
+        size="icon"
+        variant={isRecording ? 'default' : 'outline'}
+        onClick={isRecording ? stopRecording : startRecording}
+        disabled={disabled}
+        className="absolute inset-0 rounded-full"
+        style={buttonBg}
+        title={isRecording ? 'Stop recording' : 'Speak your message'}
+      >
+        <Mic className="w-4 h-4" />
+      </Button>
+
+      {/* Countdown ring — only visible during silence countdown */}
+      {countdownPct !== null && (
+        <svg
+          className="absolute pointer-events-none"
+          style={{ inset: '-4px', width: 'calc(100% + 8px)', height: 'calc(100% + 8px)' }}
+          viewBox="0 0 44 44"
+        >
+          {/* Track */}
+          <circle cx="22" cy="22" r={RING_R} fill="none" stroke="#e2e8f0" strokeWidth="2" />
+          {/* Progress arc — starts at top (12 o'clock) via rotation */}
+          <circle
+            cx="22"
+            cy="22"
+            r={RING_R}
+            fill="none"
+            stroke="#FF6B00"
+            strokeWidth="2.5"
+            strokeDasharray={CIRCUMFERENCE}
+            strokeDashoffset={dashOffset}
+            strokeLinecap="round"
+            transform="rotate(-90 22 22)"
+            style={{ transition: 'stroke-dashoffset 80ms linear' }}
+          />
+        </svg>
+      )}
+    </div>
   );
 }
