@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
         safeEnqueue({ type: 'status', message: 'Connecting...' });
 
         const claudeStream = anthropic.messages.stream({
-          model: 'claude-3-5-sonnet-20241022',
+          model: 'claude-haiku-4-5-20251001',
           max_tokens: 150,
           system: systemPrompt,
           messages: anthropicMessages,
@@ -133,8 +133,9 @@ export async function POST(request: NextRequest) {
         safeClose();
 
       } catch (err: any) {
-        console.error('[roleplay] error:', err?.message ?? err);
-        safeEnqueue({ type: 'error', message: 'Failed to connect to Claude API' });
+        const detail = err?.status ? `HTTP ${err.status}: ${err?.message}` : (err?.message ?? String(err));
+        console.error('[roleplay] error:', detail);
+        safeEnqueue({ type: 'error', message: `Claude API error: ${detail}` });
         safeClose();
       }
     },
