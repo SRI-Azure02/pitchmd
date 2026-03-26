@@ -140,6 +140,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [tableTooltip, setTableTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
   const [showPhysicianId, setShowPhysicianId] = useState(false);
+  const [hoveredSplashBtn, setHoveredSplashBtn] = useState<string | null>(null);
 
   // ── Refs ──────────────────────────────────────────────────────────────────
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -972,32 +973,72 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     }
 
     // Default splash
-    return (
-      <div className="flex flex-col items-center justify-center h-full gap-6 text-center px-8">
-        <div className="space-y-2">
-          <p className="text-2xl font-semibold text-slate-900">Ready to practice?</p>
-          <p className="text-slate-500 text-sm max-w-sm">
-            Select a physician and take on a realistic sales call simulation.
-          </p>
-        </div>
+    const splashBtn = (label: string, action: () => void, description: string) => (
+      <div key={label} className="relative w-44">
+        <p className={`absolute bottom-full mb-1.5 w-44 text-xs text-slate-500 leading-snug transition-opacity duration-150 ${hoveredSplashBtn === label ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+          {description}
+        </p>
         <Button
-          onClick={handleStartSession}
-          className="w-64 py-6 text-base rounded-full"
-          style={{
-            background: 'linear-gradient(90deg, #FF6B00, #00C8FF)',
-            border: 'none',
-            color: 'white',
+          onClick={action}
+          className="w-44 py-2.5 text-sm rounded-xl border border-slate-200 text-slate-700 transition-all bg-white"
+          onMouseEnter={e => {
+            setHoveredSplashBtn(label);
+            const el = e.currentTarget as HTMLButtonElement;
+            el.style.background = 'linear-gradient(90deg, #FF6B00, #00C8FF)';
+            el.style.color = 'white';
+            el.style.borderColor = 'transparent';
+          }}
+          onMouseLeave={e => {
+            setHoveredSplashBtn(null);
+            const el = e.currentTarget as HTMLButtonElement;
+            el.style.background = 'white';
+            el.style.color = '';
+            el.style.borderColor = '';
           }}
         >
-          Start Training Session
+          {label}
         </Button>
-        <Button
-          variant="outline"
-          onClick={() => setEvalOpen(true)}
-          className="w-64 py-6 text-base rounded-full"
-        >
-          View Last Evaluation Report
-        </Button>
+      </div>
+    );
+
+    return (
+      <div className="flex flex-col h-full gap-3 px-4 py-8">
+
+        {/* ── Pre-Field ─────────────────────────────────────────────────── */}
+        <div className="flex-1 flex flex-col justify-between rounded-2xl border border-slate-200 px-6 py-4 shadow-sm" style={{ background: '#F1EFE9' }}>
+          <p className="text-sm font-bold uppercase tracking-widest text-slate-500">Pre-Field</p>
+          <div className="flex flex-wrap gap-4">
+            {splashBtn('Practice Your Pitch', handleStartSession, 'Simulate a live sales call with a physician and get real-time coaching.')}
+            {splashBtn('Review Performance', () => setEvalOpen(true), 'See your scores and detailed feedback from recent sessions.')}
+          </div>
+        </div>
+
+        {/* ── In-Field ──────────────────────────────────────────────────── */}
+        <div className="flex-1 flex flex-col justify-between rounded-2xl border border-slate-200 px-6 py-4 shadow-sm" style={{ background: '#F1EFE9' }}>
+          <p className="text-sm font-bold uppercase tracking-widest text-slate-500">In-Field</p>
+          <div className="flex flex-wrap gap-3">
+            <Button
+              disabled
+              className="w-44 py-2.5 text-sm rounded-xl border border-slate-200 bg-white text-slate-400 cursor-not-allowed"
+            >
+              Engagement Playbook
+            </Button>
+          </div>
+        </div>
+
+        {/* ── Post-Field ────────────────────────────────────────────────── */}
+        <div className="flex-1 flex flex-col justify-between rounded-2xl border border-slate-200 px-6 py-4 shadow-sm" style={{ background: '#F1EFE9' }}>
+          <p className="text-sm font-bold uppercase tracking-widest text-slate-500">Post-Field</p>
+          <div className="flex flex-wrap gap-3">
+            <Button
+              disabled
+              className="w-44 py-2.5 text-sm rounded-xl border border-slate-200 bg-white text-slate-400 cursor-not-allowed"
+            >
+              Call Journal
+            </Button>
+          </div>
+        </div>
+
         <EvaluationPanel
           open={evalOpen}
           onClose={() => setEvalOpen(false)}
