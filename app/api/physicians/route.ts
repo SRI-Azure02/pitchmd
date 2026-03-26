@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const client = getSnowflakeClient();
-    const physicians = await client.queryAllPhysicians();
+    const physicians = await client.queryAllPhysiciansWithScores(session.userId);
     return NextResponse.json({ physicians });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';

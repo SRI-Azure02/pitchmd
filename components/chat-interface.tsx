@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import AudioInput from './audio-input';
 import EvaluationPanel from './evaluation-panel';
-import { Send, RotateCcw, Square, Volume2, VolumeX, Video, VideoOff, MessageSquare } from 'lucide-react';
+import { Send, RotateCcw, Square, Volume2, VolumeX, Video, VideoOff, MessageSquare, Search, ChevronDown, X, Check, BarChart2, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { parseEmotion, speakText, stopCurrentAudio } from '@/lib/elevenlabs';
 
 interface Message {
@@ -20,6 +20,119 @@ function randomSessionDuration(min = 60, max = 150): number {
   const r1 = Math.random();
   const r2 = Math.random();
   return Math.round(min + ((r1 + r2) / 2) * (max - min));
+}
+
+// ── Physician list helpers ─────────────────────────────────────────────────
+
+type SortDir = 'asc' | 'desc';
+type SortConfig = { field: string; dir: SortDir } | null;
+type FilterMap = { segment: string | null; specialty: string | null; overallScore: string | null; fieldReadiness: string | null };
+
+function scoreBucket(score: number | null | undefined): string {
+  if (score == null) return 'Not Evaluated';
+  if (score < 6)  return '< 6';
+  if (score < 8)  return '6–7.9';
+  if (score < 9)  return '8–8.9';
+  return '9+';
+}
+
+function physicianSortValue(p: any, field: string): any {
+  switch (field) {
+    case 'name':          return `${p.LAST_NAME ?? ''} ${p.FIRST_NAME ?? ''}`.trim().toLowerCase();
+    case 'specialty':     return (p.SPECIALTY        ?? '').toLowerCase();
+    case 'segment':       return (p.SEGMENT_NAME    ?? '').toLowerCase();
+    case 'state':         return (p.STATE            ?? '').toLowerCase();
+    case 'overallScore':  return p.OVERALL_SCORE  ?? -1;
+    case 'fieldReadiness':return (p.FIELD_READINESS ?? '').toLowerCase();
+    default:              return '';
+  }
+}
+
+// ── Physician filter dropdown ──────────────────────────────────────────────
+
+interface FilterDropdownProps {
+  label: string;
+  field: string;
+  options: string[];
+  sortType: 'alpha' | 'numeric';
+  activeFilter: string | null;
+  sortConfig: SortConfig;
+  onFilter: (val: string | null) => void;
+  onSort: (dir: SortDir) => void;
+  isOpen: boolean;
+  onToggle: () => void;
+}
+
+function PhysicianFilterDropdown({
+  label, field, options, sortType,
+  activeFilter, sortConfig, onFilter, onSort, isOpen, onToggle,
+}: FilterDropdownProps) {
+  const isThisSorted = sortConfig?.field === field;
+  const isActive = !!activeFilter || isThisSorted;
+  const asc  = sortType === 'alpha' ? 'A → Z' : 'Low → High';
+  const desc = sortType === 'alpha' ? 'Z → A' : 'High → Low';
+
+  return (
+    <div className="relative">
+      {isOpen && <div className="fixed inset-0 z-40" onClick={onToggle} />}
+      <button
+        onClick={onToggle}
+        className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+          isActive
+            ? 'border-blue-400 bg-blue-50 text-blue-700'
+            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+        }`}
+      >
+        {label}
+        {isActive && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 ml-0.5" />}
+        <ChevronDown className={`w-3 h-3 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute top-full left-0 mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-lg min-w-[190px] py-1 overflow-hidden">
+          {/* Sort options */}
+          <button
+            onClick={() => { onSort('asc'); onToggle(); }}
+            className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-slate-50 ${isThisSorted && sortConfig?.dir === 'asc' ? 'text-blue-600 font-medium' : 'text-slate-700'}`}
+          >
+            ↑ {asc}
+            {isThisSorted && sortConfig?.dir === 'asc' && <Check className="w-3 h-3" />}
+          </button>
+          <button
+            onClick={() => { onSort('desc'); onToggle(); }}
+            className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-slate-50 ${isThisSorted && sortConfig?.dir === 'desc' ? 'text-blue-600 font-medium' : 'text-slate-700'}`}
+          >
+            ↓ {desc}
+            {isThisSorted && sortConfig?.dir === 'desc' && <Check className="w-3 h-3" />}
+          </button>
+
+          {options.length > 0 && (
+            <>
+              <div className="border-t border-slate-100 my-1" />
+              <p className="px-3 py-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Filter</p>
+              <button
+                onClick={() => { onFilter(null); onToggle(); }}
+                className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-slate-50 ${!activeFilter ? 'text-blue-600 font-medium' : 'text-slate-600'}`}
+              >
+                All
+                {!activeFilter && <Check className="w-3 h-3" />}
+              </button>
+              {options.map((opt) => (
+                <button
+                  key={opt}
+                  onClick={() => { onFilter(opt); onToggle(); }}
+                  className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-slate-50 ${activeFilter === opt ? 'text-blue-600 font-medium bg-blue-50' : 'text-slate-600'}`}
+                >
+                  <span className="truncate max-w-[140px]">{opt}</span>
+                  {activeFilter === opt && <Check className="w-3 h-3 shrink-0" />}
+                </button>
+              ))}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function ChatInterface({ username = 'Rep' }: { username?: string }) {
@@ -46,6 +159,13 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   const [physicianSelectionMode, setPhysicianSelectionMode] = useState(false);
   const [physicians, setPhysicians] = useState<any[]>([]);
   const [physiciansLoading, setPhysiciansLoading] = useState(false);
+
+  // ── Physician list filter / sort state ────────────────────────────────────
+  const [physicianSearch, setPhysicianSearch] = useState('');
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ field: 'overallScore', dir: 'asc' });
+  const [filterValues, setFilterValues] = useState<FilterMap>({ segment: null, specialty: null, overallScore: null, fieldReadiness: null });
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const [tableTooltip, setTableTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
 
   // ── Refs ──────────────────────────────────────────────────────────────────
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -491,6 +611,76 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     setTtsAvailable(true);
   };
 
+  // ── Column header sort ────────────────────────────────────────────────────
+  const handleColumnSort = (field: string) => {
+    setSortConfig(prev =>
+      prev?.field === field
+        ? { field, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
+        : { field, dir: 'asc' },
+    );
+  };
+
+  // ── Derived options for dropdowns ─────────────────────────────────────────
+  const uniqueSegments    = useMemo(() => [...new Set(physicians.map(p => p.SEGMENT_NAME).filter(Boolean))].sort() as string[], [physicians]);
+  const uniqueSpecialties = useMemo(() => [...new Set(physicians.map(p => p.SPECIALTY).filter(Boolean))].sort() as string[], [physicians]);
+  const uniqueReadiness   = useMemo(() => {
+    const vals = [...new Set(physicians.map(p => p.FIELD_READINESS).filter(Boolean))].sort() as string[];
+    if (physicians.some(p => !p.FIELD_READINESS)) vals.unshift('Not Evaluated');
+    return vals;
+  }, [physicians]);
+  const scoreBucketOptions = useMemo(() => {
+    const buckets = new Set(physicians.map(p => scoreBucket(p.OVERALL_SCORE)));
+    const order = ['Not Evaluated', '< 6', '6–7.9', '8–8.9', '9+'];
+    return order.filter(b => buckets.has(b));
+  }, [physicians]);
+
+  // ── Filtered + sorted physician list ──────────────────────────────────────
+  const filteredPhysicians = useMemo(() => {
+    let result = [...physicians];
+
+    // Text search across all visible attributes
+    const q = physicianSearch.trim().toLowerCase();
+    if (q) {
+      result = result.filter(p =>
+        [p.FIRST_NAME, p.LAST_NAME, p.SPECIALTY, p.CITY, p.STATE, p.SEGMENT_NAME, p.FIELD_READINESS]
+          .some(v => v?.toLowerCase().includes(q)),
+      );
+    }
+
+    // Field filters
+    if (filterValues.segment)      result = result.filter(p => p.SEGMENT_NAME    === filterValues.segment);
+    if (filterValues.specialty)    result = result.filter(p => p.SPECIALTY        === filterValues.specialty);
+    if (filterValues.fieldReadiness) {
+      if (filterValues.fieldReadiness === 'Not Evaluated')
+        result = result.filter(p => !p.FIELD_READINESS);
+      else
+        result = result.filter(p => p.FIELD_READINESS === filterValues.fieldReadiness);
+    }
+    if (filterValues.overallScore) {
+      if (filterValues.overallScore === 'Not Evaluated')
+        result = result.filter(p => p.OVERALL_SCORE == null);
+      else
+        result = result.filter(p => scoreBucket(p.OVERALL_SCORE) === filterValues.overallScore);
+    }
+
+    // Sort
+    if (sortConfig) {
+      result.sort((a, b) => {
+        const va = physicianSortValue(a, sortConfig.field);
+        const vb = physicianSortValue(b, sortConfig.field);
+        if (va === vb) return 0;
+        if (va === '' || va === -1) return 1;
+        if (vb === '' || vb === -1) return -1;
+        const cmp = va < vb ? -1 : 1;
+        return sortConfig.dir === 'asc' ? cmp : -cmp;
+      });
+    }
+
+    return result;
+  }, [physicians, physicianSearch, filterValues, sortConfig]);
+
+  const anyFilterActive = physicianSearch.trim() || sortConfig || Object.values(filterValues).some(Boolean);
+
   const visibleMessages = messages.filter(
     (m, i) =>
       !(i === 0 && m.role === 'user' && (
@@ -518,7 +708,8 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     if (physicianSelectionMode) {
       return (
         <div className="flex flex-col h-full min-h-0">
-          <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b border-slate-100">
+          {/* ── Header ──────────────────────────────────────────────────── */}
+          <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b border-slate-100 shrink-0">
             <div>
               <p className="text-base font-semibold text-slate-900">Select a Physician</p>
               <p className="text-xs text-slate-400">Choose who you'd like to practice with today</p>
@@ -528,57 +719,266 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
             </Button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4">
+          {/* ── Filter ribbon ───────────────────────────────────────────── */}
+          <div className="shrink-0 px-4 py-2.5 border-b border-slate-100 bg-slate-50/60">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Search */}
+              <div className="relative flex-1 min-w-[180px] max-w-xs">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                <input
+                  type="text"
+                  value={physicianSearch}
+                  onChange={e => setPhysicianSearch(e.target.value)}
+                  placeholder="Search physicians…"
+                  className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400"
+                />
+                {physicianSearch && (
+                  <button onClick={() => setPhysicianSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+
+              {/* Segment dropdown */}
+              <PhysicianFilterDropdown
+                label="Segment"
+                field="segment"
+                options={uniqueSegments}
+                sortType="alpha"
+                activeFilter={filterValues.segment}
+                sortConfig={sortConfig}
+                onFilter={val => setFilterValues(prev => ({ ...prev, segment: val }))}
+                onSort={dir => setSortConfig({ field: 'segment', dir })}
+                isOpen={openDropdown === 'segment'}
+                onToggle={() => setOpenDropdown(v => v === 'segment' ? null : 'segment')}
+              />
+
+              {/* Specialty dropdown */}
+              <PhysicianFilterDropdown
+                label="Specialty"
+                field="specialty"
+                options={uniqueSpecialties}
+                sortType="alpha"
+                activeFilter={filterValues.specialty}
+                sortConfig={sortConfig}
+                onFilter={val => setFilterValues(prev => ({ ...prev, specialty: val }))}
+                onSort={dir => setSortConfig({ field: 'specialty', dir })}
+                isOpen={openDropdown === 'specialty'}
+                onToggle={() => setOpenDropdown(v => v === 'specialty' ? null : 'specialty')}
+              />
+
+              {/* Overall Score dropdown */}
+              <PhysicianFilterDropdown
+                label="Overall Score"
+                field="overallScore"
+                options={scoreBucketOptions}
+                sortType="numeric"
+                activeFilter={filterValues.overallScore}
+                sortConfig={sortConfig}
+                onFilter={val => setFilterValues(prev => ({ ...prev, overallScore: val }))}
+                onSort={dir => setSortConfig({ field: 'overallScore', dir })}
+                isOpen={openDropdown === 'overallScore'}
+                onToggle={() => setOpenDropdown(v => v === 'overallScore' ? null : 'overallScore')}
+              />
+
+              {/* Field Readiness dropdown */}
+              <PhysicianFilterDropdown
+                label="Field Readiness"
+                field="fieldReadiness"
+                options={uniqueReadiness}
+                sortType="alpha"
+                activeFilter={filterValues.fieldReadiness}
+                sortConfig={sortConfig}
+                onFilter={val => setFilterValues(prev => ({ ...prev, fieldReadiness: val }))}
+                onSort={dir => setSortConfig({ field: 'fieldReadiness', dir })}
+                isOpen={openDropdown === 'fieldReadiness'}
+                onToggle={() => setOpenDropdown(v => v === 'fieldReadiness' ? null : 'fieldReadiness')}
+              />
+
+              {/* Clear all */}
+              {anyFilterActive && (
+                <button
+                  onClick={() => {
+                    setPhysicianSearch('');
+                    setSortConfig(null);
+                    setFilterValues({ segment: null, specialty: null, overallScore: null, fieldReadiness: null });
+                  }}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs text-slate-500 hover:text-red-500 hover:bg-red-50 border border-transparent hover:border-red-200 transition-colors"
+                >
+                  <X className="w-3 h-3" />
+                  Clear
+                </button>
+              )}
+            </div>
+
+            {/* Result count */}
+            <p className="text-[11px] text-slate-400 mt-1.5">
+              {filteredPhysicians.length} of {physicians.length} physician{physicians.length !== 1 ? 's' : ''}
+              {anyFilterActive ? ' match your filters' : ''}
+            </p>
+          </div>
+
+          {/* ── Physician table ──────────────────────────────────────────── */}
+          <div className="flex-1 overflow-auto">
             {physiciansLoading ? (
               <div className="flex items-center justify-center h-40 gap-2 text-slate-400">
                 <Spinner className="w-4 h-4" />
                 <span className="text-sm">Loading physicians...</span>
               </div>
-            ) : physicians.length === 0 ? (
-              <p className="text-center text-sm text-slate-400 mt-12">No physicians found.</p>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {physicians.map((p) => {
-                  const name = `Dr. ${p.FIRST_NAME} ${p.LAST_NAME}`;
-                  return (
-                    <div
-                      key={p.PHYSICIAN_ID}
-                      className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md hover:border-slate-300 transition-all"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="font-semibold text-slate-900 text-sm leading-tight">{name}</p>
-                          <p className="text-xs text-slate-500 mt-0.5 truncate">{p.SPECIALTY}</p>
-                          {(p.CITY || p.STATE) && (
-                            <p className="text-xs text-slate-400 mt-0.5">
-                              {[p.CITY, p.STATE].filter(Boolean).join(', ')}
-                            </p>
-                          )}
-                        </div>
-                        <span
-                          className="shrink-0 text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap"
-                          style={segmentStyle(p.SEGMENT_NAME)}
-                        >
-                          {p.SEGMENT_NAME}
-                        </span>
-                      </div>
-                      <Button
-                        size="sm"
-                        className="w-full mt-1 gap-1.5 rounded-lg text-xs"
-                        style={{ background: 'linear-gradient(90deg, #FF6B00, #00C8FF)', border: 'none', color: 'white' }}
-                        onClick={() => handlePhysicianSelect(p)}
-                      >
-                        <MessageSquare className="w-3.5 h-3.5" />
-                        Start Roleplay
-                      </Button>
-                    </div>
-                  );
-                })}
+            ) : filteredPhysicians.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-40 gap-2 text-slate-400">
+                <p className="text-sm font-medium">No physicians match your filters.</p>
+                <button onClick={() => { setPhysicianSearch(''); setFilterValues({ segment: null, specialty: null, overallScore: null, fieldReadiness: null }); setSortConfig(null); }} className="text-xs text-blue-500 hover:underline">Clear filters</button>
               </div>
+            ) : (
+              <table className="w-full text-sm border-collapse min-w-[700px]">
+                <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_0_0_#e2e8f0]">
+                  <tr>
+                    {([
+                      { label: 'Physician',  field: 'name',          align: 'left',   tooltip: null },
+                      { label: 'Specialty',  field: 'specialty',     align: 'left',   tooltip: null },
+                      { label: 'Segment',    field: 'segment',       align: 'left',   tooltip: null },
+                      { label: 'State',      field: 'state',         align: 'left',   tooltip: null },
+                      { label: 'Score',      field: 'overallScore',  align: 'center', tooltip: 'Median score across your 3 most recent sessions with the physician' },
+                      { label: 'Readiness',  field: 'fieldReadiness',align: 'left',   tooltip: 'Most frequent readiness rating across your 3 most recent sessions with the physician' },
+                    ] as const).map(({ label, field, align, tooltip }) => {
+                      const active = sortConfig?.field === field;
+                      return (
+                        <th
+                          key={field}
+                          onClick={() => handleColumnSort(field)}
+                          onMouseEnter={tooltip ? e => {
+                            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                            setTableTooltip({ text: tooltip, x: rect.left + rect.width / 2, y: rect.top });
+                          } : undefined}
+                          onMouseLeave={tooltip ? () => setTableTooltip(null) : undefined}
+                          className="group/th px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide cursor-pointer select-none transition-colors"
+                          style={{ textAlign: align as any }}
+                        >
+                          <span
+                            className={`inline-flex items-center gap-1 group-hover/th:text-slate-600 ${align === 'center' ? 'justify-center w-full' : ''}`}
+                            style={{ color: active ? '#3b82f6' : '#94a3b8' }}
+                          >
+                            {label}
+                            {active
+                              ? sortConfig!.dir === 'asc'
+                                ? <ArrowUp className="w-3 h-3" />
+                                : <ArrowDown className="w-3 h-3" />
+                              : <ArrowUpDown className="w-3 h-3 opacity-0 group-hover/th:opacity-40 transition-opacity" />}
+                          </span>
+                        </th>
+                      );
+                    })}
+                    <th className="sticky right-0 bg-white px-4 py-2.5 w-24 shadow-[-1px_0_0_0_#e2e8f0]" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredPhysicians.map((p) => {
+                    const hasScore = p.OVERALL_SCORE != null;
+                    const hasEval  = hasScore || !!p.FIELD_READINESS;
+
+                    // Readiness badge colour
+                    const readinessBadge = (val: string): React.CSSProperties => {
+                      if (val === 'Field Ready')   return { background: '#d1fae5', color: '#065f46' };
+                      if (val === 'Not Ready')     return { background: '#fee2e2', color: '#991b1b' };
+                      if (val === 'Approaching')   return { background: '#fef3c7', color: '#92400e' };
+                      return { background: '#f1f5f9', color: '#475569' };
+                    };
+
+                    return (
+                      <tr key={p.PHYSICIAN_ID} className="group border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                        {/* Name */}
+                        <td className="px-4 py-3 font-semibold text-slate-900 whitespace-nowrap">
+                          Dr. {p.FIRST_NAME} {p.LAST_NAME}
+                        </td>
+
+                        {/* Specialty */}
+                        <td className="px-4 py-3 text-slate-600 text-sm">
+                          {p.SPECIALTY ?? <span className="text-slate-300">—</span>}
+                        </td>
+
+                        {/* Segment */}
+                        <td className="px-4 py-3 text-slate-600 text-sm">
+                          {p.SEGMENT_NAME ?? <span className="text-slate-300">—</span>}
+                        </td>
+
+                        {/* State */}
+                        <td className="px-4 py-3 text-slate-600 text-sm">
+                          {p.STATE ?? <span className="text-slate-300">—</span>}
+                        </td>
+
+                        {/* Overall Score */}
+                        <td className="px-4 py-3 text-slate-700 font-semibold text-sm text-center">
+                          {hasScore
+                            ? p.OVERALL_SCORE
+                            : <span className="text-slate-300 font-normal text-xs">—</span>}
+                        </td>
+
+                        {/* Field Readiness */}
+                        <td className="px-4 py-3">
+                          {p.FIELD_READINESS ? (
+                            <span
+                              className="text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap"
+                              style={readinessBadge(p.FIELD_READINESS)}
+                            >
+                              {p.FIELD_READINESS}
+                            </span>
+                          ) : <span className="text-slate-300 text-xs">—</span>}
+                        </td>
+
+                        {/* Actions */}
+                        <td className="sticky right-0 bg-white group-hover:bg-slate-50 px-4 py-3 shadow-[-1px_0_0_0_#e2e8f0] transition-colors">
+                          <div className="flex items-center gap-2">
+                            {/* Practice your pitch */}
+                            <button
+                              title="Practice your pitch"
+                              onClick={() => handlePhysicianSelect(p)}
+                              className="w-8 h-8 rounded-full flex items-center justify-center border border-slate-200 bg-white text-slate-500 hover:text-white hover:border-transparent transition-all"
+                              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'linear-gradient(135deg, #FF6B00, #00C8FF)'; }}
+                              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = ''; }}
+                            >
+                              <MessageSquare className="w-3.5 h-3.5" />
+                            </button>
+
+                            {/* View evaluation report */}
+                            <button
+                              title="View evaluation report"
+                              onClick={() => { if (hasEval) setEvalOpen(true); }}
+                              disabled={!hasEval}
+                              className={`w-8 h-8 rounded-full flex items-center justify-center border transition-all ${
+                                hasEval
+                                  ? 'border-slate-200 bg-white text-slate-500 hover:text-white hover:border-transparent cursor-pointer'
+                                  : 'border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed'
+                              }`}
+                              onMouseEnter={e => { if (hasEval) (e.currentTarget as HTMLButtonElement).style.background = 'linear-gradient(135deg, #FF6B00, #00C8FF)'; }}
+                              onMouseLeave={e => { if (hasEval) (e.currentTarget as HTMLButtonElement).style.background = ''; }}
+                            >
+                              <BarChart2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             )}
           </div>
 
           <EvaluationPanel open={evalOpen} onClose={() => setEvalOpen(false)} content="" username={username} />
+
+          {/* Fixed-position column header tooltip — renders outside overflow container */}
+          {tableTooltip && (
+            <div
+              className="pointer-events-none fixed z-[9999]"
+              style={{ left: tableTooltip.x, top: tableTooltip.y - 8, transform: 'translate(-50%, -100%)' }}
+            >
+              <div className="bg-amber-50 border border-amber-200 text-slate-900 text-xs font-medium leading-snug rounded-lg px-3 py-2 whitespace-nowrap shadow-md">
+                {tableTooltip.text}
+              </div>
+              <div className="mx-auto w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-amber-200" />
+            </div>
+          )}
         </div>
       );
     }

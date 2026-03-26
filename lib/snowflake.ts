@@ -199,9 +199,6 @@ export class SnowflakeClient {
   // ─── Physician Queries ───────────────────────────────────────────────
 
   async queryAllPhysicians(): Promise<any[]> {
-    // Join SYNTHETIC_PHYSICIAN_CHARS + SYNTHETIC_PHYSICIAN_SEGMENT — these are
-    // confirmed to exist (used by REPEVAL). Also pull VOICE_MODEL from
-    // SYNTHETIC_PHYSICIAN_VOICE if it exists; fall back gracefully if not.
     const sql = `
       SELECT
         pc.PHYSICIAN_ID,
@@ -219,6 +216,72 @@ export class SnowflakeClient {
       ORDER BY pc.PHYSICIAN_LAST_NAME, pc.PHYSICIAN_FIRST_NAME ASC
     `;
     return await this.executeQuery(sql);
+  }
+
+  /**
+   * Like queryAllPhysicians but computes each physician's OVERALL_SCORE as the
+   * median and FIELD_READINESS as the mode across the rep's most recent 3
+   * evaluation sessions with that physician.
+   */
+  async queryAllPhysiciansWithScores(appUserId: string): Promise<any[]> {
+    const sql = `
+      WITH last3 AS (
+        SELECT
+          PHYSICIAN_ID,
+          OVERALL_SCORE,
+          FIELD_READINESS,
+          ROW_NUMBER() OVER (PARTITION BY PHYSICIAN_ID ORDER BY EVALUATED_AT DESC) AS rn
+        FROM CORTEX_TESTING.ML.REPEVAL_RESULTS
+        WHERE APP_USER_ID = :1
+      ),
+      median_scores AS (
+        SELECT PHYSICIAN_ID, MEDIAN(OVERALL_SCORE) AS OVERALL_SCORE
+        FROM last3
+        WHERE rn <= 3
+        GROUP BY PHYSICIAN_ID
+      ),
+      readiness_counts AS (
+        SELECT PHYSICIAN_ID, FIELD_READINESS, COUNT(*) AS cnt
+        FROM last3
+        WHERE rn <= 3 AND FIELD_READINESS IS NOT NULL
+        GROUP BY PHYSICIAN_ID, FIELD_READINESS
+      ),
+      mode_readiness AS (
+        SELECT PHYSICIAN_ID, FIELD_READINESS
+        FROM (
+          SELECT
+            PHYSICIAN_ID,
+            FIELD_READINESS,
+            ROW_NUMBER() OVER (
+              PARTITION BY PHYSICIAN_ID
+              ORDER BY cnt DESC, FIELD_READINESS
+            ) AS mode_rn
+          FROM readiness_counts
+        )
+        WHERE mode_rn = 1
+      )
+      SELECT
+        pc.PHYSICIAN_ID,
+        pc.PHYSICIAN_FIRST_NAME     AS FIRST_NAME,
+        pc.PHYSICIAN_LAST_NAME      AS LAST_NAME,
+        pc.PHYSICIAN_SPECIALTY      AS SPECIALTY,
+        pc.PHYSICIAN_CITY           AS CITY,
+        pc.PHYSICIAN_STATE          AS STATE,
+        pc.VOICE_MODEL,
+        ps.SEGMENT_NAME,
+        ps.ATTITUDINAL_DESCRIPTION,
+        ms.OVERALL_SCORE,
+        mr.FIELD_READINESS
+      FROM CORTEX_TESTING.PUBLIC.SYNTHETIC_PHYSICIAN_CHARS pc
+      LEFT JOIN CORTEX_TESTING.PUBLIC.SYNTHETIC_PHYSICIAN_SEGMENT ps
+        ON pc.PHYSICIAN_ID = ps.PHYSICIAN_ID
+      LEFT JOIN median_scores ms   ON pc.PHYSICIAN_ID = ms.PHYSICIAN_ID
+      LEFT JOIN mode_readiness mr  ON pc.PHYSICIAN_ID = mr.PHYSICIAN_ID
+      ORDER BY pc.PHYSICIAN_LAST_NAME, pc.PHYSICIAN_FIRST_NAME ASC
+    `;
+    return await this.executeQuery(sql, {
+      '1': { type: 'TEXT', value: appUserId },
+    });
   }
 
   /**
