@@ -304,8 +304,25 @@ export class SnowflakeClient {
   // ─── Evaluation Queries ─────────────────────────────────────────────
 
   async queryLatestEvaluationByAppUser(
-    appUserId: string
+    appUserId: string,
+    physicianId?: string
   ): Promise<any> {
+    if (physicianId) {
+      const sql = `
+        SELECT *
+        FROM CORTEX_TESTING.ML.REPEVAL_RESULTS
+        WHERE APP_USER_ID = ?
+          AND PHYSICIAN_ID = ?
+        ORDER BY EVALUATED_AT DESC
+        LIMIT 1
+      `;
+      const results = await this.executeQuery(sql, {
+        '1': { type: 'TEXT', value: appUserId },
+        '2': { type: 'TEXT', value: physicianId },
+      });
+      return results?.[0] ?? null;
+    }
+
     const sql = `
       SELECT *
       FROM CORTEX_TESTING.ML.REPEVAL_RESULTS

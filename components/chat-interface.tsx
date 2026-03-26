@@ -147,6 +147,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [evalOpen, setEvalOpen] = useState(false);
+  const [evalPhysicianId, setEvalPhysicianId] = useState<string | null>(null);
   const [userTyping, setUserTyping] = useState(false);
   const [sessionDuration, setSessionDuration] = useState<number | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
@@ -603,6 +604,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     setPhysicianSelectionMode(false);
     setPhysicians([]);
     setSelectedPhysician(null);
+    setEvalPhysicianId(null);
     messagesRef.current = [];
 
     setMessages([]);
@@ -950,7 +952,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                             {/* View evaluation report */}
                             <button
                               title="View evaluation report"
-                              onClick={() => { if (hasEval) setEvalOpen(true); }}
+                              onClick={() => { if (hasEval) { setEvalPhysicianId(p.PHYSICIAN_ID); setEvalOpen(true); } }}
                               disabled={!hasEval}
                               className={`w-10 h-10 rounded-full flex items-center justify-center border transition-all ${
                                 hasEval
@@ -972,7 +974,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
             )}
           </div>
 
-          <EvaluationPanel open={evalOpen} onClose={() => setEvalOpen(false)} content="" username={username} />
+          <EvaluationPanel open={evalOpen} onClose={() => setEvalOpen(false)} content="" username={username} physicianId={evalPhysicianId} />
 
           {/* Fixed-position column header tooltip — renders outside overflow container */}
           {tableTooltip && (
@@ -1022,6 +1024,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
           onClose={() => setEvalOpen(false)}
           content=""
           username={username}
+          physicianId={evalPhysicianId}
         />
       </div>
     );
@@ -1076,7 +1079,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
               {message.content}
               {message.isEvaluation && (
                 <button
-                  onClick={() => setEvalOpen(true)}
+                  onClick={() => { setEvalPhysicianId(physicianIdRef.current); setEvalOpen(true); }}
                   className="mt-2 flex items-center gap-1.5 text-blue-600 hover:text-blue-700 font-medium text-xs"
                 >
                   View Evaluation Report →
@@ -1245,6 +1248,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
         onClose={() => setEvalOpen(false)}
         content=""
         username={username}
+        physicianId={evalPhysicianId}
       />
     </div>
   );
