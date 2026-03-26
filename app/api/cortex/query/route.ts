@@ -53,19 +53,62 @@ const PLANNING_PATTERNS: Array<string | RegExp> = [
   'respond in character',
   'I have the physician profile',
   'physician profile',
-  'based on risk-averse',
+  'risk-averse',         // catches "given she's risk-averse", "based on risk-averse", etc.
+  'risk averse',
   'my response should',
   'I will respond',
   'as the physician',
   'the sales rep',
+  'I already gave',      // "I already gave a first in-character message"
+  'continue in character',
+  'given she',           // "given she's risk-averse and conservative"
+  'given his',
+  'given their',
+  'Now I need to',       // "Now I need to continue in character"
+  'fetching the data',
   // Parenthetical reasoning notes the agent sometimes prefixes
   /^\[EMOTION:[^\]]+\]\s*\(/,   // starts with emotion tag + "("
+  /^\[EMOTION:[^\]]+\]\s*-/,    // starts with emotion tag + "- " (dash-prefixed planning note)
+  /^\[EMOTION:[^\]]+\]\s*Wait/, // starts with emotion tag + "Wait"
 ];
 
 function isAgentPlanningBlock(block: string): boolean {
   return PLANNING_PATTERNS.some((p) =>
     typeof p === 'string' ? block.includes(p) : p.test(block),
   );
+}
+
+/**
+ * Find the character index in `text` where genuine physician roleplay dialogue
+ * starts — i.e., the first [EMOTION:] tag that is NOT a planning block.
+ *
+ * Requires MIN_LOOKAHEAD chars of body content after the tag before making a
+ * decision: this prevents false-positive classification when planning keywords
+ * (e.g. "risk-averse", "in character") appear a few tokens after the tag.
+ *
+ * Returns -1 if no qualifying block has been found yet (need more tokens).
+ */
+const ROLEPLAY_LOOKAHEAD = 150; // chars of body required before classifying
+
+function findRoleplayStart(text: string): number {
+  const re = /\[EMOTION:[^\]]+\]/gi;
+  let match: RegExpExecArray | null;
+  // eslint-disable-next-line no-cond-assign
+  while ((match = re.exec(text)) !== null) {
+    const start = match.index;
+    const bodyStart = start + match[0].length;
+
+    // Not enough content after tag yet — wait for more tokens
+    if (text.length - bodyStart < ROLEPLAY_LOOKAHEAD) continue;
+
+    // Check the full block (up to 500 chars) for planning patterns
+    const block = text.slice(start, Math.min(start + 500, text.length));
+    if (!isAgentPlanningBlock(block)) {
+      return start;
+    }
+    // This was a planning block — keep scanning for the next EMOTION tag
+  }
+  return -1;
 }
 
 /**
@@ -104,6 +147,10 @@ function extractRoleplay(text: string): string | null {
  * Keep physician responses short (rep-first pacing).
  * Merges fragments after title abbreviations (Dr., Mr., Mrs., Ms., Prof.)
  * so "I'm Dr." + "Smith." stays as one sentence rather than being cut.
+ *
+ * FIX 2: This is still used for the `done` event's text field (TTS / fallback).
+ * The client-side rendering now does its own 2-sentence truncation on streamed
+ * chunks, so the server truncation is only a safety net.
  */
 function shortenRoleplay(text: string): string {
   const emotion = text.match(EMOTION_TAG_REGEX)?.[0] ?? '[EMOTION:neutral]';
@@ -221,16 +268,25 @@ export async function POST(request: NextRequest) {
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
 
-        let buffer = '';
+        let sseBuffer = '';
         let fullText = '';
+
+        // FIX 1: Incremental streaming state
+        // Once we identify the start of genuine roleplay dialogue we switch to
+        // streaming mode and forward every subsequent token to the client as a
+        // `chunk` event.  This eliminates the full-LLM-generation wait before
+        // the user sees the first word of the physician's response.
+        let streamingMode = false;
+        let streamingStartIdx = -1; // char index in fullText where roleplay starts
+        let evalDetected = false;   // once true, streaming is suppressed (eval path)
 
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
 
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() ?? '';
+          sseBuffer += decoder.decode(value, { stream: true });
+          const lines = sseBuffer.split('\n');
+          sseBuffer = lines.pop() ?? '';
 
           for (const line of lines) {
             if (!line.startsWith('data:')) continue;
@@ -239,27 +295,51 @@ export async function POST(request: NextRequest) {
 
             try {
               const parsed = JSON.parse(payload);
-              if (typeof parsed.text === 'string') {
-                fullText += parsed.text;
+              if (typeof parsed.text !== 'string') continue;
+
+              const token = parsed.text;
+              fullText += token;
+
+              // Check for eval keywords as tokens arrive — if detected,
+              // disable streaming mode (eval responses are never streamed).
+              if (!evalDetected) {
+                evalDetected = EVAL_KEYWORDS.some((kw) => fullText.includes(kw));
+                if (evalDetected && streamingMode) {
+                  streamingMode = false; // abort any accidental streaming
+                }
               }
-            } catch {}
+
+              if (evalDetected) continue; // buffer-only path for eval responses
+
+              if (streamingMode) {
+                // FIX 1: Forward every new token directly to the browser
+                safeEnqueue({ type: 'chunk', text: token });
+              } else {
+                // Pre-streaming: check whether we can now identify the roleplay start
+                const startIdx = findRoleplayStart(fullText);
+                if (startIdx !== -1) {
+                  streamingMode = true;
+                  streamingStartIdx = startIdx;
+                  // Flush everything accumulated so far from the roleplay start
+                  safeEnqueue({ type: 'chunk', text: fullText.slice(startIdx) });
+                  console.log('[cortex] streaming started at char', startIdx);
+                }
+              }
+            } catch { /* malformed SSE token — skip */ }
           }
         }
+
+        // ── Post-stream processing (same as before) ────────────────────────────
 
         // Log raw agent output
         const isEvalLog = EVAL_KEYWORDS.some((kw) => fullText.includes(kw));
         if (isEvalLog) {
-          // Log full evaluation text so we can see the exact JSON format
           console.log('[cortex] EVALUATION fullText (full):\n', fullText);
         } else {
           console.log('[cortex] raw fullText (first 800 chars):', fullText.slice(0, 800));
         }
 
-        // ── Extract metadata from full accumulated text BEFORE any stripping ──
-        // extractRoleplay() slices from [EMOTION:] onwards, which discards
-        // [SESSION_DURATION:] and [VOICE_MODEL:] that appear before it.
-        // We must capture these values from fullText now and pass them
-        // explicitly in the done event so the client can act on them.
+        // Extract metadata from full accumulated text BEFORE any stripping
         const sessionDurationMatch = fullText.match(SESSION_DURATION_REGEX);
         const sessionDuration = sessionDurationMatch
           ? Number(sessionDurationMatch[1])
@@ -268,28 +348,20 @@ export async function POST(request: NextRequest) {
         const voiceModelMatch = fullText.match(VOICE_MODEL_REGEX);
         const voiceModel = voiceModelMatch ? voiceModelMatch[1].trim() : null;
 
-        // Extract physician ID so the client can call REPEVAL directly
-        // instead of relying on the Cortex Agent to invoke it.
         const physicianIdMatch = fullText.match(PHYSICIAN_ID_REGEX);
         const physicianId = physicianIdMatch ? physicianIdMatch[1].trim() : null;
 
-        // ── Detect evaluation response BEFORE stripping ───────────────────────
-        // Keyword-matching on the stripped output would miss all eval fields
-        // because extractSelectionContent / shortenRoleplay discard them.
         const isEvaluation = EVAL_KEYWORDS.some((kw) => fullText.includes(kw));
 
-        // ── Build display text ────────────────────────────────────────────────
+        // Build display text
         let output: string;
         let suppressed = false;
 
         if (isEvaluation) {
-          // EvaluationPanel fetches fresh data from Snowflake; the text value
-          // is only shown as a chat bubble, so keep it short.
           output = 'Your evaluation is ready.';
         } else if (EMOTION_TAG_REGEX.test(fullText)) {
           const roleplayText = extractRoleplay(fullText);
           if (roleplayText === null) {
-            // Pure agent planning response — suppress silently on the client
             suppressed = true;
             output = '';
           } else {
@@ -297,24 +369,28 @@ export async function POST(request: NextRequest) {
             if (!EMOTION_TAG_REGEX.test(output)) {
               output = `[EMOTION:neutral] ${output}`;
             }
+            // FIX 2: shortenRoleplay still runs for TTS / fallback, but the
+            // client renders from streamed chunks (already truncated to 2
+            // sentences client-side) so this only matters for non-streamed paths.
             output = shortenRoleplay(output);
           }
         } else {
           output = extractSelectionContent(fullText);
         }
 
-        // ── Emit done with metadata attached ─────────────────────────────────
-        // sessionDuration and voiceModel are null for non-roleplay responses
-        // (physician list), so the client can safely gate on their presence.
-        // suppressed=true means the client should not render a chat bubble.
+        // Emit done with metadata.
+        // wasStreamed=true tells the client it already has the display text from
+        // chunk events and should use its accumulated streamingContent rather
+        // than event.text (which is still included for TTS / planning fallback).
         safeEnqueue({
           type: 'done',
           text: output,
-          sessionDuration,   // number | null — drives countdown timer
-          voiceModel,        // string | null — drives ElevenLabs voice ID
-          physicianId,       // string | null — used by client to call REPEVAL directly
-          isEvaluation,      // boolean — detected before stripping
-          suppressed,        // boolean — skip chat bubble for planning responses
+          sessionDuration,
+          voiceModel,
+          physicianId,
+          isEvaluation,
+          suppressed,
+          wasStreamed: streamingMode, // FIX 1: client uses this to decide rendering
         });
         safeClose();
       } catch (err: any) {

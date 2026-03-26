@@ -106,6 +106,49 @@ function PhysicianFilterDropdown({
   );
 }
 
+// ── Streaming helpers ──────────────────────────────────────────────────────
+
+/**
+ * Count complete sentences in `text`, respecting common title abbreviations
+ * (Dr., Mr., etc.) so they don't produce false sentence boundaries.
+ * Only counts sentences that are truly ended (followed by whitespace or EOS).
+ */
+function countCompleteSentences(text: string): number {
+  const TITLE_ABBREV = /\b(Dr|Mr|Mrs|Ms|Prof|Sr|Jr|St|vs|etc)\s*\.$/i;
+  // Split on sentence-ending punctuation followed by whitespace
+  const parts = text.split(/(?<=[.!?])\s+/).filter(Boolean);
+  let count = 0;
+  for (let i = 0; i < parts.length - 1; i++) { // last part may be incomplete
+    if (!TITLE_ABBREV.test(parts[i])) count++;
+  }
+  // Also count the last part if text ends with sentence-ending punctuation
+  if (parts.length > 0) {
+    const last = parts[parts.length - 1];
+    if (/[.!?]$/.test(last) && !TITLE_ABBREV.test(last)) count++;
+  }
+  return count;
+}
+
+/**
+ * Truncate `text` to at most `maxSentences` complete sentences.
+ */
+function truncateToSentences(text: string, maxSentences: number): string {
+  const TITLE_ABBREV = /\b(Dr|Mr|Mrs|Ms|Prof|Sr|Jr|St|vs|etc)\s*\.$/i;
+  const rawParts = text.split(/(?<=[.!?])\s+/).filter(Boolean);
+  const sentences: string[] = [];
+  for (let i = 0; i < rawParts.length; i++) {
+    const part = rawParts[i];
+    if (TITLE_ABBREV.test(part) && i + 1 < rawParts.length) {
+      rawParts[i + 1] = `${part} ${rawParts[i + 1]}`;
+    } else {
+      sentences.push(part);
+    }
+  }
+  return sentences.slice(0, maxSentences).join(' ');
+}
+
+// ── Component ──────────────────────────────────────────────────────────────
+
 export default function ChatInterface({ username = 'Rep' }: { username?: string }) {
   const targetDurationRef = useRef<number>(randomSessionDuration());
 
@@ -141,6 +184,14 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   const [tableTooltip, setTableTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
   const [showPhysicianId, setShowPhysicianId] = useState(false);
   const [hoveredSplashBtn, setHoveredSplashBtn] = useState<string | null>(null);
+
+  // FIX 1+2: Incremental streaming state
+  // streamingContent holds physician tokens as they arrive so the user sees
+  // text appearing word-by-word instead of waiting for the full response.
+  const [streamingContent, setStreamingContent] = useState<string>('');
+  const streamingContentRef = useRef<string>('');   // sync ref for accumulation
+  const streamingSentences = useRef<number>(0);      // sentences rendered so far
+  const isStreamingRef = useRef<boolean>(false);     // true while chunk events arrive
 
   // ── Refs ──────────────────────────────────────────────────────────────────
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -336,11 +387,19 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     stopCurrentAudio();
 
     try {
-      const HEAD = Math.min(3, updatedMessages.length);
+      // FIX 1+2: Reset streaming state for each new message
+      streamingContentRef.current = '';
+      streamingSentences.current = 0;
+      isStreamingRef.current = false;
+      setStreamingContent('');
+
+      // FIX 3: Reduced message window — first 2 + last 5 (was first 3 + last 6)
+      // Fewer tokens sent to the agent shortens the Cortex planning step.
+      const HEAD = Math.min(2, updatedMessages.length);
       const headIds = new Set(updatedMessages.slice(0, HEAD).map((m) => m.id));
-      const tail = updatedMessages.slice(-6);
+      const tail = updatedMessages.slice(-5);
       const contextMessages =
-        updatedMessages.length > 9
+        updatedMessages.length > 7
           ? [
             ...updatedMessages.slice(0, HEAD),
             ...tail.filter((m) => !headIds.has(m.id)),
@@ -376,6 +435,29 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
             if (event.type === 'status') {
               setStatusMessage(event.message);
 
+            } else if (event.type === 'chunk') {
+              // FIX 1+2: Incremental token from the server — append to the
+              // streaming bubble, capped at 2 complete sentences.
+              if (streamingSentences.current >= 2) continue;
+              isStreamingRef.current = true;
+
+              const candidate = streamingContentRef.current + event.text;
+              const sentenceCount = countCompleteSentences(candidate);
+
+              if (sentenceCount >= 2) {
+                // Extract emotion tag from the start of the streamed block
+                const emotionMatch = candidate.match(/^\[EMOTION:[^\]]+\]\s*/i);
+                const emotionPrefix = emotionMatch ? emotionMatch[0] : '';
+                const body = candidate.slice(emotionPrefix.length);
+                const truncated = truncateToSentences(body, 2);
+                streamingContentRef.current = emotionPrefix + truncated;
+                streamingSentences.current = 2;
+              } else {
+                streamingContentRef.current = candidate;
+                streamingSentences.current = sentenceCount;
+              }
+              setStreamingContent(streamingContentRef.current);
+
             } else if (event.type === 'done') {
               console.log('[debug] done event text:', event.text?.slice(0, 400));
               // Agent planning responses are suppressed server-side; skip chat bubble
@@ -388,18 +470,18 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                   physicianIdRef.current = event.physicianId;
                   console.log('[eval] physician ID captured:', event.physicianId);
                 }
+                // Clear any partial streaming content
+                streamingContentRef.current = '';
+                streamingSentences.current = 0;
+                isStreamingRef.current = false;
+                setStreamingContent('');
                 setLoading(false);
                 setStatusMessage('');
                 continue;
               }
               const isEval = event.isEvaluation === true;
 
-              // ── FIX: Read metadata from event fields, not from stripped text ──
-              // The route strips [SESSION_DURATION:] and [VOICE_MODEL:] from the
-              // display text (they appear before [EMOTION:] and extractRoleplay()
-              // discards everything before the first emotion tag). We now pass
-              // these values explicitly as event.sessionDuration and event.voiceModel
-              // so they survive the text-processing pipeline intact.
+              // Read metadata from event fields, not from stripped text
               const duration: number | null = event.sessionDuration ?? null;
               const voiceModel: string | null = event.voiceModel ?? null;
 
@@ -439,7 +521,21 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                 setTimeRemaining(resolvedDuration);
               }
 
-              const { emotion, cleanText: emotionStripped } = parseEmotion(event.text);
+              // FIX 1+2: Always use the server-processed event.text as the
+              // authoritative display text.  The streaming bubble (streamingContent)
+              // provides visual feedback only — it is cleared here and replaced
+              // by the final message.  This prevents planning-block false-positives
+              // from leaking into message history even if the streaming detection
+              // briefly shows wrong content in the live bubble.
+              const displayText = event.text;
+
+              // Clear streaming state — bubble replaced by final committed message
+              streamingContentRef.current = '';
+              streamingSentences.current = 0;
+              isStreamingRef.current = false;
+              setStreamingContent('');
+
+              const { emotion, cleanText: emotionStripped } = parseEmotion(displayText);
 
               if (isEval) {
                 setMessages((prev) => [
@@ -542,6 +638,11 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     setPhysicianSelectionMode(false);
     setSessionStarted(true);
     hasStarted.current = true;
+
+    // FIX 4: Fire-and-forget pre-warm request to Snowflake so the TCP
+    // connection and any cold-start overhead are resolved before the user
+    // types their first message.
+    fetch('/api/cortex/prewarm', { method: 'POST' }).catch(() => {});
 
     // Tell the agent which physician was selected so it skips list presentation
     // and goes straight to profile fetch + roleplay.
@@ -1112,7 +1213,18 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
           </div>
         ))}
 
-        {loading && messages.length > 0 && (
+        {/* FIX 1+2: Show streaming content as it arrives token-by-token,
+            replacing the generic spinner once chunks start flowing in. */}
+        {loading && streamingContent && (
+          <div className="flex items-end gap-2">
+            <div className="w-2.5 h-2.5 rounded-full bg-black shrink-0 mb-2" />
+            <div className="max-w-sm lg:max-w-xl px-4 py-3 rounded-2xl rounded-bl-sm bg-slate-100 text-slate-900 text-sm leading-relaxed whitespace-pre-wrap">
+              {streamingContent.replace(/^\[EMOTION:[^\]]+\]\s*/i, '')}
+              <span className="inline-block w-1.5 h-3.5 bg-slate-400 ml-0.5 align-middle animate-pulse" />
+            </div>
+          </div>
+        )}
+        {loading && !streamingContent && messages.length > 0 && (
           <div className="flex items-end gap-2">
             <div className="w-2.5 h-2.5 rounded-full bg-black shrink-0" />
             <div className="bg-slate-100 px-4 py-3 rounded-2xl rounded-bl-sm flex items-center gap-2">
