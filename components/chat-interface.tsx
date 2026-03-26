@@ -13,6 +13,8 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   isEvaluation?: boolean;
+  /** Internal seed messages (e.g. "begin roleplay") — never shown in chat UI */
+  internal?: boolean;
 }
 
 
@@ -211,6 +213,9 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   // Timestamp (ms) when REPEVAL was fired for the current session.
   // null = not yet triggered. Non-null also acts as the "already fired" guard.
   const evalStartedAtRef = useRef<number | null>(null);
+  // Full physician object stored at selection time; used to build the Claude
+  // system prompt for direct-API roleplay (bypasses Snowflake Cortex Agent).
+  const selectedPhysicianDataRef = useRef<any>(null);
   const sendMessageRef = useRef<(text: string, history: Message[]) => Promise<void>>(
     async () => { },
   );
@@ -294,7 +299,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     }
 
     const transcript = history
-      .filter((m) => !m.isEvaluation)
+      .filter((m) => !m.isEvaluation && !m.internal)
       .map((m) => `${m.role === 'user' ? 'Rep' : 'Physician'}: ${m.content}`)
       .join('\n');
 
@@ -371,10 +376,12 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
       triggerEvaluation(history);
     }
 
+    const isInternalSeed = text === '__begin_roleplay__';
     const userMessage: Message = {
       id: `msg_${Date.now()}`,
       role: 'user',
       content: text,
+      ...(isInternalSeed ? { internal: true } : {}),
     };
     const updatedMessages = [...history, userMessage];
     setMessages(updatedMessages);
@@ -393,25 +400,46 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
       isStreamingRef.current = false;
       setStreamingContent('');
 
-      // FIX 3: Reduced message window — first 2 + last 5 (was first 3 + last 6)
-      // Fewer tokens sent to the agent shortens the Cortex planning step.
-      const HEAD = Math.min(2, updatedMessages.length);
-      const headIds = new Set(updatedMessages.slice(0, HEAD).map((m) => m.id));
-      const tail = updatedMessages.slice(-5);
-      const contextMessages =
-        updatedMessages.length > 7
-          ? [
-            ...updatedMessages.slice(0, HEAD),
-            ...tail.filter((m) => !headIds.has(m.id)),
-          ]
-          : updatedMessages;
+      // Build context window.
+      // For direct Claude roleplay we send the full history (Claude is fast
+      // and has no Snowflake planning step).  For legacy Cortex fallback we
+      // keep the trimmed window (first 2 + last 5).
+      const inRoleplay = selectedPhysicianDataRef.current !== null;
 
-      const response = await fetch('/api/cortex/query', {
+      let contextMessages: Message[];
+      if (inRoleplay) {
+        // Send full history — Claude handles long context efficiently
+        contextMessages = updatedMessages;
+      } else {
+        // Legacy Cortex path: trimmed window to reduce planning-step latency
+        const HEAD = Math.min(2, updatedMessages.length);
+        const headIds = new Set(updatedMessages.slice(0, HEAD).map((m) => m.id));
+        const tail = updatedMessages.slice(-5);
+        contextMessages = updatedMessages.length > 7
+          ? [...updatedMessages.slice(0, HEAD), ...tail.filter((m) => !headIds.has(m.id))]
+          : updatedMessages;
+      }
+
+      // Route: direct Claude API during roleplay; Snowflake Cortex as fallback
+      const endpoint = inRoleplay ? '/api/roleplay/message' : '/api/cortex/query';
+      const requestBody = inRoleplay
+        ? {
+            messages: contextMessages.map((m) => ({
+              role: m.role,
+              content: m.content,
+              internal: m.internal ?? false,
+            })),
+            physician: selectedPhysicianDataRef.current,
+            username,
+          }
+        : {
+            messages: contextMessages.map((m) => ({ role: m.role, content: m.content })),
+          };
+
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: contextMessages.map((m) => ({ role: m.role, content: m.content })),
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok || !response.body) throw new Error('Failed to connect to agent');
@@ -623,12 +651,14 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     const id: string = physician.PHYSICIAN_ID;
     const name = `Dr. ${physician.FIRST_NAME} ${physician.LAST_NAME}`;
 
-    // Lock in physician ID and voice model immediately — no need to wait for
-    // the agent's planning block or a separate voice-model lookup.
+    // Lock in physician ID and voice model immediately.
     physicianIdRef.current = id;
     if (physician.VOICE_MODEL && !currentVoiceRef.current) {
       currentVoiceRef.current = physician.VOICE_MODEL;
     }
+
+    // Store full physician object so sendMessage can build the Claude system prompt.
+    selectedPhysicianDataRef.current = physician;
 
     setSelectedPhysician({
       name,
@@ -639,17 +669,10 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     setSessionStarted(true);
     hasStarted.current = true;
 
-    // FIX 4: Fire-and-forget pre-warm request to Snowflake so the TCP
-    // connection and any cold-start overhead are resolved before the user
-    // types their first message.
-    fetch('/api/cortex/prewarm', { method: 'POST' }).catch(() => {});
-
-    // Tell the agent which physician was selected so it skips list presentation
-    // and goes straight to profile fetch + roleplay.
-    const firstMessage =
-      `My name is ${username}. I have selected ${name} (Physician ID: ${id}). ` +
-      `Please skip the physician list and begin the roleplay immediately.`;
-    sendMessage(firstMessage, []);
+    // Kick off roleplay with a silent internal seed message — this triggers
+    // the physician's opening greeting via direct Claude API (no Snowflake hop).
+    // The message is marked internal=true so it is never shown in the chat UI.
+    sendMessage('__begin_roleplay__', []);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -673,6 +696,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     roleplayingRef.current = false;
     currentVoiceRef.current = null;
     physicianIdRef.current = null;
+    selectedPhysicianDataRef.current = null;
     evalStartedAtRef.current = null;
     targetDurationRef.current = randomSessionDuration();
     setPhysicianSelectionMode(false);
@@ -766,6 +790,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
 
   const visibleMessages = messages.filter(
     (m, i) =>
+      !m.internal &&
       !(i === 0 && m.role === 'user' && (
         m.content.startsWith("Hello! I'm ready to begin") ||
         m.content.startsWith('My name is') && m.content.includes('Please skip the physician list')
