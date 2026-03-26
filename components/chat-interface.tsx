@@ -159,6 +159,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   const [physicianSelectionMode, setPhysicianSelectionMode] = useState(false);
   const [physicians, setPhysicians] = useState<any[]>([]);
   const [physiciansLoading, setPhysiciansLoading] = useState(false);
+  const [selectedPhysician, setSelectedPhysician] = useState<{ name: string; specialty: string | null; segment: string | null } | null>(null);
 
   // ── Physician list filter / sort state ────────────────────────────────────
   const [physicianSearch, setPhysicianSearch] = useState('');
@@ -559,6 +560,11 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
       currentVoiceRef.current = physician.VOICE_MODEL;
     }
 
+    setSelectedPhysician({
+      name,
+      specialty: physician.SPECIALTY ?? null,
+      segment:   physician.SEGMENT_NAME ?? null,
+    });
     setPhysicianSelectionMode(false);
     setSessionStarted(true);
     hasStarted.current = true;
@@ -596,6 +602,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     targetDurationRef.current = randomSessionDuration();
     setPhysicianSelectionMode(false);
     setPhysicians([]);
+    setSelectedPhysician(null);
     messagesRef.current = [];
 
     setMessages([]);
@@ -1023,6 +1030,21 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   // ── Active session ────────────────────────────────────────────────────────
   return (
     <div className="relative flex flex-col h-full min-h-0">
+
+      {/* ── Physician context ribbon ──────────────────────────────────────── */}
+      {selectedPhysician && (
+        <div className="shrink-0 px-4 py-2.5 border-b border-slate-100 bg-white">
+          <p className="font-semibold text-slate-900 text-sm leading-tight">
+            {selectedPhysician.name}
+          </p>
+          {(selectedPhysician.specialty || selectedPhysician.segment) && (
+            <p className="text-xs text-slate-500 mt-0.5">
+              {[selectedPhysician.specialty, selectedPhysician.segment].filter(Boolean).join(' · ')}
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="flex-1 overflow-y-auto pr-1 space-y-4 pb-28">
         {messages.length === 0 && loading && (
           <div className="flex items-end gap-2">
