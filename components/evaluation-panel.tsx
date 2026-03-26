@@ -12,6 +12,7 @@ interface EvaluationPanelProps {
   onClose: () => void;
   content: string;
   username?: string;
+  physicianId?: string | null;
 }
 
 const DIMENSIONS = [
@@ -128,7 +129,7 @@ function CollapsibleDimension({ title, score, rationale, indicators }: {
   );
 }
 
-export default function EvaluationPanel({ open, onClose, content, username }: EvaluationPanelProps) {
+export default function EvaluationPanel({ open, onClose, content, username, physicianId }: EvaluationPanelProps) {
   const [evaluation, setEvaluation] = useState<any>(null);
   const [historyWithPhysician, setHistoryWithPhysician] = useState<any[]>([]);
   const [historyAllPhysicians, setHistoryAllPhysicians] = useState<any[]>([]);
@@ -141,14 +142,17 @@ export default function EvaluationPanel({ open, onClose, content, username }: Ev
   useEffect(() => {
     if (open) fetchEvaluation();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, physicianId]);
 
   const fetchEvaluation = async () => {
     setLoading(true);
     setError(null);
     setNoData(false);
     try {
-      const res = await fetch('/api/evaluation');
+      const url = physicianId
+        ? `/api/evaluation?physicianId=${encodeURIComponent(physicianId)}`
+        : '/api/evaluation';
+      const res = await fetch(url);
       if (res.status === 404) { setNoData(true); setEvaluation(null); return; }
       if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Could not load evaluation'); }
       const data = await res.json();
