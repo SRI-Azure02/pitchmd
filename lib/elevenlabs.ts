@@ -28,11 +28,12 @@ export function parseEmotion(text: string): {
   const emotion = emotionMatch?.[1]?.toLowerCase() ?? 'neutral';
   const voiceModel = voiceMatch?.[1] ?? 'default';
 
+  // cleanText is used for display — keep markdown (* for italic) intact
+  // so the chat renderer shows physician names / emphasis correctly.
   const cleanText = text
     .replace(/\[EMOTION:[^\]]+\]/gi, '')
     .replace(/\[VOICE_MODEL:[^\]]+\]/gi, '')
     .replace(/\[SESSION_DURATION:[^\]]+\]/gi, '')
-    .replace(/\*[^*]+\*/g, '')
     .trim();
 
   return { emotion, voiceModel, cleanText };
@@ -77,11 +78,18 @@ export async function speakText(
   const settings =
     EMOTION_SETTINGS[emotion] ?? EMOTION_SETTINGS.neutral;
 
+  // Strip markdown formatting before sending to TTS — asterisks should not
+  // be spoken aloud, but the display text keeps them for rendering italics.
+  const ttsText = text
+    .replace(/\*([^*]+)\*/g, '$1')  // *word* → word
+    .replace(/\*+/g, '')             // stray asterisks
+    .trim();
+
   const response = await fetch('/api/tts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      text,
+      text: ttsText,
       voiceId,
       stability: settings.stability,
       style: settings.style,

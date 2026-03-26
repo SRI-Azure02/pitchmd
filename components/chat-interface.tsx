@@ -2,11 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
 import AudioInput from './audio-input';
 import EvaluationPanel from './evaluation-panel';
-import { Send, RotateCcw, Square } from 'lucide-react';
+import { Send, RotateCcw, Square, Volume2, VolumeX, Video, VideoOff, MessageSquare } from 'lucide-react';
 import { parseEmotion, speakText, stopCurrentAudio } from '@/lib/elevenlabs';
 
 interface Message {
@@ -23,12 +22,8 @@ function randomSessionDuration(min = 60, max = 150): number {
   return Math.round(min + ((r1 + r2) / 2) * (max - min));
 }
 
-const MAX_TURNS = 12;
-
 export default function ChatInterface({ username = 'Rep' }: { username?: string }) {
   const targetDurationRef = useRef<number>(randomSessionDuration());
-
-  const GREETING = `Hello! I'm ready to begin my sales training session. My name is ${username}. [REQUESTED_SESSION_DURATION:${targetDurationRef.current}]`;
 
   // ── Session state ─────────────────────────────────────────────────────────
   const [sessionStarted, setSessionStarted] = useState(false);
@@ -43,16 +38,33 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   const [sessionDuration, setSessionDuration] = useState<number | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [ttsAvailable, setTtsAvailable] = useState(true);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [avatarEnabled, setAvatarEnabled] = useState(false);
+  const voiceEnabledRef = useRef(true);
+
+  // ── Physician selection state ─────────────────────────────────────────────
+  const [physicianSelectionMode, setPhysicianSelectionMode] = useState(false);
+  const [physicians, setPhysicians] = useState<any[]>([]);
+  const [physiciansLoading, setPhysiciansLoading] = useState(false);
 
   // ── Refs ──────────────────────────────────────────────────────────────────
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesRef = useRef<Message[]>([]);
   const inputRef = useRef('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const hasStarted = useRef(false);
   const autoEndedRef = useRef(false);
   const sessionEndedRef = useRef(false);
   const roleplayingRef = useRef(false);
   const currentVoiceRef = useRef<string | null>(null);
+  // Physician ID extracted from the agent's planning response; used to call
+  // REPEVAL directly so we don't depend on the Cortex Agent invoking it.
+  const physicianIdRef = useRef<string | null>(null);
+  // Prevents double-triggering REPEVAL if both the timer and a manual "done"
+  // fire close together.
+  // Timestamp (ms) when REPEVAL was fired for the current session.
+  // null = not yet triggered. Non-null also acts as the "already fired" guard.
+  const evalStartedAtRef = useRef<number | null>(null);
   const sendMessageRef = useRef<(text: string, history: Message[]) => Promise<void>>(
     async () => { },
   );
@@ -61,6 +73,15 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   useEffect(() => { inputRef.current = inputValue; }, [inputValue]);
   useEffect(() => { messagesRef.current = messages; }, [messages]);
   useEffect(() => { sessionEndedRef.current = sessionEnded; }, [sessionEnded]);
+  useEffect(() => { voiceEnabledRef.current = voiceEnabled; }, [voiceEnabled]);
+
+  // ── Auto-resize textarea ───────────────────────────────────────────────────
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [inputValue]);
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, statusMessage]);
@@ -103,6 +124,89 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeRemaining, sessionDuration, loading]);
 
+  // ── triggerEvaluation ─────────────────────────────────────────────────────
+  // Two-phase approach:
+  //   Phase 1 — fire REPEVAL (stored proc runs in background, ~60-120 s).
+  //             Show "generating" message in chat immediately.
+  //   Phase 2 — poll /api/evaluation every 5 s. Accept only a result whose
+  //             PHYSICIAN_ID matches this session AND whose EVALUATED_AT
+  //             differs from the baseline (the last result before we fired).
+  //             When found, add "ready" message with View Report button.
+  //             Never auto-opens the panel — user clicks the button.
+  const triggerEvaluation = async (history: Message[]) => {
+    // ── Guard ──────────────────────────────────────────────────────────────
+    const physicianId = physicianIdRef.current;
+    console.log(`[eval] triggerEvaluation — physician=${physicianId}, alreadyFired=${evalStartedAtRef.current !== null}`);
+    if (evalStartedAtRef.current !== null) return;
+    if (!physicianId) {
+      setMessages((prev) => [...prev, {
+        id: `msg_${Date.now()}_eval_err`,
+        role: 'assistant' as const,
+        content: '⚠️ Could not start evaluation: no physician ID recorded. Please start a new session.',
+      }]);
+      return;
+    }
+
+    const transcript = history
+      .filter((m) => !m.isEvaluation)
+      .map((m) => `${m.role === 'user' ? 'Rep' : 'Physician'}: ${m.content}`)
+      .join('\n');
+
+    if (!transcript.trim()) {
+      console.warn('[eval] empty transcript — skipping');
+      return;
+    }
+
+    evalStartedAtRef.current = Date.now();
+
+    // ── Show "generating" message immediately ────────────────────────────────
+    setMessages((prev) => [...prev, {
+      id: `msg_${Date.now()}_eval_pending`,
+      role: 'assistant' as const,
+      content: 'Your evaluation report is being generated. This typically takes 1–3 minutes — please wait.',
+    }]);
+
+    // ── Call /api/evaluation/submit and AWAIT its response.
+    //    The route now awaits REPEVAL to completion before returning 200.
+    //    No DB polling needed — when this fetch resolves, the result is in the DB.
+    try {
+      console.log(`[eval] calling /api/evaluation/submit — physician=${physicianId}`);
+      const res = await fetch('/api/evaluation/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ physicianId, transcript }),
+      });
+
+      if (res.ok) {
+        console.log('[eval] ✅ REPEVAL completed — showing report button');
+        setMessages((prev) => [...prev, {
+          id: `msg_${Date.now()}_eval_ready`,
+          role: 'assistant' as const,
+          content: 'Your evaluation report is ready.',
+          isEvaluation: true,
+        }]);
+      } else {
+        const errBody = await res.json().catch(() => ({}));
+        const errMsg = (errBody as any)?.error || `HTTP ${res.status}`;
+        console.error(`[eval] REPEVAL failed — ${errMsg}`);
+        setMessages((prev) => [...prev, {
+          id: `msg_${Date.now()}_eval_err`,
+          role: 'assistant' as const,
+          content: `⚠️ Evaluation failed: ${errMsg}. Please try again.`,
+          isEvaluation: true,
+        }]);
+      }
+    } catch (e: any) {
+      console.error('[eval] network error:', e?.message);
+      setMessages((prev) => [...prev, {
+        id: `msg_${Date.now()}_eval_err`,
+        role: 'assistant' as const,
+        content: '⚠️ Network error during evaluation. Please check your connection and try again.',
+        isEvaluation: true,
+      }]);
+    }
+  };
+
   // ── sendMessage ───────────────────────────────────────────────────────────
   const sendMessage = async (text: string, history: Message[]) => {
     if (sessionEndedRef.current) return;
@@ -115,6 +219,10 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
       setSessionEnded(true);
       setTimeRemaining(null);
       stopCurrentAudio();
+
+      // Trigger REPEVAL directly — don't rely on the Cortex Agent to call it.
+      // history is the conversation BEFORE "done", which is what REPEVAL needs.
+      triggerEvaluation(history);
     }
 
     const userMessage: Message = {
@@ -174,6 +282,21 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
               setStatusMessage(event.message);
 
             } else if (event.type === 'done') {
+              console.log('[debug] done event text:', event.text?.slice(0, 400));
+              // Agent planning responses are suppressed server-side; skip chat bubble
+              // but still process sessionDuration/voiceModel/physicianId metadata.
+              if (event.suppressed === true) {
+                console.log('[debug] suppressed planning response — skipping bubble');
+                // The planning block contains the PHYSICIAN_ID — capture it now
+                // so we can call REPEVAL directly at session end.
+                if (event.physicianId && !physicianIdRef.current) {
+                  physicianIdRef.current = event.physicianId;
+                  console.log('[eval] physician ID captured:', event.physicianId);
+                }
+                setLoading(false);
+                setStatusMessage('');
+                continue;
+              }
               const isEval = event.isEvaluation === true;
 
               // ── FIX: Read metadata from event fields, not from stripped text ──
@@ -185,10 +308,24 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
               const duration: number | null = event.sessionDuration ?? null;
               const voiceModel: string | null = event.voiceModel ?? null;
 
-              // Capture voice model on first occurrence
+              // Capture voice model on first occurrence and use it to look up
+              // the physician ID — fallback for when the agent doesn't emit a
+              // planning block containing PHYSICIAN_ID.
               if (voiceModel && !currentVoiceRef.current) {
                 currentVoiceRef.current = voiceModel;
                 console.log('[tts] voice model assigned:', voiceModel);
+
+                if (!physicianIdRef.current) {
+                  fetch(`/api/physicians/by-voice-model?model=${encodeURIComponent(voiceModel)}`)
+                    .then((r) => r.json())
+                    .then((data) => {
+                      if (data.physicianId && !physicianIdRef.current) {
+                        physicianIdRef.current = data.physicianId;
+                        console.log('[eval] physician ID from voice model lookup:', data.physicianId);
+                      }
+                    })
+                    .catch((err) => console.warn('[eval] voice model lookup failed:', err));
+                }
               }
 
               // Start timer on first roleplay message (identified by presence of
@@ -219,8 +356,9 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                     isEvaluation: true,
                   },
                 ]);
-                setEvalOpen(true);
                 setTimeRemaining(null);
+                // Evaluation panel is opened by triggerEvaluation's poller
+                // once fresh results appear in the DB. No direct open here.
               } else {
                 setMessages((prev) => [
                   ...prev,
@@ -231,7 +369,9 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                   },
                 ]);
 
-                if (currentVoiceRef.current) {
+                // Only speak during active roleplay, with a voice model assigned,
+                // and only when voice is currently enabled (ref avoids stale closure).
+                if (roleplayingRef.current && currentVoiceRef.current && voiceEnabledRef.current) {
                   console.log(
                     '[tts] speaking | voice:', currentVoiceRef.current,
                     '| emotion:', emotion,
@@ -273,11 +413,42 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   sendMessageRef.current = sendMessage;
 
   // ── Session controls ──────────────────────────────────────────────────────
-  const handleStartSession = () => {
-    if (hasStarted.current) return;
+  const handleStartSession = async () => {
+    if (hasStarted.current || physicianSelectionMode) return;
+    setPhysicianSelectionMode(true);
+    setPhysiciansLoading(true);
+    try {
+      const res = await fetch('/api/physicians');
+      const data = await res.json();
+      setPhysicians(data.physicians ?? []);
+    } catch (err) {
+      console.error('[physicians] fetch failed:', err);
+    } finally {
+      setPhysiciansLoading(false);
+    }
+  };
+
+  const handlePhysicianSelect = (physician: any) => {
+    const id: string = physician.PHYSICIAN_ID;
+    const name = `Dr. ${physician.FIRST_NAME} ${physician.LAST_NAME}`;
+
+    // Lock in physician ID and voice model immediately — no need to wait for
+    // the agent's planning block or a separate voice-model lookup.
+    physicianIdRef.current = id;
+    if (physician.VOICE_MODEL && !currentVoiceRef.current) {
+      currentVoiceRef.current = physician.VOICE_MODEL;
+    }
+
+    setPhysicianSelectionMode(false);
     setSessionStarted(true);
     hasStarted.current = true;
-    sendMessage(GREETING, []);
+
+    // Tell the agent which physician was selected so it skips list presentation
+    // and goes straight to profile fetch + roleplay.
+    const firstMessage =
+      `My name is ${username}. I have selected ${name} (Physician ID: ${id}). ` +
+      `Please skip the physician list and begin the roleplay immediately.`;
+    sendMessage(firstMessage, []);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -300,7 +471,11 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     hasStarted.current = false;
     roleplayingRef.current = false;
     currentVoiceRef.current = null;
+    physicianIdRef.current = null;
+    evalStartedAtRef.current = null;
     targetDurationRef.current = randomSessionDuration();
+    setPhysicianSelectionMode(false);
+    setPhysicians([]);
     messagesRef.current = [];
 
     setMessages([]);
@@ -318,41 +493,103 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
 
   const visibleMessages = messages.filter(
     (m, i) =>
-      !(i === 0 && m.role === 'user' && m.content.startsWith("Hello! I'm ready to begin")),
+      !(i === 0 && m.role === 'user' && (
+        m.content.startsWith("Hello! I'm ready to begin") ||
+        m.content.startsWith('My name is') && m.content.includes('Please skip the physician list')
+      )),
   );
-  const turnLimitReached = visibleMessages.length >= MAX_TURNS;
-
-  // Turn-limit auto-end
-  useEffect(() => {
-    if (
-      turnLimitReached &&
-      !loading &&
-      !autoEndedRef.current &&
-      !sessionEndedRef.current &&
-      visibleMessages[visibleMessages.length - 1]?.role === 'assistant'
-    ) {
-      autoEndedRef.current = true;
-      sessionEndedRef.current = true;
-      sendMessageRef.current('done', messagesRef.current);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [turnLimitReached, loading]);
-
   const timerRatio =
     timeRemaining !== null && sessionDuration !== null
       ? timeRemaining / sessionDuration
       : null;
   const isLastThird = timerRatio !== null && timerRatio <= 1 / 3;
 
+  // ── Segment badge colour ──────────────────────────────────────────────────
+  const segmentStyle = (segment: string): React.CSSProperties => {
+    if (segment?.includes('Innovator'))   return { background: '#e0f2fe', color: '#0369a1' };
+    if (segment?.includes('Pragmatist')) return { background: '#fef3c7', color: '#92400e' };
+    if (segment?.includes('Conservative')) return { background: '#d1fae5', color: '#065f46' };
+    return { background: '#f1f5f9', color: '#475569' };
+  };
+
   // ── Pre-session splash ────────────────────────────────────────────────────
   if (!sessionStarted) {
+    // Physician selection grid
+    if (physicianSelectionMode) {
+      return (
+        <div className="flex flex-col h-full min-h-0">
+          <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b border-slate-100">
+            <div>
+              <p className="text-base font-semibold text-slate-900">Select a Physician</p>
+              <p className="text-xs text-slate-400">Choose who you'd like to practice with today</p>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => setPhysicianSelectionMode(false)} className="text-xs text-slate-400">
+              ← Back
+            </Button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4">
+            {physiciansLoading ? (
+              <div className="flex items-center justify-center h-40 gap-2 text-slate-400">
+                <Spinner className="w-4 h-4" />
+                <span className="text-sm">Loading physicians...</span>
+              </div>
+            ) : physicians.length === 0 ? (
+              <p className="text-center text-sm text-slate-400 mt-12">No physicians found.</p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {physicians.map((p) => {
+                  const name = `Dr. ${p.FIRST_NAME} ${p.LAST_NAME}`;
+                  return (
+                    <div
+                      key={p.PHYSICIAN_ID}
+                      className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md hover:border-slate-300 transition-all"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-slate-900 text-sm leading-tight">{name}</p>
+                          <p className="text-xs text-slate-500 mt-0.5 truncate">{p.SPECIALTY}</p>
+                          {(p.CITY || p.STATE) && (
+                            <p className="text-xs text-slate-400 mt-0.5">
+                              {[p.CITY, p.STATE].filter(Boolean).join(', ')}
+                            </p>
+                          )}
+                        </div>
+                        <span
+                          className="shrink-0 text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap"
+                          style={segmentStyle(p.SEGMENT_NAME)}
+                        >
+                          {p.SEGMENT_NAME}
+                        </span>
+                      </div>
+                      <Button
+                        size="sm"
+                        className="w-full mt-1 gap-1.5 rounded-lg text-xs"
+                        style={{ background: 'linear-gradient(90deg, #FF6B00, #00C8FF)', border: 'none', color: 'white' }}
+                        onClick={() => handlePhysicianSelect(p)}
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        Start Roleplay
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <EvaluationPanel open={evalOpen} onClose={() => setEvalOpen(false)} content="" username={username} />
+        </div>
+      );
+    }
+
+    // Default splash
     return (
       <div className="flex flex-col items-center justify-center h-full gap-6 text-center px-8">
         <div className="space-y-2">
           <p className="text-2xl font-semibold text-slate-900">Ready to practice?</p>
           <p className="text-slate-500 text-sm max-w-sm">
-            The AI will present a list of physicians to choose from, then take on their
-            persona for a realistic sales call simulation.
+            Select a physician and take on a realistic sales call simulation.
           </p>
         </div>
         <Button
@@ -373,12 +610,6 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
         >
           View Last Evaluation Report
         </Button>
-        <p className="text-xs text-slate-400">
-          Type{' '}
-          <span className="font-medium text-slate-500">&quot;end&quot;</span> or{' '}
-          <span className="font-medium text-slate-500">&quot;done&quot;</span> during the
-          session to trigger your evaluation
-        </p>
         <EvaluationPanel
           open={evalOpen}
           onClose={() => setEvalOpen(false)}
@@ -454,11 +685,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
       <div className="absolute bottom-0 left-0 right-0 bg-white pt-2 pb-1">
         <div className="mb-1 px-1">
           <div className="flex items-center justify-between mb-1">
-            {turnLimitReached ? (
-              <p className="text-xs text-amber-600 font-medium">
-                Session limit reached — generating your evaluation...
-              </p>
-            ) : timeRemaining !== null && sessionDuration !== null ? (
+            {timeRemaining !== null && sessionDuration !== null ? (
               isLastThird ? (
                 <span
                   className="text-xs font-bold px-2 py-0.5 rounded"
@@ -471,23 +698,44 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                   Time left: {timeRemaining}s
                 </p>
               )
-            ) : (
-              <p className="text-xs text-slate-400">
-                Type{' '}
-                <span className="font-medium text-slate-500">&quot;end&quot;</span> or{' '}
-                <span className="font-medium text-slate-500">&quot;done&quot;</span> when
-                finished
-              </p>
-            )}
+            ) : null}
 
-            {!ttsAvailable && (
-              <span
-                className="text-xs text-amber-600 font-medium ml-2"
-                title="ElevenLabs returned an error. Check your API key and account credits at elevenlabs.io."
+            <div className="flex items-center gap-1">
+              {!ttsAvailable && (
+                <span
+                  className="text-xs text-amber-600 font-medium mr-1"
+                  title="ElevenLabs returned an error. Check your API key and account credits at elevenlabs.io."
+                >
+                  🔇 Error
+                </span>
+              )}
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                onClick={() => {
+                  const next = !voiceEnabledRef.current;
+                  voiceEnabledRef.current = next;
+                  setVoiceEnabled(next);
+                  if (!next) stopCurrentAudio();
+                }}
+                className="h-7 w-7 rounded-full"
+                title={voiceEnabled ? 'Disable voice' : 'Enable voice'}
               >
-                🔇 Voice unavailable
-              </span>
-            )}
+                {voiceEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5 text-slate-400" />}
+              </Button>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                onClick={() => setAvatarEnabled((v) => !v)}
+                className="h-7 w-7 rounded-full"
+                title={avatarEnabled ? 'Disable video avatar' : 'Enable video avatar (coming soon)'}
+                disabled
+              >
+                {avatarEnabled ? <Video className="w-3.5 h-3.5" /> : <VideoOff className="w-3.5 h-3.5 text-slate-300" />}
+              </Button>
+            </div>
           </div>
 
           {timeRemaining !== null && sessionDuration !== null && (
@@ -512,29 +760,31 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
               }
               onAutoSubmit={handleAutoSubmit}
               userTyping={userTyping}
-              disabled={loading || turnLimitReached || sessionEnded}
+              disabled={loading || sessionEnded}
             />
-            <Input
-              placeholder={
-                sessionEnded
-                  ? 'Session ended'
-                  : turnLimitReached
-                    ? 'Session limit reached...'
-                    : 'Type your response...'
-              }
+            <textarea
+              ref={textareaRef}
+              rows={1}
+              placeholder={sessionEnded ? 'Session ended' : 'Type your response...'}
               value={inputValue}
               onChange={(e) => {
                 setInputValue(e.target.value);
                 setUserTyping(true);
               }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSubmit(e as unknown as React.FormEvent);
+                }
+              }}
               onFocus={() => setUserTyping(true)}
               onBlur={() => setUserTyping(false)}
-              disabled={loading || turnLimitReached || sessionEnded}
-              className="flex-1"
+              disabled={loading || sessionEnded}
+              className="flex-1 resize-none overflow-hidden rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 leading-5 min-h-[38px] max-h-40"
             />
             <Button
               type="submit"
-              disabled={loading || !inputValue.trim() || turnLimitReached || sessionEnded}
+              disabled={loading || !inputValue.trim() || sessionEnded}
               size="icon"
               className="rounded-full shrink-0"
             >
