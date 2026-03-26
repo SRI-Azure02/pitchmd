@@ -53,13 +53,23 @@ const PLANNING_PATTERNS: Array<string | RegExp> = [
   'respond in character',
   'I have the physician profile',
   'physician profile',
-  'based on risk-averse',
+  'risk-averse',         // catches "given she's risk-averse", "based on risk-averse", etc.
+  'risk averse',
   'my response should',
   'I will respond',
   'as the physician',
   'the sales rep',
+  'I already gave',      // "I already gave a first in-character message"
+  'continue in character',
+  'given she',           // "given she's risk-averse and conservative"
+  'given his',
+  'given their',
+  'Now I need to',       // "Now I need to continue in character"
+  'fetching the data',
   // Parenthetical reasoning notes the agent sometimes prefixes
   /^\[EMOTION:[^\]]+\]\s*\(/,   // starts with emotion tag + "("
+  /^\[EMOTION:[^\]]+\]\s*-/,    // starts with emotion tag + "- " (dash-prefixed planning note)
+  /^\[EMOTION:[^\]]+\]\s*Wait/, // starts with emotion tag + "Wait"
 ];
 
 function isAgentPlanningBlock(block: string): boolean {
@@ -70,25 +80,33 @@ function isAgentPlanningBlock(block: string): boolean {
 
 /**
  * Find the character index in `text` where genuine physician roleplay dialogue
- * starts — i.e., the first [EMOTION:] tag that is NOT a planning block and has
- * at least 15 chars of body text after it.
+ * starts — i.e., the first [EMOTION:] tag that is NOT a planning block.
+ *
+ * Requires MIN_LOOKAHEAD chars of body content after the tag before making a
+ * decision: this prevents false-positive classification when planning keywords
+ * (e.g. "risk-averse", "in character") appear a few tokens after the tag.
  *
  * Returns -1 if no qualifying block has been found yet (need more tokens).
  */
+const ROLEPLAY_LOOKAHEAD = 150; // chars of body required before classifying
+
 function findRoleplayStart(text: string): number {
   const re = /\[EMOTION:[^\]]+\]/gi;
   let match: RegExpExecArray | null;
   // eslint-disable-next-line no-cond-assign
   while ((match = re.exec(text)) !== null) {
     const start = match.index;
-    // Require at least 15 chars of body content after the tag before deciding
     const bodyStart = start + match[0].length;
-    if (text.length - bodyStart < 15) continue; // not enough lookahead yet
 
-    const block = text.slice(start, Math.min(start + 400, text.length));
+    // Not enough content after tag yet — wait for more tokens
+    if (text.length - bodyStart < ROLEPLAY_LOOKAHEAD) continue;
+
+    // Check the full block (up to 500 chars) for planning patterns
+    const block = text.slice(start, Math.min(start + 500, text.length));
     if (!isAgentPlanningBlock(block)) {
       return start;
     }
+    // This was a planning block — keep scanning for the next EMOTION tag
   }
   return -1;
 }

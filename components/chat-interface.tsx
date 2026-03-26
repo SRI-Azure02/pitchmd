@@ -521,15 +521,15 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                 setTimeRemaining(resolvedDuration);
               }
 
-              // FIX 1+2: If tokens were streamed to the client, use the
-              // accumulated streaming content (already truncated to 2 sentences)
-              // as the display text.  Fall back to event.text for non-streamed
-              // paths (selection responses, planning-only suppressed turns, etc.)
-              const displayText = (event.wasStreamed && streamingContentRef.current)
-                ? streamingContentRef.current
-                : event.text;
+              // FIX 1+2: Always use the server-processed event.text as the
+              // authoritative display text.  The streaming bubble (streamingContent)
+              // provides visual feedback only — it is cleared here and replaced
+              // by the final message.  This prevents planning-block false-positives
+              // from leaking into message history even if the streaming detection
+              // briefly shows wrong content in the live bubble.
+              const displayText = event.text;
 
-              // Clear streaming state — bubble will be replaced by final message
+              // Clear streaming state — bubble replaced by final committed message
               streamingContentRef.current = '';
               streamingSentences.current = 0;
               isStreamingRef.current = false;
