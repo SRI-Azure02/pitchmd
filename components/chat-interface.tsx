@@ -940,11 +940,11 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                             <button
                               title="Practice your pitch"
                               onClick={() => handlePhysicianSelect(p)}
-                              className="w-8 h-8 rounded-full flex items-center justify-center border border-slate-200 bg-white text-slate-500 hover:text-white hover:border-transparent transition-all"
+                              className="w-10 h-10 rounded-full flex items-center justify-center border border-slate-200 bg-white text-slate-500 hover:text-white hover:border-transparent transition-all"
                               onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'linear-gradient(135deg, #FF6B00, #00C8FF)'; }}
                               onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = ''; }}
                             >
-                              <MessageSquare className="w-3.5 h-3.5" />
+                              <MessageSquare className="w-4 h-4" />
                             </button>
 
                             {/* View evaluation report */}
@@ -952,7 +952,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                               title="View evaluation report"
                               onClick={() => { if (hasEval) setEvalOpen(true); }}
                               disabled={!hasEval}
-                              className={`w-8 h-8 rounded-full flex items-center justify-center border transition-all ${
+                              className={`w-10 h-10 rounded-full flex items-center justify-center border transition-all ${
                                 hasEval
                                   ? 'border-slate-200 bg-white text-slate-500 hover:text-white hover:border-transparent cursor-pointer'
                                   : 'border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed'
@@ -960,7 +960,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                               onMouseEnter={e => { if (hasEval) (e.currentTarget as HTMLButtonElement).style.background = 'linear-gradient(135deg, #FF6B00, #00C8FF)'; }}
                               onMouseLeave={e => { if (hasEval) (e.currentTarget as HTMLButtonElement).style.background = ''; }}
                             >
-                              <BarChart2 className="w-3.5 h-3.5" />
+                              <BarChart2 className="w-4 h-4" />
                             </button>
                           </div>
                         </td>
