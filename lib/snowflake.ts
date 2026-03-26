@@ -12,6 +12,7 @@ export class SnowflakeClient {
   private account: string;
   private warehouse: string;
   private pat: string;
+  private role: string;
 
   constructor() {
     this.account = process.env.SNOWFLAKE_ACCOUNT || '';
@@ -20,6 +21,9 @@ export class SnowflakeClient {
       process.env.SNOWFLAKE_PAT ||
       process.env.SNOWFLAKE_PASSWORD ||
       '';
+    // Optional: override the session role used for procedure execution.
+    // Set SNOWFLAKE_ROLE in .env.local to a role that has EXECUTE on ML.REPEVAL.
+    this.role = process.env.SNOWFLAKE_ROLE || '';
 
     if (!this.account || !this.warehouse || !this.pat) {
       throw new Error(
@@ -85,6 +89,71 @@ export class SnowflakeClient {
     return await this.pollForResults(statementId);
   }
 
+  /**
+   * Call CORTEX_TESTING.ML.REPEVAL directly.
+   * REPEVAL runs EVALUATE_SALES_REP (Claude 3.5 Sonnet via Snowflake Cortex)
+   * which takes 60–120s, so we poll for up to 5 minutes.
+   */
+  async callRepEval(
+    physicianId: string,
+    transcript: string,
+    appUserId: string,
+  ): Promise<void> {
+    // Use schema-qualified name only (ML.REPEVAL), not fully qualified.
+    // The database/schema context is passed in the request body so Snowflake
+    // resolves ML.REPEVAL within CORTEX_TESTING — matching how the Cortex
+    // Agent calls it: CALL ML.REPEVAL(...)
+    const sql = `CALL ML.REPEVAL(:1, :2, :3)`;
+    const bindings = {
+      '1': { type: 'TEXT', value: physicianId },
+      '2': { type: 'TEXT', value: transcript },
+      '3': { type: 'TEXT', value: appUserId },
+    };
+
+    const body: Record<string, any> = {
+      statement: sql,
+      database: 'CORTEX_TESTING',
+      schema: 'ML',
+      warehouse: this.warehouse,
+      bindings,
+    };
+    if (this.role) body.role = this.role;
+
+    console.log(`[snowflake] callRepEval — physician=${physicianId}, user=${appUserId}, role=${this.role || '(default)'}, transcriptLen=${transcript.length}`);
+
+    let response: any;
+    try {
+      response = await axios.post(
+        `${this.baseURL}/statements`,
+        body,
+        { headers: this.headers },
+      );
+    } catch (err: any) {
+      const status = err?.response?.status;
+      const data = err?.response?.data;
+      console.error(`[snowflake] callRepEval initial POST failed — status=${status}`, JSON.stringify(data));
+      throw err;
+    }
+
+    console.log(`[snowflake] callRepEval initial response — code=${response.data?.code}, statementHandle=${response.data?.statementHandle}`);
+
+    if (response.data?.code === '090001') {
+      console.log('[snowflake] callRepEval completed synchronously');
+      return;
+    }
+
+    const statementId = response.data.statementHandle;
+    if (!statementId) {
+      console.error('[snowflake] callRepEval — no statementHandle, full response:', JSON.stringify(response.data));
+      throw new Error('No statementHandle returned from Snowflake for REPEVAL');
+    }
+
+    console.log(`[snowflake] callRepEval polling for statementId=${statementId}`);
+    // Poll up to 5 minutes (300 × 1s)
+    await this.pollForResults(statementId, 300, 1000);
+    console.log(`[snowflake] callRepEval completed — statementId=${statementId}`);
+  }
+
   private async pollForResults(
     statementId: string,
     maxAttempts = 60,
@@ -130,17 +199,43 @@ export class SnowflakeClient {
   // ─── Physician Queries ───────────────────────────────────────────────
 
   async queryAllPhysicians(): Promise<any[]> {
+    // Join SYNTHETIC_PHYSICIAN_CHARS + SYNTHETIC_PHYSICIAN_SEGMENT — these are
+    // confirmed to exist (used by REPEVAL). Also pull VOICE_MODEL from
+    // SYNTHETIC_PHYSICIAN_VOICE if it exists; fall back gracefully if not.
     const sql = `
       SELECT
-        PHYSICIAN_ID,
-        FIRST_NAME,
-        LAST_NAME,
-        SPECIALTY,
-        SEGMENT_NAME
-      FROM CORTEX_TESTING.PUBLIC.PHYSICIANS
-      ORDER BY LAST_NAME, FIRST_NAME ASC
+        pc.PHYSICIAN_ID,
+        pc.PHYSICIAN_FIRST_NAME     AS FIRST_NAME,
+        pc.PHYSICIAN_LAST_NAME      AS LAST_NAME,
+        pc.PHYSICIAN_SPECIALTY      AS SPECIALTY,
+        pc.PHYSICIAN_CITY           AS CITY,
+        pc.PHYSICIAN_STATE          AS STATE,
+        pc.VOICE_MODEL,
+        ps.SEGMENT_NAME,
+        ps.ATTITUDINAL_DESCRIPTION
+      FROM CORTEX_TESTING.PUBLIC.SYNTHETIC_PHYSICIAN_CHARS pc
+      LEFT JOIN CORTEX_TESTING.PUBLIC.SYNTHETIC_PHYSICIAN_SEGMENT ps
+        ON pc.PHYSICIAN_ID = ps.PHYSICIAN_ID
+      ORDER BY pc.PHYSICIAN_LAST_NAME, pc.PHYSICIAN_FIRST_NAME ASC
     `;
     return await this.executeQuery(sql);
+  }
+
+  /**
+   * Look up a physician's ID by their ElevenLabs voice model ID.
+   * Queries SYNTHETIC_PHYSICIAN_CHARS which is confirmed to exist.
+   */
+  async getPhysicianByVoiceModel(voiceModel: string): Promise<string | null> {
+    const sql = `
+      SELECT PHYSICIAN_ID
+      FROM CORTEX_TESTING.PUBLIC.SYNTHETIC_PHYSICIAN_CHARS
+      WHERE VOICE_MODEL = ?
+      LIMIT 1
+    `;
+    const results = await this.executeQuery(sql, {
+      '1': { type: 'TEXT', value: voiceModel },
+    });
+    return results?.[0]?.PHYSICIAN_ID ?? null;
   }
 
   // ─── Evaluation Queries ─────────────────────────────────────────────

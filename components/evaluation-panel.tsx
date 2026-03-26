@@ -140,6 +140,7 @@ export default function EvaluationPanel({ open, onClose, content, username }: Ev
 
   useEffect(() => {
     if (open) fetchEvaluation();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const fetchEvaluation = async () => {
@@ -243,9 +244,8 @@ export default function EvaluationPanel({ open, onClose, content, username }: Ev
         </DialogHeader>
         {loading && <div className="py-12 text-center text-sm text-slate-500">Loading evaluation...</div>}
         {!loading && noData && (
-          <div className="py-16 text-center space-y-2">
+          <div className="py-16 text-center">
             <p className="text-slate-500 font-medium">No evaluation on record yet.</p>
-            <p className="text-sm text-slate-400">Complete a training session and end it with &quot;done&quot; to generate your first report.</p>
           </div>
         )}
         {!loading && error && <div className="py-6 text-center text-sm text-red-500">{error}</div>}
