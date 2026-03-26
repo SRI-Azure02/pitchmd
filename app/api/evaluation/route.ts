@@ -13,13 +13,13 @@ export async function GET(request: NextRequest) {
   }
 
   const appUserId = session.userId;
-  const physicianId = request.nextUrl.searchParams.get('physicianId') ?? undefined;
+  const filterPhysicianId = request.nextUrl.searchParams.get('physicianId') ?? undefined;
 
   try {
     const client = getSnowflakeClient();
 
     const evaluation =
-      await client.queryLatestEvaluationByAppUser(appUserId, physicianId);
+      await client.queryLatestEvaluationByAppUser(appUserId, filterPhysicianId);
 
     if (!evaluation) {
       return NextResponse.json(

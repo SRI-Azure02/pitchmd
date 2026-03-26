@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import AudioInput from './audio-input';
 import EvaluationPanel from './evaluation-panel';
-import { Send, RotateCcw, Square, Volume2, VolumeX, Video, VideoOff, MessageSquare, Search, ChevronDown, X, Check, BarChart2, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import { Send, RotateCcw, Square, Volume2, VolumeX, Video, VideoOff, MessageSquare, Search, ChevronDown, X, Check, BarChart2, ArrowUp, ArrowDown, ArrowUpDown, Hash } from 'lucide-react';
 import { parseEmotion, speakText, stopCurrentAudio } from '@/lib/elevenlabs';
 
 interface Message {
@@ -39,6 +39,7 @@ function scoreBucket(score: number | null | undefined): string {
 function physicianSortValue(p: any, field: string): any {
   switch (field) {
     case 'name':          return `${p.LAST_NAME ?? ''} ${p.FIRST_NAME ?? ''}`.trim().toLowerCase();
+    case 'physicianId':   return (p.PHYSICIAN_ID ?? '').toLowerCase();
     case 'specialty':     return (p.SPECIALTY        ?? '').toLowerCase();
     case 'segment':       return (p.SEGMENT_NAME    ?? '').toLowerCase();
     case 'state':         return (p.STATE            ?? '').toLowerCase();
@@ -168,6 +169,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   const [filterValues, setFilterValues] = useState<FilterMap>({ segment: null, specialty: null, overallScore: null, fieldReadiness: null });
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [tableTooltip, setTableTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
+  const [showPhysicianId, setShowPhysicianId] = useState(false);
 
   // ── Refs ──────────────────────────────────────────────────────────────────
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -818,6 +820,20 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                   Clear
                 </button>
               )}
+
+              {/* Physician ID column toggle */}
+              <button
+                onClick={() => setShowPhysicianId(v => !v)}
+                className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                  showPhysicianId
+                    ? 'border-blue-300 bg-blue-50 text-blue-700'
+                    : 'border-slate-200 bg-white text-slate-400 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-600'
+                }`}
+                title={showPhysicianId ? 'Hide Physician ID column' : 'Show Physician ID column'}
+              >
+                <Hash className="w-3 h-3" />
+                ID
+              </button>
             </div>
 
             {/* Result count */}
@@ -844,13 +860,15 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                 <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_0_0_#e2e8f0]">
                   <tr>
                     {([
-                      { label: 'Physician',  field: 'name',          align: 'left',   tooltip: null },
-                      { label: 'Specialty',  field: 'specialty',     align: 'left',   tooltip: null },
+                      { label: 'Physician ID', field: 'physicianId',   align: 'left',   tooltip: null },
+                      { label: 'Physician',    field: 'name',          align: 'left',   tooltip: null },
+                      { label: 'Specialty',    field: 'specialty',     align: 'left',   tooltip: null },
                       { label: 'Segment',    field: 'segment',       align: 'left',   tooltip: null },
                       { label: 'State',      field: 'state',         align: 'left',   tooltip: null },
                       { label: 'Score',      field: 'overallScore',  align: 'center', tooltip: 'Median score across your 3 most recent sessions with the physician' },
                       { label: 'Readiness',  field: 'fieldReadiness',align: 'left',   tooltip: 'Most frequent readiness rating across your 3 most recent sessions with the physician' },
                     ] as const).map(({ label, field, align, tooltip }) => {
+                      if (field === 'physicianId' && !showPhysicianId) return null;
                       const active = sortConfig?.field === field;
                       return (
                         <th
@@ -896,6 +914,13 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
 
                     return (
                       <tr key={p.PHYSICIAN_ID} className="group border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                        {/* Physician ID (hidden by default) */}
+                        {showPhysicianId && (
+                          <td className="px-4 py-3 text-slate-500 text-sm font-mono">
+                            {p.PHYSICIAN_ID ?? <span className="text-slate-300">—</span>}
+                          </td>
+                        )}
+
                         {/* Name */}
                         <td className="px-4 py-3 font-semibold text-slate-900 whitespace-nowrap">
                           Dr. {p.FIRST_NAME} {p.LAST_NAME}
