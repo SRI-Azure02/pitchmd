@@ -53,25 +53,17 @@ function physicianSortValue(p: any, field: string): any {
 
 interface FilterDropdownProps {
   label: string;
-  field: string;
   options: string[];
-  sortType: 'alpha' | 'numeric';
   activeFilter: string | null;
-  sortConfig: SortConfig;
   onFilter: (val: string | null) => void;
-  onSort: (dir: SortDir) => void;
   isOpen: boolean;
   onToggle: () => void;
 }
 
 function PhysicianFilterDropdown({
-  label, field, options, sortType,
-  activeFilter, sortConfig, onFilter, onSort, isOpen, onToggle,
+  label, options, activeFilter, onFilter, isOpen, onToggle,
 }: FilterDropdownProps) {
-  const isThisSorted = sortConfig?.field === field;
-  const isActive = !!activeFilter || isThisSorted;
-  const asc  = sortType === 'alpha' ? 'A → Z' : 'Low → High';
-  const desc = sortType === 'alpha' ? 'Z → A' : 'High → Low';
+  const isActive = !!activeFilter;
 
   return (
     <div className="relative">
@@ -91,45 +83,23 @@ function PhysicianFilterDropdown({
 
       {isOpen && (
         <div className="absolute top-full left-0 mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-lg min-w-[190px] py-1 overflow-hidden">
-          {/* Sort options */}
           <button
-            onClick={() => { onSort('asc'); onToggle(); }}
-            className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-slate-50 ${isThisSorted && sortConfig?.dir === 'asc' ? 'text-blue-600 font-medium' : 'text-slate-700'}`}
+            onClick={() => { onFilter(null); onToggle(); }}
+            className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-slate-50 ${!activeFilter ? 'text-blue-600 font-medium' : 'text-slate-600'}`}
           >
-            ↑ {asc}
-            {isThisSorted && sortConfig?.dir === 'asc' && <Check className="w-3 h-3" />}
+            All
+            {!activeFilter && <Check className="w-3 h-3" />}
           </button>
-          <button
-            onClick={() => { onSort('desc'); onToggle(); }}
-            className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-slate-50 ${isThisSorted && sortConfig?.dir === 'desc' ? 'text-blue-600 font-medium' : 'text-slate-700'}`}
-          >
-            ↓ {desc}
-            {isThisSorted && sortConfig?.dir === 'desc' && <Check className="w-3 h-3" />}
-          </button>
-
-          {options.length > 0 && (
-            <>
-              <div className="border-t border-slate-100 my-1" />
-              <p className="px-3 py-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Filter</p>
-              <button
-                onClick={() => { onFilter(null); onToggle(); }}
-                className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-slate-50 ${!activeFilter ? 'text-blue-600 font-medium' : 'text-slate-600'}`}
-              >
-                All
-                {!activeFilter && <Check className="w-3 h-3" />}
-              </button>
-              {options.map((opt) => (
-                <button
-                  key={opt}
-                  onClick={() => { onFilter(opt); onToggle(); }}
-                  className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-slate-50 ${activeFilter === opt ? 'text-blue-600 font-medium bg-blue-50' : 'text-slate-600'}`}
-                >
-                  <span className="truncate max-w-[140px]">{opt}</span>
-                  {activeFilter === opt && <Check className="w-3 h-3 shrink-0" />}
-                </button>
-              ))}
-            </>
-          )}
+          {options.map((opt) => (
+            <button
+              key={opt}
+              onClick={() => { onFilter(opt); onToggle(); }}
+              className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-slate-50 ${activeFilter === opt ? 'text-blue-600 font-medium bg-blue-50' : 'text-slate-600'}`}
+            >
+              <span className="truncate max-w-[140px]">{opt}</span>
+              {activeFilter === opt && <Check className="w-3 h-3 shrink-0" />}
+            </button>
+          ))}
         </div>
       )}
     </div>
@@ -753,13 +723,9 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
               {/* Segment dropdown */}
               <PhysicianFilterDropdown
                 label="Segment"
-                field="segment"
                 options={uniqueSegments}
-                sortType="alpha"
                 activeFilter={filterValues.segment}
-                sortConfig={sortConfig}
                 onFilter={val => setFilterValues(prev => ({ ...prev, segment: val }))}
-                onSort={dir => setSortConfig({ field: 'segment', dir })}
                 isOpen={openDropdown === 'segment'}
                 onToggle={() => setOpenDropdown(v => v === 'segment' ? null : 'segment')}
               />
@@ -767,13 +733,9 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
               {/* Specialty dropdown */}
               <PhysicianFilterDropdown
                 label="Specialty"
-                field="specialty"
                 options={uniqueSpecialties}
-                sortType="alpha"
                 activeFilter={filterValues.specialty}
-                sortConfig={sortConfig}
                 onFilter={val => setFilterValues(prev => ({ ...prev, specialty: val }))}
-                onSort={dir => setSortConfig({ field: 'specialty', dir })}
                 isOpen={openDropdown === 'specialty'}
                 onToggle={() => setOpenDropdown(v => v === 'specialty' ? null : 'specialty')}
               />
@@ -781,13 +743,9 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
               {/* Overall Score dropdown */}
               <PhysicianFilterDropdown
                 label="Overall Score"
-                field="overallScore"
                 options={scoreBucketOptions}
-                sortType="numeric"
                 activeFilter={filterValues.overallScore}
-                sortConfig={sortConfig}
                 onFilter={val => setFilterValues(prev => ({ ...prev, overallScore: val }))}
-                onSort={dir => setSortConfig({ field: 'overallScore', dir })}
                 isOpen={openDropdown === 'overallScore'}
                 onToggle={() => setOpenDropdown(v => v === 'overallScore' ? null : 'overallScore')}
               />
@@ -795,13 +753,9 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
               {/* Field Readiness dropdown */}
               <PhysicianFilterDropdown
                 label="Field Readiness"
-                field="fieldReadiness"
                 options={uniqueReadiness}
-                sortType="alpha"
                 activeFilter={filterValues.fieldReadiness}
-                sortConfig={sortConfig}
                 onFilter={val => setFilterValues(prev => ({ ...prev, fieldReadiness: val }))}
-                onSort={dir => setSortConfig({ field: 'fieldReadiness', dir })}
                 isOpen={openDropdown === 'fieldReadiness'}
                 onToggle={() => setOpenDropdown(v => v === 'fieldReadiness' ? null : 'fieldReadiness')}
               />
@@ -821,26 +775,26 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                 </button>
               )}
 
-              {/* Physician ID column toggle */}
+            </div>
+
+            {/* Result count + column toggle row */}
+            <div className="flex items-center justify-between mt-1.5">
+              <p className="text-[11px] text-slate-400">
+                {filteredPhysicians.length} of {physicians.length} physician{physicians.length !== 1 ? 's' : ''}
+                {anyFilterActive ? ' match your filters' : ''}
+              </p>
               <button
                 onClick={() => setShowPhysicianId(v => !v)}
-                className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[11px] font-medium transition-colors ${
                   showPhysicianId
                     ? 'border-blue-300 bg-blue-50 text-blue-700'
                     : 'border-slate-200 bg-white text-slate-400 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-600'
                 }`}
-                title={showPhysicianId ? 'Hide Physician ID column' : 'Show Physician ID column'}
               >
                 <Hash className="w-3 h-3" />
-                ID
+                {showPhysicianId ? 'Hide Physician ID' : 'Show Physician ID'}
               </button>
             </div>
-
-            {/* Result count */}
-            <p className="text-[11px] text-slate-400 mt-1.5">
-              {filteredPhysicians.length} of {physicians.length} physician{physicians.length !== 1 ? 's' : ''}
-              {anyFilterActive ? ' match your filters' : ''}
-            </p>
           </div>
 
           {/* ── Physician table ──────────────────────────────────────────── */}
