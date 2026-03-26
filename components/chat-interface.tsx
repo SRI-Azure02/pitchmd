@@ -720,6 +720,19 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                 )}
               </div>
 
+              {/* Physician ID column toggle */}
+              <button
+                onClick={() => setShowPhysicianId(v => !v)}
+                className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                  showPhysicianId
+                    ? 'border-blue-300 bg-blue-50 text-blue-700'
+                    : 'border-slate-200 bg-white text-slate-400 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-600'
+                }`}
+              >
+                <Hash className="w-3 h-3" />
+                {showPhysicianId ? 'Hide Physician ID' : 'Show Physician ID'}
+              </button>
+
               {/* Segment dropdown */}
               <PhysicianFilterDropdown
                 label="Segment"
@@ -777,24 +790,11 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
 
             </div>
 
-            {/* Result count + column toggle row */}
-            <div className="flex items-center justify-between mt-1.5">
-              <p className="text-[11px] text-slate-400">
-                {filteredPhysicians.length} of {physicians.length} physician{physicians.length !== 1 ? 's' : ''}
-                {anyFilterActive ? ' match your filters' : ''}
-              </p>
-              <button
-                onClick={() => setShowPhysicianId(v => !v)}
-                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[11px] font-medium transition-colors ${
-                  showPhysicianId
-                    ? 'border-blue-300 bg-blue-50 text-blue-700'
-                    : 'border-slate-200 bg-white text-slate-400 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-600'
-                }`}
-              >
-                <Hash className="w-3 h-3" />
-                {showPhysicianId ? 'Hide Physician ID' : 'Show Physician ID'}
-              </button>
-            </div>
+            {/* Result count */}
+            <p className="text-[11px] text-slate-400 mt-1.5">
+              {filteredPhysicians.length} of {physicians.length} physician{physicians.length !== 1 ? 's' : ''}
+              {anyFilterActive ? ' match your filters' : ''}
+            </p>
           </div>
 
           {/* ── Physician table ──────────────────────────────────────────── */}
