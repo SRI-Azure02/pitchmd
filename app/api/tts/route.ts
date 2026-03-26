@@ -31,6 +31,8 @@ export async function POST(request: NextRequest) {
   }
 
   const apiKey = process.env.ELEVENLABS_API_KEY;
+  console.log('[tts] key present:', !!apiKey, '| key prefix:', apiKey?.slice(0, 8));
+  console.log('[tts] voiceId:', voiceId, '| text length:', text.length);
   if (!apiKey) {
     console.warn('[tts] ELEVENLABS_API_KEY not configured');
     return new Response(JSON.stringify({ error: 'TTS not configured' }), {
@@ -57,12 +59,12 @@ export async function POST(request: NextRequest) {
   });
 
   if (!response.ok) {
-    // Don't forward raw ElevenLabs error body — may contain account info
-    console.error('[tts] ElevenLabs error:', response.status);
-    return new Response(JSON.stringify({ error: `TTS request failed: ${response.status}` }), {
-      status: response.status,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    const errBody = await response.text().catch(() => '(unreadable)');
+    console.error('[tts] ElevenLabs error:', response.status, errBody);
+    return new Response(
+      JSON.stringify({ error: `TTS ${response.status}`, detail: errBody, voiceId }),
+      { status: response.status, headers: { 'Content-Type': 'application/json' } }
+    );
   }
 
   return new Response(response.body, {

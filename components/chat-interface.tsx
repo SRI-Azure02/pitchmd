@@ -168,9 +168,9 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   const [sessionDuration, setSessionDuration] = useState<number | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [ttsAvailable, setTtsAvailable] = useState(true);
-  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [voiceEnabled, setVoiceEnabled] = useState(false); // muted by default; toggle to enable
   const [avatarEnabled, setAvatarEnabled] = useState(false);
-  const voiceEnabledRef = useRef(true);
+  const voiceEnabledRef = useRef(false); // matches voiceEnabled initial state
 
   // ── Physician selection state ─────────────────────────────────────────────
   const [physicianSelectionMode, setPhysicianSelectionMode] = useState(false);

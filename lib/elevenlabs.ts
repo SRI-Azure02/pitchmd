@@ -43,6 +43,7 @@ export function parseEmotion(text: string): {
 
 let currentAudio: HTMLAudioElement | null = null;
 let currentObjectUrl: string | null = null;
+let currentUtterance: SpeechSynthesisUtterance | null = null;
 
 function cancelCurrentAudio() {
   if (currentAudio) {
@@ -54,11 +55,54 @@ function cancelCurrentAudio() {
     URL.revokeObjectURL(currentObjectUrl);
     currentObjectUrl = null;
   }
+  if (currentUtterance) {
+    window.speechSynthesis?.cancel();
+    currentUtterance = null;
+  }
+}
+
+// ─── Browser Web Speech API fallback ─────────────────────────
+
+function speakWithBrowser(text: string, emotion: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (!window.speechSynthesis) {
+      reject(new Error('Web Speech API not supported'));
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    currentUtterance = utterance;
+
+    // Map emotion to pitch/rate for basic expressiveness
+    const emotionMap: Record<string, { rate: number; pitch: number }> = {
+      neutral:    { rate: 1.0,  pitch: 1.0 },
+      curious:    { rate: 1.05, pitch: 1.1 },
+      skeptical:  { rate: 0.95, pitch: 0.95 },
+      frustrated: { rate: 1.1,  pitch: 0.9 },
+      dismissive: { rate: 0.9,  pitch: 0.85 },
+      impressed:  { rate: 1.05, pitch: 1.15 },
+      urgent:     { rate: 1.15, pitch: 1.05 },
+    };
+    const settings = emotionMap[emotion] ?? emotionMap.neutral;
+    utterance.rate = settings.rate;
+    utterance.pitch = settings.pitch;
+
+    // Prefer a male English voice if available
+    const voices = window.speechSynthesis.getVoices();
+    const preferred = voices.find(v => v.lang.startsWith('en') && v.name.toLowerCase().includes('male'))
+      ?? voices.find(v => v.lang.startsWith('en'))
+      ?? voices[0];
+    if (preferred) utterance.voice = preferred;
+
+    utterance.onend = () => { currentUtterance = null; resolve(); };
+    utterance.onerror = (e) => { currentUtterance = null; reject(new Error(e.error)); };
+    window.speechSynthesis.speak(utterance);
+  });
 }
 
 /**
- * ✅ Feature-flagged TTS
- * FEATURE_TTS=stub | real
+ * ✅ Feature-flagged TTS with browser fallback
+ * NEXT_PUBLIC_FEATURE_TTS=stub | real
  */
 export async function speakText(
   text: string,
@@ -67,7 +111,6 @@ export async function speakText(
 ): Promise<void> {
   const mode = process.env.NEXT_PUBLIC_FEATURE_TTS ?? 'stub';
 
-  // ✅ STUB MODE — no audio, no error
   if (mode === 'stub') {
     console.info('[tts] stub mode — audio skipped');
     return;
@@ -75,51 +118,47 @@ export async function speakText(
 
   cancelCurrentAudio();
 
-  const settings =
-    EMOTION_SETTINGS[emotion] ?? EMOTION_SETTINGS.neutral;
+  const settings = EMOTION_SETTINGS[emotion] ?? EMOTION_SETTINGS.neutral;
 
-  // Strip markdown formatting before sending to TTS — asterisks should not
-  // be spoken aloud, but the display text keeps them for rendering italics.
   const ttsText = text
-    .replace(/\*([^*]+)\*/g, '$1')  // *word* → word
-    .replace(/\*+/g, '')             // stray asterisks
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/\*+/g, '')
     .trim();
 
-  const response = await fetch('/api/tts', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      text: ttsText,
-      voiceId,
-      stability: settings.stability,
-      style: settings.style,
-      similarity_boost: settings.similarity_boost,
-    }),
-  });
+  // Try ElevenLabs first
+  try {
+    const response = await fetch('/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: ttsText,
+        voiceId,
+        stability: settings.stability,
+        style: settings.style,
+        similarity_boost: settings.similarity_boost,
+      }),
+    });
 
-  if (!response.ok) {
-    const msg =
-      response.status === 402
-        ? 'ElevenLabs quota exceeded (402)'
-        : response.status === 503
-        ? 'ElevenLabs API key not configured (503)'
-        : `TTS request failed (${response.status})`;
+    if (!response.ok) {
+      const body = await response.json().catch(() => null);
+      console.warn('[tts] ElevenLabs failed, falling back to browser TTS:', response.status, body?.detail ?? '');
+      await speakWithBrowser(ttsText, emotion);
+      return;
+    }
 
-    console.error('[tts] error:', msg);
-    throw new Error(msg);
+    const audioBlob = await response.blob();
+    const audioUrl = URL.createObjectURL(audioBlob);
+    currentObjectUrl = audioUrl;
+    const audio = new Audio(audioUrl);
+    currentAudio = audio;
+    audio.onended = cancelCurrentAudio;
+    audio.onerror = cancelCurrentAudio;
+    await audio.play();
+
+  } catch (err) {
+    console.warn('[tts] ElevenLabs error, falling back to browser TTS:', err);
+    await speakWithBrowser(ttsText, emotion);
   }
-
-  const audioBlob = await response.blob();
-  const audioUrl = URL.createObjectURL(audioBlob);
-
-  currentObjectUrl = audioUrl;
-  const audio = new Audio(audioUrl);
-  currentAudio = audio;
-
-  audio.onended = cancelCurrentAudio;
-  audio.onerror = cancelCurrentAudio;
-
-  await audio.play();
 }
 
 export function stopCurrentAudio() {
