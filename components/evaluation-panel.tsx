@@ -103,7 +103,7 @@ function CollapsibleDimension({ title, score, rationale, indicators, sessionCoun
             <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${score >= 8 ? 'bg-green-100 text-green-700' :
               score >= 6 ? 'bg-yellow-100 text-yellow-700' :
                 'bg-red-100 text-red-700'
-              }`}>{score}/10</span>
+              }`}>{Number(score).toFixed(1)}/10</span>
           )}
         </div>
         <span className="text-slate-400 text-lg">{open ? '−' : '+'}</span>
@@ -252,53 +252,56 @@ export default function EvaluationPanel({ open, onClose, content, username, phys
         {!loading && error && <div className="py-6 text-center text-sm text-red-500">{error}</div>}
         {e && !loading && (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="border border-slate-200 rounded-lg p-5 bg-white">
-                <p className="text-sm font-medium text-slate-500 mb-1">Field Readiness</p>
-                <p className="text-xs text-slate-400 mb-3">Based on median overall score across most recent {sessionCount} session{sessionCount !== 1 ? 's' : ''}</p>
-                <div className="flex justify-center mb-4">
-                  <span className={`text-sm font-bold px-3 py-1.5 rounded-full ${fieldReadyColor()}`}>{fieldReadinessLabel()}</span>
+            <div className="border border-slate-200 rounded-lg p-6 bg-white">
+              <div className="flex items-stretch gap-0 mb-6">
+                <div className="flex-1 flex flex-col pr-6">
+                  <p className="text-sm font-bold text-slate-800 mb-1">Field Readiness</p>
+                  <p className="text-xs text-slate-400 mb-4">Based on median overall score across most recent {sessionCount} session{sessionCount !== 1 ? 's' : ''}</p>
+                  <div className="flex-1 flex items-center justify-center">
+                    <span className={`text-sm font-bold px-4 py-2 rounded-full ${fieldReadyColor()}`}>{fieldReadinessLabel()}</span>
+                  </div>
                 </div>
-                <div className="border-t border-slate-100 pt-3 space-y-1.5">
-                  <p className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wide">Qualifying Criteria</p>
-                  <div className="flex items-center gap-2">
+                <div className="w-px bg-slate-200 self-stretch mx-2" />
+                <div className="flex-1 flex flex-col pl-6">
+                  <p className="text-sm font-bold text-slate-800 mb-1">Overall Score</p>
+                  <p className="text-xs text-slate-400 mb-4">Median across most recent {sessionCount} session{sessionCount !== 1 ? 's' : ''}</p>
+                  <div className="flex-1 flex items-center justify-center">
+                    <p className="text-5xl font-bold text-slate-900">{e.OVERALL_SCORE ?? '—'}<span className="text-xl font-normal text-slate-400"> /10</span></p>
+                  </div>
+                </div>
+              </div>
+              <div className="border-t border-slate-100 pt-4">
+                <p className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wide">Qualifying Criteria</p>
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-1.5 whitespace-nowrap">
                     <span className="inline-block w-2 h-2 rounded-full bg-green-500 shrink-0" />
                     <span className="text-xs text-slate-600"><span className="font-semibold text-slate-700">Field Ready</span> — Score ≥ 8</span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 whitespace-nowrap">
                     <span className="inline-block w-2 h-2 rounded-full bg-yellow-400 shrink-0" />
                     <span className="text-xs text-slate-600"><span className="font-semibold text-slate-700">Coaching Needed</span> — Score 6–7</span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 whitespace-nowrap">
                     <span className="inline-block w-2 h-2 rounded-full bg-red-400 shrink-0" />
                     <span className="text-xs text-slate-600"><span className="font-semibold text-slate-700">Not Ready</span> — Score &lt; 6</span>
                   </div>
                 </div>
               </div>
-              <div className="border border-slate-200 rounded-lg p-5 bg-white text-center">
-                <p className="text-sm font-medium text-slate-500 mb-1">Overall Score</p>
-                <p className="text-xs text-slate-400 mb-1">Median across most recent {sessionCount} session{sessionCount !== 1 ? 's' : ''}</p>
-                <p className="text-5xl font-bold text-slate-900">{e.OVERALL_SCORE ?? '—'}<span className="text-xl font-normal text-slate-400"> /10</span></p>
-              </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="border border-slate-200 rounded-lg p-5 bg-white">
-                <p className="text-sm font-bold text-slate-800 mb-1">Recommendations</p>
-                <p className="text-xs text-slate-400 mb-3">Across most recent {sessionCount} session{sessionCount !== 1 ? 's' : ''}</p>
-                {Array.isArray(e.RECOMMENDATIONS) && e.RECOMMENDATIONS.length > 0 ? (
-                  <ul className="space-y-2">{e.RECOMMENDATIONS.map((rec: string, i: number) => (
-                    <li key={i} className="flex items-start gap-2">
-                      <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
-                      <span className="text-sm text-slate-700 leading-relaxed">{rec}</span>
-                    </li>
-                  ))}</ul>
-                ) : <p className="text-sm text-slate-400">—</p>}
-              </div>
-              <div className="border border-slate-200 rounded-lg p-5 bg-white">
-                <p className="text-sm font-bold text-slate-800 mb-1">Coaching Priority</p>
-                <p className="text-xs text-slate-400 mb-3">Across most recent {sessionCount} session{sessionCount !== 1 ? 's' : ''}</p>
-                <p className="text-sm text-slate-700 leading-relaxed">{e.COACHING_PRIORITY ?? '—'}</p>
-              </div>
+            <div className="border border-slate-200 rounded-lg p-5 bg-white">
+              <p className="text-sm font-bold text-slate-800 mb-1">Coaching Priority</p>
+              <p className="text-xs text-slate-400 mb-3">Across most recent {sessionCount} session{sessionCount !== 1 ? 's' : ''}</p>
+              {e.COACHING_PRIORITY && (
+                <p className="text-sm font-medium text-slate-700 mb-3">{e.COACHING_PRIORITY}</p>
+              )}
+              {Array.isArray(e.RECOMMENDATIONS) && e.RECOMMENDATIONS.length > 0 ? (
+                <ul className="space-y-2">{e.RECOMMENDATIONS.map((rec: string, i: number) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
+                    <span className="text-sm text-slate-700 leading-relaxed">{rec}</span>
+                  </li>
+                ))}</ul>
+              ) : !e.COACHING_PRIORITY && <p className="text-sm text-slate-400">—</p>}
             </div>
             <div className="border border-slate-200 rounded-lg p-5 bg-white">
               <p className="text-sm font-bold text-slate-800 mb-1">Dimension Scores</p>
