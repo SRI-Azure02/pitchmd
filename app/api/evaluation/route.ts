@@ -6,69 +6,55 @@ export async function GET(request: NextRequest) {
   const session = await getSessionFromRequest(request);
 
   if (!session) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401 }
-    );
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const appUserId = session.userId;
-  const filterPhysicianId = request.nextUrl.searchParams.get('physicianId') ?? undefined;
+  const physicianId = request.nextUrl.searchParams.get('physicianId');
+
+  if (!physicianId) {
+    return NextResponse.json(
+      { error: 'physicianId query parameter is required' },
+      { status: 400 }
+    );
+  }
 
   try {
     const client = getSnowflakeClient();
 
-    const evaluation =
-      await client.queryLatestEvaluationByAppUser(appUserId, filterPhysicianId);
+    // Aggregated result: median scores, mode field readiness,
+    // majority boolean indicators — scoped to this user + physician.
+    const evaluation = await client.queryAggregatedEvaluationByPhysician(
+      appUserId,
+      physicianId
+    );
 
     if (!evaluation) {
       return NextResponse.json(
-        { error: 'No evaluation found for this user' },
+        { error: 'No evaluation found for this user and physician' },
         { status: 404 }
       );
     }
 
-    const physicianId = evaluation.PHYSICIAN_ID;
-    const segmentName = evaluation.SEGMENT_NAME;
-
     const physicianName =
-      evaluation.PHYSICIAN_FIRST_NAME &&
-      evaluation.PHYSICIAN_LAST_NAME
+      evaluation.PHYSICIAN_FIRST_NAME && evaluation.PHYSICIAN_LAST_NAME
         ? `${evaluation.PHYSICIAN_FIRST_NAME} ${evaluation.PHYSICIAN_LAST_NAME}`
         : physicianId;
 
-    const [
-      historyWithPhysician,
-      historyAllPhysicians,
-      segmentMedian,
-    ] = await Promise.all([
+    // Individual session scores for the trend line chart
+    const historyWithPhysician = await client.queryEvaluationHistory(
+      appUserId,
       physicianId
-        ? client.queryEvaluationHistory(appUserId, physicianId)
-        : Promise.resolve([]),
-
-      client.queryEvaluationHistoryAllPhysicians(appUserId),
-
-      segmentName
-        ? client.querySegmentMedianScoresForUser(
-            appUserId,
-            segmentName
-          )
-        : Promise.resolve([]),
-    ]);
+    );
 
     return NextResponse.json({
       evaluation,
       physicianName,
       historyWithPhysician,
-      historyAllPhysicians,
-      segmentMedian,
+      sessionCount: evaluation.SESSION_COUNT ?? 1,
     });
   } catch (error: any) {
-    console.error(
-      '[evaluation] error:',
-      error?.response?.data || error?.message
-    );
-
+    console.error('[evaluation] error:', error?.response?.data || error?.message);
     return NextResponse.json(
       { error: error?.message || 'Failed to fetch evaluation' },
       { status: 500 }

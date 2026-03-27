@@ -303,35 +303,145 @@ export class SnowflakeClient {
 
   // ─── Evaluation Queries ─────────────────────────────────────────────
 
-  async queryLatestEvaluationByAppUser(
+  /**
+   * Returns a single aggregated evaluation row for a specific user + physician:
+   *   - OVERALL_SCORE / dimension scores  → MEDIAN of most recent 3 sessions
+   *   - FIELD_READINESS                   → MODE  of most recent 3 sessions
+   *   - Boolean indicators (CK_C*, COMP_K*, TR_T*, CL_L*) → majority (> 50 %) of most recent 3
+   *   - Rationales, RECOMMENDATIONS, COACHING_PRIORITY, OH_OBJECTION_DETAILS → from latest session
+   */
+  async queryAggregatedEvaluationByPhysician(
     appUserId: string,
-    physicianId?: string
+    physicianId: string
   ): Promise<any> {
-    if (physicianId) {
-      const sql = `
-        SELECT *
+    const sql = `
+      WITH last3 AS (
+        SELECT *,
+          ROW_NUMBER() OVER (ORDER BY EVALUATED_AT DESC) AS rn
         FROM CORTEX_TESTING.ML.REPEVAL_RESULTS
         WHERE APP_USER_ID = ?
           AND PHYSICIAN_ID = ?
-        ORDER BY EVALUATED_AT DESC
-        LIMIT 1
-      `;
-      const results = await this.executeQuery(sql, {
-        '1': { type: 'TEXT', value: appUserId },
-        '2': { type: 'TEXT', value: physicianId },
-      });
-      return results?.[0] ?? null;
-    }
-
-    const sql = `
-      SELECT *
-      FROM CORTEX_TESTING.ML.REPEVAL_RESULTS
-      WHERE APP_USER_ID = ?
-      ORDER BY EVALUATED_AT DESC
-      LIMIT 1
+      ),
+      latest AS (
+        SELECT * FROM last3 WHERE rn = 1
+      ),
+      top3 AS (
+        SELECT * FROM last3 WHERE rn <= 3
+      ),
+      n AS (
+        SELECT COUNT(*) AS cnt FROM top3
+      ),
+      median_scores AS (
+        SELECT
+          MEDIAN(OVERALL_SCORE)              AS OVERALL_SCORE,
+          MEDIAN(CLINICAL_KNOWLEDGE_SCORE)   AS CLINICAL_KNOWLEDGE_SCORE,
+          MEDIAN(OBJECTION_HANDLING_SCORE)   AS OBJECTION_HANDLING_SCORE,
+          MEDIAN(COMPLIANCE_SCORE)           AS COMPLIANCE_SCORE,
+          MEDIAN(TONE_RAPPORT_SCORE)         AS TONE_RAPPORT_SCORE,
+          MEDIAN(CLOSING_SCORE)              AS CLOSING_SCORE
+        FROM top3
+      ),
+      readiness_mode AS (
+        SELECT FIELD_READINESS
+        FROM (
+          SELECT FIELD_READINESS,
+            ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC, FIELD_READINESS) AS mode_rn
+          FROM top3
+          WHERE FIELD_READINESS IS NOT NULL
+          GROUP BY FIELD_READINESS
+        )
+        WHERE mode_rn = 1
+      ),
+      bool_agg AS (
+        SELECT
+          SUM(CASE WHEN CK_C1 THEN 1 ELSE 0 END)    AS CK_C1,
+          SUM(CASE WHEN CK_C2 THEN 1 ELSE 0 END)    AS CK_C2,
+          SUM(CASE WHEN CK_C3 THEN 1 ELSE 0 END)    AS CK_C3,
+          SUM(CASE WHEN CK_C4 THEN 1 ELSE 0 END)    AS CK_C4,
+          SUM(CASE WHEN CK_C5 THEN 1 ELSE 0 END)    AS CK_C5,
+          SUM(CASE WHEN CK_C6 THEN 1 ELSE 0 END)    AS CK_C6,
+          SUM(CASE WHEN CK_C7 THEN 1 ELSE 0 END)    AS CK_C7,
+          SUM(CASE WHEN CK_C8 THEN 1 ELSE 0 END)    AS CK_C8,
+          SUM(CASE WHEN COMP_K1 THEN 1 ELSE 0 END)  AS COMP_K1,
+          SUM(CASE WHEN COMP_K2 THEN 1 ELSE 0 END)  AS COMP_K2,
+          SUM(CASE WHEN COMP_K3 THEN 1 ELSE 0 END)  AS COMP_K3,
+          SUM(CASE WHEN COMP_K4 THEN 1 ELSE 0 END)  AS COMP_K4,
+          SUM(CASE WHEN COMP_K5 THEN 1 ELSE 0 END)  AS COMP_K5,
+          SUM(CASE WHEN COMP_K6 THEN 1 ELSE 0 END)  AS COMP_K6,
+          SUM(CASE WHEN TR_T1 THEN 1 ELSE 0 END)    AS TR_T1,
+          SUM(CASE WHEN TR_T2 THEN 1 ELSE 0 END)    AS TR_T2,
+          SUM(CASE WHEN TR_T3 THEN 1 ELSE 0 END)    AS TR_T3,
+          SUM(CASE WHEN TR_T4 THEN 1 ELSE 0 END)    AS TR_T4,
+          SUM(CASE WHEN TR_T5 THEN 1 ELSE 0 END)    AS TR_T5,
+          SUM(CASE WHEN TR_T6 THEN 1 ELSE 0 END)    AS TR_T6,
+          SUM(CASE WHEN TR_T7 THEN 1 ELSE 0 END)    AS TR_T7,
+          SUM(CASE WHEN CL_L1 THEN 1 ELSE 0 END)    AS CL_L1,
+          SUM(CASE WHEN CL_L2 THEN 1 ELSE 0 END)    AS CL_L2,
+          SUM(CASE WHEN CL_L3 THEN 1 ELSE 0 END)    AS CL_L3,
+          SUM(CASE WHEN CL_L4 THEN 1 ELSE 0 END)    AS CL_L4,
+          SUM(CASE WHEN CL_L5 THEN 1 ELSE 0 END)    AS CL_L5,
+          SUM(CASE WHEN CL_L6 THEN 1 ELSE 0 END)    AS CL_L6
+        FROM top3
+      )
+      SELECT
+        l.PHYSICIAN_ID,
+        l.PHYSICIAN_FIRST_NAME,
+        l.PHYSICIAN_LAST_NAME,
+        l.PHYSICIAN_SPECIALTY,
+        l.SEGMENT_NAME,
+        l.CLINICAL_KNOWLEDGE_RATIONALE,
+        l.OBJECTION_HANDLING_RATIONALE,
+        l.COMPLIANCE_RATIONALE,
+        l.TONE_RAPPORT_RATIONALE,
+        l.CLOSING_RATIONALE,
+        l.OH_OBJECTION_DETAILS,
+        l.RECOMMENDATIONS,
+        l.COACHING_PRIORITY,
+        l.EVALUATED_AT,
+        rm.FIELD_READINESS,
+        ms.OVERALL_SCORE,
+        ms.CLINICAL_KNOWLEDGE_SCORE,
+        ms.OBJECTION_HANDLING_SCORE,
+        ms.COMPLIANCE_SCORE,
+        ms.TONE_RAPPORT_SCORE,
+        ms.CLOSING_SCORE,
+        (ba.CK_C1   > n.cnt / 2) AS CK_C1,
+        (ba.CK_C2   > n.cnt / 2) AS CK_C2,
+        (ba.CK_C3   > n.cnt / 2) AS CK_C3,
+        (ba.CK_C4   > n.cnt / 2) AS CK_C4,
+        (ba.CK_C5   > n.cnt / 2) AS CK_C5,
+        (ba.CK_C6   > n.cnt / 2) AS CK_C6,
+        (ba.CK_C7   > n.cnt / 2) AS CK_C7,
+        (ba.CK_C8   > n.cnt / 2) AS CK_C8,
+        (ba.COMP_K1 > n.cnt / 2) AS COMP_K1,
+        (ba.COMP_K2 > n.cnt / 2) AS COMP_K2,
+        (ba.COMP_K3 > n.cnt / 2) AS COMP_K3,
+        (ba.COMP_K4 > n.cnt / 2) AS COMP_K4,
+        (ba.COMP_K5 > n.cnt / 2) AS COMP_K5,
+        (ba.COMP_K6 > n.cnt / 2) AS COMP_K6,
+        (ba.TR_T1   > n.cnt / 2) AS TR_T1,
+        (ba.TR_T2   > n.cnt / 2) AS TR_T2,
+        (ba.TR_T3   > n.cnt / 2) AS TR_T3,
+        (ba.TR_T4   > n.cnt / 2) AS TR_T4,
+        (ba.TR_T5   > n.cnt / 2) AS TR_T5,
+        (ba.TR_T6   > n.cnt / 2) AS TR_T6,
+        (ba.TR_T7   > n.cnt / 2) AS TR_T7,
+        (ba.CL_L1   > n.cnt / 2) AS CL_L1,
+        (ba.CL_L2   > n.cnt / 2) AS CL_L2,
+        (ba.CL_L3   > n.cnt / 2) AS CL_L3,
+        (ba.CL_L4   > n.cnt / 2) AS CL_L4,
+        (ba.CL_L5   > n.cnt / 2) AS CL_L5,
+        (ba.CL_L6   > n.cnt / 2) AS CL_L6,
+        n.cnt                      AS SESSION_COUNT
+      FROM latest l
+      CROSS JOIN median_scores ms
+      CROSS JOIN bool_agg ba
+      CROSS JOIN n
+      LEFT JOIN readiness_mode rm ON 1 = 1
     `;
     const results = await this.executeQuery(sql, {
       '1': { type: 'TEXT', value: appUserId },
+      '2': { type: 'TEXT', value: physicianId },
     });
     return results?.[0] ?? null;
   }
