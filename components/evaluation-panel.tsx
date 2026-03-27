@@ -55,12 +55,6 @@ function parseSnowflakeDate(val: any): Date | null {
   return isNaN(d.getTime()) ? null : d;
 }
 
-function formatDate(val: any): string {
-  const d = parseSnowflakeDate(val);
-  if (!d) return '';
-  return `${d.getMonth() + 1}/${d.getDate()}/${String(d.getFullYear()).slice(2)}`;
-}
-
 function formatDateTime(val: any): string {
   const d = parseSnowflakeDate(val);
   if (!d) return '';
@@ -132,8 +126,7 @@ function CollapsibleDimension({ title, score, rationale, indicators }: {
 export default function EvaluationPanel({ open, onClose, content, username, physicianId }: EvaluationPanelProps) {
   const [evaluation, setEvaluation] = useState<any>(null);
   const [historyWithPhysician, setHistoryWithPhysician] = useState<any[]>([]);
-  const [historyAllPhysicians, setHistoryAllPhysicians] = useState<any[]>([]);
-  const [segmentMedian, setSegmentMedian] = useState<any[]>([]);
+  const [sessionCount, setSessionCount] = useState<number>(1);
   const [physicianName, setPhysicianName] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [noData, setNoData] = useState(false);
@@ -149,10 +142,8 @@ export default function EvaluationPanel({ open, onClose, content, username, phys
     setError(null);
     setNoData(false);
     try {
-      const url = physicianId
-        ? `/api/evaluation?physicianId=${encodeURIComponent(physicianId)}`
-        : '/api/evaluation';
-      const res = await fetch(url);
+      if (!physicianId) { setNoData(true); return; }
+      const res = await fetch(`/api/evaluation?physicianId=${encodeURIComponent(physicianId)}`);
       if (res.status === 404) { setNoData(true); setEvaluation(null); return; }
       if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Could not load evaluation'); }
       const data = await res.json();
@@ -161,8 +152,7 @@ export default function EvaluationPanel({ open, onClose, content, username, phys
       const last = data.evaluation?.PHYSICIAN_LAST_NAME;
       setPhysicianName([first, last].filter(Boolean).join(' ') || data.evaluation?.PHYSICIAN_ID || null);
       setHistoryWithPhysician(data.historyWithPhysician || []);
-      setHistoryAllPhysicians(data.historyAllPhysicians || []);
-      setSegmentMedian(data.segmentMedian || []);
+      setSessionCount(data.sessionCount ?? 1);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -179,23 +169,12 @@ export default function EvaluationPanel({ open, onClose, content, username, phys
     return 'bg-red-100 text-red-700';
   };
 
+  const aggregationNote = `Aggregated across ${sessionCount} session${sessionCount !== 1 ? 's' : ''} with this physician`;
+
   const barData = DIMENSIONS.map(d => ({ name: d.short, fullName: d.label, score: e?.[d.key] ?? 0 }));
 
   const histPhysicianData = historyWithPhysician.map((r: any) => ({
     date: formatDateTime(r.EVALUATED_AT),
-    Overall: r.OVERALL_SCORE, CK: r.CLINICAL_KNOWLEDGE_SCORE, OH: r.OBJECTION_HANDLING_SCORE,
-    CO: r.COMPLIANCE_SCORE, TR: r.TONE_RAPPORT_SCORE, CL: r.CLOSING_SCORE,
-  }));
-
-  // Charts 2 & 3 use ::DATE — use formatDate which correctly parses "YYYY-MM-DD" as local midnight
-  const histAllData = historyAllPhysicians.map((r: any) => ({
-    date: formatDate(r.EVALUATED_AT),
-    Overall: r.OVERALL_SCORE, CK: r.CLINICAL_KNOWLEDGE_SCORE, OH: r.OBJECTION_HANDLING_SCORE,
-    CO: r.COMPLIANCE_SCORE, TR: r.TONE_RAPPORT_SCORE, CL: r.CLOSING_SCORE,
-  }));
-
-  const segmentData = segmentMedian.map((r: any) => ({
-    date: formatDate(r.EVALUATED_AT),
     Overall: r.OVERALL_SCORE, CK: r.CLINICAL_KNOWLEDGE_SCORE, OH: r.OBJECTION_HANDLING_SCORE,
     CO: r.COMPLIANCE_SCORE, TR: r.TONE_RAPPORT_SCORE, CL: r.CLOSING_SCORE,
   }));
@@ -244,12 +223,16 @@ export default function EvaluationPanel({ open, onClose, content, username, phys
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[90vh] overflow-y-auto" style={{ maxWidth: '90rem', width: '90vw' }}>
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold text-slate-900">Evaluation Report</DialogTitle>
+          <DialogTitle className="text-xl font-bold text-slate-900">
+            Evaluation Report
+            {physicianName && <span className="ml-2 text-base font-normal text-slate-500">— {physicianName}</span>}
+          </DialogTitle>
+          {e && <p className="text-xs text-slate-400 mt-0.5">{aggregationNote}</p>}
         </DialogHeader>
         {loading && <div className="py-12 text-center text-sm text-slate-500">Loading evaluation...</div>}
         {!loading && noData && (
           <div className="py-16 text-center">
-            <p className="text-slate-500 font-medium">No evaluation on record yet.</p>
+            <p className="text-slate-500 font-medium">No evaluation on record yet for this physician.</p>
           </div>
         )}
         {!loading && error && <div className="py-6 text-center text-sm text-red-500">{error}</div>}
@@ -257,17 +240,20 @@ export default function EvaluationPanel({ open, onClose, content, username, phys
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="border border-slate-200 rounded-lg p-5 bg-white text-center">
-                <p className="text-sm font-medium text-slate-500 mb-3">Field Readiness</p>
+                <p className="text-sm font-medium text-slate-500 mb-1">Field Readiness</p>
+                <p className="text-xs text-slate-400 mb-3">Mode across most recent {sessionCount} session{sessionCount !== 1 ? 's' : ''}</p>
                 <span className={`text-sm font-bold px-3 py-1.5 rounded-full ${fieldReadyColor()}`}>{e.FIELD_READINESS ?? '—'}</span>
               </div>
               <div className="border border-slate-200 rounded-lg p-5 bg-white text-center">
                 <p className="text-sm font-medium text-slate-500 mb-1">Overall Score</p>
+                <p className="text-xs text-slate-400 mb-1">Median across most recent {sessionCount} session{sessionCount !== 1 ? 's' : ''}</p>
                 <p className="text-5xl font-bold text-slate-900">{e.OVERALL_SCORE ?? '—'}<span className="text-xl font-normal text-slate-400"> /10</span></p>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="border border-slate-200 rounded-lg p-5 bg-white">
-                <p className="text-sm font-bold text-slate-800 mb-3">Recommendations</p>
+                <p className="text-sm font-bold text-slate-800 mb-1">Recommendations</p>
+                <p className="text-xs text-slate-400 mb-3">From most recent session</p>
                 {Array.isArray(e.RECOMMENDATIONS) && e.RECOMMENDATIONS.length > 0 ? (
                   <ul className="space-y-2">{e.RECOMMENDATIONS.map((rec: string, i: number) => (
                     <li key={i} className="flex items-start gap-2">
@@ -278,12 +264,14 @@ export default function EvaluationPanel({ open, onClose, content, username, phys
                 ) : <p className="text-sm text-slate-400">—</p>}
               </div>
               <div className="border border-slate-200 rounded-lg p-5 bg-white">
-                <p className="text-sm font-bold text-slate-800 mb-3">Coaching Priority</p>
+                <p className="text-sm font-bold text-slate-800 mb-1">Coaching Priority</p>
+                <p className="text-xs text-slate-400 mb-3">From most recent session</p>
                 <p className="text-sm text-slate-700 leading-relaxed">{e.COACHING_PRIORITY ?? '—'}</p>
               </div>
             </div>
             <div className="border border-slate-200 rounded-lg p-5 bg-white">
-              <p className="text-sm font-bold text-slate-800 mb-4">Dimension Scores</p>
+              <p className="text-sm font-bold text-slate-800 mb-1">Dimension Scores</p>
+              <p className="text-xs text-slate-400 mb-4">Median across most recent {sessionCount} session{sessionCount !== 1 ? 's' : ''}</p>
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={barData} margin={{ top: 20, right: 10, left: 10, bottom: 5 }}>
                   <XAxis dataKey="name" tick={{ fontSize: 12 }} />
@@ -347,27 +335,11 @@ export default function EvaluationPanel({ open, onClose, content, username, phys
               { label: 'Connected close to urgency or relevance', value: e.CL_L5 },
               { label: 'Established follow-up timeline', value: e.CL_L6 },
             ]} />
-            <div className="grid grid-cols-3 gap-4">
-              <HistoryChart
-                data={histPhysicianData}
-                title={physicianName ?? e.PHYSICIAN_ID ?? ''}
-                subtitle={[e.PHYSICIAN_SPECIALTY, e.PHYSICIAN_ID].filter(Boolean).join(' — ')}
-              />
-              <HistoryChart data={segmentData} title={`Median — ${e.SEGMENT_NAME ?? 'Same Segment'}`} />
-              <HistoryChart data={histAllData} title="Median — All Physicians" />
-            </div>
-            {Array.isArray(e.RECOMMENDATIONS) && e.RECOMMENDATIONS.length > 0 && (
-              <div className="border border-slate-200 rounded-lg p-5 bg-white">
-                <p className="text-sm font-bold text-slate-800 mb-3">Coaching Focus Summary</p>
-                <p className="text-sm text-slate-500 mb-3">Synthesized across all training sessions{e.SEGMENT_NAME ? ` with ${e.SEGMENT_NAME} physicians` : ''}.</p>
-                <ul className="space-y-2">{e.RECOMMENDATIONS.map((rec: string, i: number) => (
-                  <li key={i} className="flex items-start gap-2">
-                    <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-orange-400 shrink-0" />
-                    <span className="text-sm text-slate-700 leading-relaxed">{rec}</span>
-                  </li>
-                ))}</ul>
-              </div>
-            )}
+            <HistoryChart
+              data={histPhysicianData}
+              title={`Score Trend — ${physicianName ?? e.PHYSICIAN_ID ?? ''}`}
+              subtitle={[e.PHYSICIAN_SPECIALTY, e.PHYSICIAN_ID].filter(Boolean).join(' — ')}
+            />
           </div>
         )}
       </DialogContent>
