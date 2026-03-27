@@ -352,6 +352,23 @@ export class SnowflakeClient {
         )
         WHERE mode_rn = 1
       ),
+      rec_agg AS (
+        SELECT ARRAY_AGG(DISTINCT r.value::STRING) AS RECOMMENDATIONS
+        FROM top3,
+        LATERAL FLATTEN(input => RECOMMENDATIONS) r
+        WHERE RECOMMENDATIONS IS NOT NULL
+      ),
+      coaching_mode AS (
+        SELECT COACHING_PRIORITY
+        FROM (
+          SELECT COACHING_PRIORITY,
+            ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC, COACHING_PRIORITY) AS mode_rn
+          FROM top3
+          WHERE COACHING_PRIORITY IS NOT NULL
+          GROUP BY COACHING_PRIORITY
+        )
+        WHERE mode_rn = 1
+      ),
       bool_agg AS (
         SELECT
           SUM(CASE WHEN CK_C1 THEN 1 ELSE 0 END)    AS CK_C1,
@@ -395,8 +412,8 @@ export class SnowflakeClient {
         l.TONE_RAPPORT_RATIONALE,
         l.CLOSING_RATIONALE,
         l.OH_OBJECTION_DETAILS,
-        l.RECOMMENDATIONS,
-        l.COACHING_PRIORITY,
+        ra.RECOMMENDATIONS,
+        cm.COACHING_PRIORITY,
         l.EVALUATED_AT,
         rm.FIELD_READINESS,
         ms.OVERALL_SCORE,
@@ -438,6 +455,8 @@ export class SnowflakeClient {
       CROSS JOIN bool_agg ba
       CROSS JOIN n
       LEFT JOIN readiness_mode rm ON 1 = 1
+      LEFT JOIN rec_agg ra ON 1 = 1
+      LEFT JOIN coaching_mode cm ON 1 = 1
     `;
     const results = await this.executeQuery(sql, {
       '1': { type: 'TEXT', value: appUserId },
