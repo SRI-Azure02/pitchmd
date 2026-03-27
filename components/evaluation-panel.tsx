@@ -79,13 +79,15 @@ function ScoreBar({ score, max = 10 }: { score: number; max?: number }) {
   );
 }
 
-function CollapsibleDimension({ title, score, rationale, indicators }: {
+function CollapsibleDimension({ title, score, rationale, indicators, sessionCount }: {
   title: string;
   score: number | null;
   rationale: string | null;
   indicators: { label: string; value: boolean | null }[];
+  sessionCount?: number;
 }) {
   const [open, setOpen] = useState(false);
+  const n = sessionCount ?? 1;
   return (
     <div className="border border-slate-200 rounded-lg bg-white overflow-hidden">
       <button
@@ -93,7 +95,10 @@ function CollapsibleDimension({ title, score, rationale, indicators }: {
         className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50 transition-colors"
       >
         <div className="flex items-center gap-4">
-          <span className="text-sm font-bold text-slate-800">{title}</span>
+          <div className="text-left">
+            <span className="text-sm font-bold text-slate-800">{title}</span>
+            <p className="text-xs text-slate-400">Median across {n} session{n !== 1 ? 's' : ''} · Indicators: majority vote</p>
+          </div>
           {score !== null && (
             <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${score >= 8 ? 'bg-green-100 text-green-700' :
               score >= 6 ? 'bg-yellow-100 text-yellow-700' :
@@ -162,14 +167,23 @@ export default function EvaluationPanel({ open, onClose, content, username, phys
 
   const e = evaluation;
 
-  const fieldReadyColor = () => {
-    if (!e?.FIELD_READINESS) return 'bg-slate-100 text-slate-600';
-    if (e.FIELD_READINESS === 'Field Ready') return 'bg-green-100 text-green-700';
-    if (e.FIELD_READINESS.includes('Coaching')) return 'bg-yellow-100 text-yellow-700';
+  const fieldReadinessLabel = (): string => {
+    const s = e?.OVERALL_SCORE;
+    if (s == null) return '—';
+    if (s >= 8) return 'Field Ready';
+    if (s >= 6) return 'Coaching Needed';
+    return 'Not Ready';
+  };
+
+  const fieldReadyColor = (): string => {
+    const s = e?.OVERALL_SCORE;
+    if (s == null) return 'bg-slate-100 text-slate-600';
+    if (s >= 8) return 'bg-green-100 text-green-700';
+    if (s >= 6) return 'bg-yellow-100 text-yellow-700';
     return 'bg-red-100 text-red-700';
   };
 
-  const aggregationNote = `Aggregated across ${sessionCount} session${sessionCount !== 1 ? 's' : ''} with this physician`;
+  const aggregationNote = `Aggregated across ${sessionCount} most recent session${sessionCount !== 1 ? 's' : ''} with this physician`;
 
   const barData = DIMENSIONS.map(d => ({ name: d.short, fullName: d.label, score: e?.[d.key] ?? 0 }));
 
@@ -239,10 +253,27 @@ export default function EvaluationPanel({ open, onClose, content, username, phys
         {e && !loading && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <div className="border border-slate-200 rounded-lg p-5 bg-white text-center">
+              <div className="border border-slate-200 rounded-lg p-5 bg-white">
                 <p className="text-sm font-medium text-slate-500 mb-1">Field Readiness</p>
-                <p className="text-xs text-slate-400 mb-3">Mode across most recent {sessionCount} session{sessionCount !== 1 ? 's' : ''}</p>
-                <span className={`text-sm font-bold px-3 py-1.5 rounded-full ${fieldReadyColor()}`}>{e.FIELD_READINESS ?? '—'}</span>
+                <p className="text-xs text-slate-400 mb-3">Based on median overall score across most recent {sessionCount} session{sessionCount !== 1 ? 's' : ''}</p>
+                <div className="flex justify-center mb-4">
+                  <span className={`text-sm font-bold px-3 py-1.5 rounded-full ${fieldReadyColor()}`}>{fieldReadinessLabel()}</span>
+                </div>
+                <div className="border-t border-slate-100 pt-3 space-y-1.5">
+                  <p className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wide">Qualifying Criteria</p>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block w-2 h-2 rounded-full bg-green-500 shrink-0" />
+                    <span className="text-xs text-slate-600"><span className="font-semibold text-slate-700">Field Ready</span> — Score ≥ 8</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block w-2 h-2 rounded-full bg-yellow-400 shrink-0" />
+                    <span className="text-xs text-slate-600"><span className="font-semibold text-slate-700">Coaching Needed</span> — Score 6–7</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block w-2 h-2 rounded-full bg-red-400 shrink-0" />
+                    <span className="text-xs text-slate-600"><span className="font-semibold text-slate-700">Not Ready</span> — Score &lt; 6</span>
+                  </div>
+                </div>
               </div>
               <div className="border border-slate-200 rounded-lg p-5 bg-white text-center">
                 <p className="text-sm font-medium text-slate-500 mb-1">Overall Score</p>
@@ -253,7 +284,7 @@ export default function EvaluationPanel({ open, onClose, content, username, phys
             <div className="grid grid-cols-2 gap-4">
               <div className="border border-slate-200 rounded-lg p-5 bg-white">
                 <p className="text-sm font-bold text-slate-800 mb-1">Recommendations</p>
-                <p className="text-xs text-slate-400 mb-3">From most recent session</p>
+                <p className="text-xs text-slate-400 mb-3">Across most recent {sessionCount} session{sessionCount !== 1 ? 's' : ''}</p>
                 {Array.isArray(e.RECOMMENDATIONS) && e.RECOMMENDATIONS.length > 0 ? (
                   <ul className="space-y-2">{e.RECOMMENDATIONS.map((rec: string, i: number) => (
                     <li key={i} className="flex items-start gap-2">
@@ -265,7 +296,7 @@ export default function EvaluationPanel({ open, onClose, content, username, phys
               </div>
               <div className="border border-slate-200 rounded-lg p-5 bg-white">
                 <p className="text-sm font-bold text-slate-800 mb-1">Coaching Priority</p>
-                <p className="text-xs text-slate-400 mb-3">From most recent session</p>
+                <p className="text-xs text-slate-400 mb-3">Across most recent {sessionCount} session{sessionCount !== 1 ? 's' : ''}</p>
                 <p className="text-sm text-slate-700 leading-relaxed">{e.COACHING_PRIORITY ?? '—'}</p>
               </div>
             </div>
@@ -276,7 +307,7 @@ export default function EvaluationPanel({ open, onClose, content, username, phys
                 <BarChart data={barData} margin={{ top: 20, right: 10, left: 10, bottom: 5 }}>
                   <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                   <Tooltip formatter={(value: any, name: any, props: any) => [value, props.payload.fullName]} />
-                  <Bar dataKey="score" radius={[4, 4, 0, 0]} label={{ position: 'top', fontSize: 12, fontWeight: 600 }}>
+                  <Bar dataKey="score" radius={[4, 4, 0, 0]} label={{ position: 'top', fontSize: 12, fontWeight: 600, formatter: (v: any) => Number(v).toFixed(1) }}>
                     {barData.map((entry, index) => <Cell key={index} fill={DIM_COLORS[index]} />)}
                   </Bar>
                 </BarChart>
@@ -290,7 +321,7 @@ export default function EvaluationPanel({ open, onClose, content, username, phys
                 ))}
               </div>
             </div>
-            <CollapsibleDimension title="Clinical Knowledge" score={e.CLINICAL_KNOWLEDGE_SCORE} rationale={e.CLINICAL_KNOWLEDGE_RATIONALE} indicators={[
+            <CollapsibleDimension title="Clinical Knowledge" score={e.CLINICAL_KNOWLEDGE_SCORE} rationale={e.CLINICAL_KNOWLEDGE_RATIONALE} sessionCount={sessionCount} indicators={[
               { label: 'Cited a peer-reviewed publication by name', value: e.CK_C1 },
               { label: 'Cited a major medical conference', value: e.CK_C2 },
               { label: 'Used specific quantitative data points', value: e.CK_C3 },
@@ -300,7 +331,7 @@ export default function EvaluationPanel({ open, onClose, content, username, phys
               { label: 'Connected data to clinical relevance', value: e.CK_C7 },
               { label: 'Introduced patient scenarios unprompted', value: e.CK_C8 },
             ]} />
-            <CollapsibleDimension title="Objection Handling" score={e.OBJECTION_HANDLING_SCORE} rationale={e.OBJECTION_HANDLING_RATIONALE} indicators={
+            <CollapsibleDimension title="Objection Handling" score={e.OBJECTION_HANDLING_SCORE} rationale={e.OBJECTION_HANDLING_RATIONALE} sessionCount={sessionCount} indicators={
               Array.isArray(e.OH_OBJECTION_DETAILS)
                 ? e.OH_OBJECTION_DETAILS.flatMap((obj: any, i: number) => [
                   { label: `Objection ${i + 1}: ${obj.summary ?? ''}`, value: null },
@@ -310,7 +341,7 @@ export default function EvaluationPanel({ open, onClose, content, username, phys
                   { label: 'Qualify', value: !!obj.qualify },
                 ]) : []
             } />
-            <CollapsibleDimension title="Compliance" score={e.COMPLIANCE_SCORE} rationale={e.COMPLIANCE_RATIONALE} indicators={[
+            <CollapsibleDimension title="Compliance" score={e.COMPLIANCE_SCORE} rationale={e.COMPLIANCE_RATIONALE} sessionCount={sessionCount} indicators={[
               { label: 'No off-label efficacy or indication claims', value: e.COMP_K1 },
               { label: 'No unsupported outcome claims', value: e.COMP_K2 },
               { label: 'Evidence levels clearly labeled', value: e.COMP_K3 },
@@ -318,7 +349,7 @@ export default function EvaluationPanel({ open, onClose, content, username, phys
               { label: 'Appropriate qualifiers for limited evidence', value: e.COMP_K5 },
               { label: 'Presented both efficacy and safety data', value: e.COMP_K6 },
             ]} />
-            <CollapsibleDimension title="Tone & Rapport" score={e.TONE_RAPPORT_SCORE} rationale={e.TONE_RAPPORT_RATIONALE} indicators={[
+            <CollapsibleDimension title="Tone & Rapport" score={e.TONE_RAPPORT_SCORE} rationale={e.TONE_RAPPORT_RATIONALE} sessionCount={sessionCount} indicators={[
               { label: 'Used professional, appropriate language', value: e.TR_T1 },
               { label: 'Demonstrated confidence without arrogance', value: e.TR_T2 },
               { label: "Asked about physician's practice / patients", value: e.TR_T3 },
@@ -327,7 +358,7 @@ export default function EvaluationPanel({ open, onClose, content, username, phys
               { label: 'Created conversational moments', value: e.TR_T6 },
               { label: 'Listened and built on physician responses', value: e.TR_T7 },
             ]} />
-            <CollapsibleDimension title="Closing Technique" score={e.CLOSING_SCORE} rationale={e.CLOSING_RATIONALE} indicators={[
+            <CollapsibleDimension title="Closing Technique" score={e.CLOSING_SCORE} rationale={e.CLOSING_RATIONALE} sessionCount={sessionCount} indicators={[
               { label: 'Summarized key value points', value: e.CL_L1 },
               { label: 'Asked a commitment question', value: e.CL_L2 },
               { label: 'Proposed a specific, concrete next step', value: e.CL_L3 },
