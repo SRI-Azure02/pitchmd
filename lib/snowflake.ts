@@ -621,7 +621,12 @@ export class SnowflakeClient {
    */
   async queryPerformanceBySegment(appUserId: string): Promise<any[]> {
     const sql = `
-      WITH ranked AS (
+      WITH all_segments AS (
+        SELECT DISTINCT SEGMENT_NAME
+        FROM CORTEX_TESTING.PUBLIC.SYNTHETIC_PHYSICIAN_SEGMENT
+        WHERE SEGMENT_NAME IS NOT NULL
+      ),
+      ranked AS (
         SELECT *,
           ROW_NUMBER() OVER (PARTITION BY SEGMENT_NAME ORDER BY EVALUATED_AT DESC) AS rn
         FROM CORTEX_TESTING.ML.REPEVAL_RESULTS
@@ -661,24 +666,26 @@ export class SnowflakeClient {
         WHERE mode_rn = 1
       )
       SELECT
-        ms.SEGMENT_NAME,
+        s.SEGMENT_NAME,
         ms.OVERALL_SCORE,
         ms.CLINICAL_KNOWLEDGE_SCORE,
         ms.OBJECTION_HANDLING_SCORE,
         ms.COMPLIANCE_SCORE,
         ms.TONE_RAPPORT_SCORE,
         ms.CLOSING_SCORE,
-        n.cnt                                              AS SESSION_COUNT,
+        COALESCE(n.cnt, 0)                                 AS SESSION_COUNT,
         cm.COACHING_PRIORITY,
         CASE
-          WHEN ms.OVERALL_SCORE >= 8 THEN 'Field Ready'
-          WHEN ms.OVERALL_SCORE >= 6 THEN 'Coaching Needed'
+          WHEN ms.OVERALL_SCORE IS NULL  THEN NULL
+          WHEN ms.OVERALL_SCORE >= 8     THEN 'Field Ready'
+          WHEN ms.OVERALL_SCORE >= 6     THEN 'Coaching Needed'
           ELSE 'Not Field Ready'
         END                                                AS FIELD_READINESS
-      FROM median_scores ms
-      LEFT JOIN n_per_seg n     ON ms.SEGMENT_NAME = n.SEGMENT_NAME
-      LEFT JOIN coaching_mode cm ON ms.SEGMENT_NAME = cm.SEGMENT_NAME
-      ORDER BY ms.SEGMENT_NAME
+      FROM all_segments s
+      LEFT JOIN median_scores ms  ON s.SEGMENT_NAME = ms.SEGMENT_NAME
+      LEFT JOIN n_per_seg n       ON s.SEGMENT_NAME = n.SEGMENT_NAME
+      LEFT JOIN coaching_mode cm  ON s.SEGMENT_NAME = cm.SEGMENT_NAME
+      ORDER BY s.SEGMENT_NAME
     `;
     return await this.executeQuery(sql, {
       '1': { type: 'TEXT', value: appUserId },
