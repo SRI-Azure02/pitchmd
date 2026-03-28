@@ -536,6 +536,108 @@ export class SnowflakeClient {
       '2': { type: 'TEXT', value: segmentName },
     });
   }
+
+  /**
+   * Overall performance summary across ALL physicians for a user.
+   * N = 3 × (number of distinct segments the user has encountered).
+   * Scores: MEDIAN of most recent N sessions.
+   * FIELD_READINESS: derived from median overall score (≥8 Field Ready, ≥6 Coaching Needed).
+   * COACHING_PRIORITY: MODE of most recent N sessions.
+   */
+  async queryOverallPerformance(appUserId: string): Promise<any> {
+    const sql = `
+      WITH all_sessions AS (
+        SELECT *,
+          ROW_NUMBER() OVER (ORDER BY EVALUATED_AT DESC) AS rn
+        FROM CORTEX_TESTING.ML.REPEVAL_RESULTS
+        WHERE APP_USER_ID = ?
+      ),
+      seg_count AS (
+        SELECT COUNT(DISTINCT SEGMENT_NAME) AS cnt
+        FROM CORTEX_TESTING.ML.REPEVAL_RESULTS
+        WHERE APP_USER_ID = ?
+          AND SEGMENT_NAME IS NOT NULL
+      ),
+      top_n AS (
+        SELECT s.*
+        FROM all_sessions s, seg_count sc
+        WHERE s.rn <= GREATEST(sc.cnt * 3, 3)
+      ),
+      n AS (
+        SELECT COUNT(*) AS cnt FROM top_n
+      ),
+      median_scores AS (
+        SELECT
+          MEDIAN(OVERALL_SCORE)              AS OVERALL_SCORE,
+          MEDIAN(CLINICAL_KNOWLEDGE_SCORE)   AS CLINICAL_KNOWLEDGE_SCORE,
+          MEDIAN(OBJECTION_HANDLING_SCORE)   AS OBJECTION_HANDLING_SCORE,
+          MEDIAN(COMPLIANCE_SCORE)           AS COMPLIANCE_SCORE,
+          MEDIAN(TONE_RAPPORT_SCORE)         AS TONE_RAPPORT_SCORE,
+          MEDIAN(CLOSING_SCORE)              AS CLOSING_SCORE
+        FROM top_n
+      ),
+      coaching_mode AS (
+        SELECT COACHING_PRIORITY
+        FROM (
+          SELECT COACHING_PRIORITY,
+            ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC, COACHING_PRIORITY) AS mode_rn
+          FROM top_n
+          WHERE COACHING_PRIORITY IS NOT NULL
+          GROUP BY COACHING_PRIORITY
+        )
+        WHERE mode_rn = 1
+      )
+      SELECT
+        ms.OVERALL_SCORE,
+        ms.CLINICAL_KNOWLEDGE_SCORE,
+        ms.OBJECTION_HANDLING_SCORE,
+        ms.COMPLIANCE_SCORE,
+        ms.TONE_RAPPORT_SCORE,
+        ms.CLOSING_SCORE,
+        cm.COACHING_PRIORITY,
+        n.cnt                                              AS SESSION_COUNT,
+        sc.cnt                                             AS SEGMENT_COUNT,
+        CASE
+          WHEN ms.OVERALL_SCORE >= 8 THEN 'Field Ready'
+          WHEN ms.OVERALL_SCORE >= 6 THEN 'Coaching Needed'
+          ELSE 'Not Field Ready'
+        END                                                AS FIELD_READINESS
+      FROM median_scores ms
+      CROSS JOIN coaching_mode cm
+      CROSS JOIN n
+      CROSS JOIN seg_count sc
+    `;
+    const results = await this.executeQuery(sql, {
+      '1': { type: 'TEXT', value: appUserId },
+      '2': { type: 'TEXT', value: appUserId },
+    });
+    return results?.[0] ?? null;
+  }
+
+  /**
+   * Daily median scores over the past 12 months for a user (all physicians).
+   * Used for the trend line chart on the Performance panel.
+   */
+  async queryPerformanceTrend(appUserId: string): Promise<any[]> {
+    const sql = `
+      SELECT
+        EVALUATED_AT::DATE                             AS EVALUATED_AT,
+        MEDIAN(OVERALL_SCORE)                          AS OVERALL_SCORE,
+        MEDIAN(CLINICAL_KNOWLEDGE_SCORE)               AS CLINICAL_KNOWLEDGE_SCORE,
+        MEDIAN(OBJECTION_HANDLING_SCORE)               AS OBJECTION_HANDLING_SCORE,
+        MEDIAN(COMPLIANCE_SCORE)                       AS COMPLIANCE_SCORE,
+        MEDIAN(TONE_RAPPORT_SCORE)                     AS TONE_RAPPORT_SCORE,
+        MEDIAN(CLOSING_SCORE)                          AS CLOSING_SCORE
+      FROM CORTEX_TESTING.ML.REPEVAL_RESULTS
+      WHERE APP_USER_ID = ?
+        AND EVALUATED_AT >= DATEADD(year, -1, CURRENT_TIMESTAMP)
+      GROUP BY EVALUATED_AT::DATE
+      ORDER BY EVALUATED_AT::DATE ASC
+    `;
+    return await this.executeQuery(sql, {
+      '1': { type: 'TEXT', value: appUserId },
+    });
+  }
 }
 
 // ─── Singleton ─────────────────────────────────────────────────────────
