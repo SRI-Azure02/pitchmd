@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import AudioInput from './audio-input';
 import EvaluationPanel from './evaluation-panel';
+import PerformancePanel from './performance-panel';
 import { Send, RotateCcw, Square, Volume2, VolumeX, Video, VideoOff, MessageSquare, Search, ChevronDown, X, Check, BarChart2, ArrowUp, ArrowDown, ArrowUpDown, Hash } from 'lucide-react';
 import { parseEmotion, speakText, stopCurrentAudio } from '@/lib/elevenlabs';
 
@@ -164,6 +165,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   const [statusMessage, setStatusMessage] = useState('');
   const [evalOpen, setEvalOpen] = useState(false);
   const [evalPhysicianId, setEvalPhysicianId] = useState<string | null>(null);
+  const [performanceOpen, setPerformanceOpen] = useState(false);
   const [userTyping, setUserTyping] = useState(false);
   const [sessionDuration, setSessionDuration] = useState<number | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
@@ -1135,7 +1137,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
           <p className="text-sm font-bold uppercase tracking-widest text-slate-500">Pre-Field</p>
           <div className="flex flex-wrap gap-4">
             {splashBtn('Practice Your Pitch', handleStartSession, 'Simulate a live sales call with a physician and get real-time coaching.')}
-            {splashBtn('Review Performance', () => setEvalOpen(true), 'See your scores and detailed feedback from recent sessions.')}
+            {splashBtn('Review Performance', () => setPerformanceOpen(true), 'See your scores and detailed feedback from recent sessions.')}
           </div>
         </div>
 
@@ -1171,6 +1173,10 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
           content=""
           username={username}
           physicianId={evalPhysicianId}
+        />
+        <PerformancePanel
+          open={performanceOpen}
+          onClose={() => setPerformanceOpen(false)}
         />
       </div>
     );
