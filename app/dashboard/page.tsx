@@ -58,11 +58,11 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="h-screen bg-[#F1EFE9] flex flex-col p-4 overflow-hidden">
-      <div className="flex flex-col flex-1 max-w-5xl w-full mx-auto min-h-0">
+    <div className="h-screen bg-[#F1EFE9] flex flex-col overflow-hidden">
+      <div className="flex flex-col flex-1 w-full min-h-0">
 
         {/* Header */}
-        <div className="flex justify-between items-center mb-4 shrink-0">
+        <div className="flex justify-between items-center px-6 pt-4 mb-3 shrink-0">
           <div>
             <h1 className="text-3xl font-semibold text-slate-900">PitchMD™</h1>
             <p style={{
@@ -80,11 +80,10 @@ export default function DashboardPage() {
           </Button>
         </div>
 
-        {/* Chat — fills remaining height */}
-        <Card className="p-6 bg-white flex flex-col flex-1 min-h-0 overflow-hidden">
+        {/* Chat — full width, fills remaining height */}
+        <Card className="p-0 bg-white flex flex-col flex-1 min-h-0 overflow-hidden rounded-none border-x-0 border-b-0">
           <ChatInterface username={session?.username ?? 'Rep'} />
         </Card>
-        <p className="text-center text-xs text-slate-700 mt-2 shrink-0">Powered by SRIntelligence™</p>
 
       </div>
     </div>

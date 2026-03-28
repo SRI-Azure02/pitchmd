@@ -12,7 +12,7 @@ interface AudioInputProps {
   userTyping?: boolean;
 }
 
-const SILENCE_TIMEOUT = 7000;
+const SILENCE_TIMEOUT = 3000;
 const RING_R = 20;
 const CIRCUMFERENCE = 2 * Math.PI * RING_R;
 

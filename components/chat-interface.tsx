@@ -73,7 +73,7 @@ function PhysicianFilterDropdown({
       {isOpen && <div className="fixed inset-0 z-40" onClick={onToggle} />}
       <button
         onClick={onToggle}
-        className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+        className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border text-base font-medium transition-colors ${
           isActive
             ? 'border-blue-400 bg-blue-50 text-blue-700'
             : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
@@ -85,22 +85,22 @@ function PhysicianFilterDropdown({
       </button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-lg min-w-[190px] py-1 overflow-hidden">
+        <div className="absolute top-full left-0 mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-lg min-w-max py-1 overflow-hidden">
           <button
             onClick={() => { onFilter(null); onToggle(); }}
-            className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-slate-50 ${!activeFilter ? 'text-blue-600 font-medium' : 'text-slate-600'}`}
+            className={`w-full text-left px-4 py-2 text-base flex items-center justify-between hover:bg-slate-50 ${!activeFilter ? 'text-blue-600 font-medium' : 'text-slate-600'}`}
           >
-            All
-            {!activeFilter && <Check className="w-3 h-3" />}
+            <span className="whitespace-nowrap">All</span>
+            {!activeFilter && <Check className="w-3.5 h-3.5 ml-4" />}
           </button>
           {options.map((opt) => (
             <button
               key={opt}
               onClick={() => { onFilter(opt); onToggle(); }}
-              className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-slate-50 ${activeFilter === opt ? 'text-blue-600 font-medium bg-blue-50' : 'text-slate-600'}`}
+              className={`w-full text-left px-4 py-2 text-base flex items-center justify-between hover:bg-slate-50 ${activeFilter === opt ? 'text-blue-600 font-medium bg-blue-50' : 'text-slate-600'}`}
             >
-              <span className="truncate max-w-[140px]">{opt}</span>
-              {activeFilter === opt && <Check className="w-3 h-3 shrink-0" />}
+              <span className="whitespace-nowrap">{opt}</span>
+              {activeFilter === opt && <Check className="w-3.5 h-3.5 ml-4 shrink-0" />}
             </button>
           ))}
         </div>
@@ -172,6 +172,10 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   const [ttsAvailable, setTtsAvailable] = useState(true);
   const [voiceEnabled, setVoiceEnabled] = useState(false); // muted by default; toggle to enable
   const [evalReady, setEvalReady] = useState(false); // true once REPEVAL finishes — drives persistent toast
+  const [evalGenerating, setEvalGenerating] = useState(false); // true from session-end until eval is ready
+  const [evalRefreshTrigger, setEvalRefreshTrigger] = useState(0); // incremented to force EvaluationPanel re-fetch
+  const [showTranscript, setShowTranscript] = useState(false);
+  const [transcriptCountdownActive, setTranscriptCountdownActive] = useState(false);
   const [avatarEnabled, setAvatarEnabled] = useState(false);
   const voiceEnabledRef = useRef(false); // matches voiceEnabled initial state
 
@@ -248,6 +252,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
       !roleplaying ||
       sessionEnded ||
       loading ||
+      transcriptCountdownActive ||
       timeRemaining === null ||
       timeRemaining <= 0
     ) {
@@ -261,7 +266,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     }, 1000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roleplaying, sessionEnded, loading]);
+  }, [roleplaying, sessionEnded, loading, transcriptCountdownActive]);
 
   // ── Timer expiry → auto-end session ──────────────────────────────────────
   useEffect(() => {
@@ -334,6 +339,8 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
       if (res.ok) {
         console.log('[eval] ✅ REPEVAL completed — showing report button');
         setEvalReady(true);
+        setEvalGenerating(false);
+        setEvalRefreshTrigger((n) => n + 1); // trigger EvaluationPanel to re-fetch with fresh data
         setMessages((prev) => [...prev, {
           id: `msg_${Date.now()}_eval_ready`,
           role: 'assistant' as const,
@@ -374,6 +381,14 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
       setSessionEnded(true);
       setTimeRemaining(null);
       stopCurrentAudio();
+
+      // Open evaluation panel immediately with skeleton loading
+      const pid = physicianIdRef.current;
+      if (pid) {
+        setEvalPhysicianId(pid);
+        setEvalGenerating(true);
+        setEvalOpen(true);
+      }
 
       // Trigger REPEVAL directly — don't rely on the Cortex Agent to call it.
       // history is the conversation BEFORE "done", which is what REPEVAL needs.
@@ -722,6 +737,53 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     setSessionStarted(false);
     setTtsAvailable(true);
     setEvalReady(false);
+    setEvalGenerating(false);
+    setEvalRefreshTrigger(0);
+    setShowTranscript(false);
+  };
+
+  // ── Back to physician list (no eval triggered) ────────────────────────────
+  const handleBackToPhysicianList = () => {
+    stopCurrentAudio();
+
+    // Prevent timer and any in-flight message from triggering eval
+    autoEndedRef.current = true;
+    sessionEndedRef.current = true;
+
+    // Reset refs
+    hasStarted.current = false;
+    roleplayingRef.current = false;
+    currentVoiceRef.current = null;
+    physicianIdRef.current = null;
+    selectedPhysicianDataRef.current = null;
+    evalStartedAtRef.current = null;
+    targetDurationRef.current = randomSessionDuration();
+
+    // Reset state (no eval, no evalGenerating)
+    messagesRef.current = [];
+    setMessages([]);
+    setStatusMessage('');
+    setUserTyping(false);
+    setInputValue('');
+    setSessionEnded(false);
+    setRoleplaying(false);
+    setSessionDuration(null);
+    setTimeRemaining(null);
+    setLoading(false);
+    setSessionStarted(false);
+    setTtsAvailable(true);
+    setEvalReady(false);
+    setEvalGenerating(false);
+    setEvalRefreshTrigger(0);
+    setShowTranscript(false);
+    setSelectedPhysician(null);
+    setEvalPhysicianId(null);
+
+    // Clear the guard refs after state is queued
+    sessionEndedRef.current = false;
+
+    // Return to physician list (keep the physicians array loaded)
+    setPhysicianSelectionMode(true);
   };
 
   // ── Column header sort ────────────────────────────────────────────────────
@@ -825,11 +887,11 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
           {/* ── Header ──────────────────────────────────────────────────── */}
           <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b border-slate-100 shrink-0">
             <div>
-              <p className="text-base font-semibold text-slate-900">Select a Physician</p>
-              <p className="text-xs text-slate-400">Choose who you'd like to practice with today</p>
+              <p className="text-lg font-semibold text-slate-900">Select a Physician</p>
+              <p className="text-sm text-slate-400">Choose who you'd like to practice with today</p>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => setPhysicianSelectionMode(false)} className="text-xs text-slate-400">
-              ← Back
+            <Button variant="ghost" size="sm" onClick={() => setPhysicianSelectionMode(false)} className="text-sm text-slate-400">
+              Back
             </Button>
           </div>
 
@@ -844,7 +906,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                   value={physicianSearch}
                   onChange={e => setPhysicianSearch(e.target.value)}
                   placeholder="Search physicians…"
-                  className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400"
+                  className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 bg-white text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400"
                 />
                 {physicianSearch && (
                   <button onClick={() => setPhysicianSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
@@ -856,7 +918,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
               {/* Physician ID column toggle */}
               <button
                 onClick={() => setShowPhysicianId(v => !v)}
-                className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-base font-medium transition-colors ${
                   showPhysicianId
                     ? 'border-blue-300 bg-blue-50 text-blue-700'
                     : 'border-slate-200 bg-white text-slate-400 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-600'
@@ -914,7 +976,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                     setSortConfig(null);
                     setFilterValues({ segment: null, specialty: null, overallScore: null, fieldReadiness: null });
                   }}
-                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs text-slate-500 hover:text-red-500 hover:bg-red-50 border border-transparent hover:border-red-200 transition-colors"
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-sm text-slate-500 hover:text-red-500 hover:bg-red-50 border border-transparent hover:border-red-200 transition-colors"
                 >
                   <X className="w-3 h-3" />
                   Clear
@@ -924,7 +986,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
             </div>
 
             {/* Result count */}
-            <p className="text-[11px] text-slate-400 mt-1.5">
+            <p className="text-xs text-slate-400 mt-1.5">
               {filteredPhysicians.length} of {physicians.length} physician{physicians.length !== 1 ? 's' : ''}
               {anyFilterActive ? ' match your filters' : ''}
             </p>
@@ -943,7 +1005,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                 <button onClick={() => { setPhysicianSearch(''); setFilterValues({ segment: null, specialty: null, overallScore: null, fieldReadiness: null }); setSortConfig(null); }} className="text-xs text-blue-500 hover:underline">Clear filters</button>
               </div>
             ) : (
-              <table className="w-full text-sm border-collapse min-w-[700px]">
+              <table className="w-full text-base border-collapse min-w-[700px]">
                 <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_0_0_#e2e8f0]">
                   <tr>
                     {([
@@ -966,7 +1028,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                             setTableTooltip({ text: tooltip, x: rect.left + rect.width / 2, y: rect.top });
                           } : undefined}
                           onMouseLeave={tooltip ? () => setTableTooltip(null) : undefined}
-                          className="group/th px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide cursor-pointer select-none transition-colors"
+                          className="group/th px-4 py-2.5 text-sm font-semibold uppercase tracking-wide cursor-pointer select-none transition-colors"
                           style={{ textAlign: align as any }}
                         >
                           <span
@@ -1014,37 +1076,37 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                         </td>
 
                         {/* Specialty */}
-                        <td className="px-4 py-3 text-slate-600 text-sm">
+                        <td className="px-4 py-3 text-slate-600">
                           {p.SPECIALTY ?? <span className="text-slate-300">—</span>}
                         </td>
 
                         {/* Segment */}
-                        <td className="px-4 py-3 text-slate-600 text-sm">
+                        <td className="px-4 py-3 text-slate-600">
                           {p.SEGMENT_NAME ?? <span className="text-slate-300">—</span>}
                         </td>
 
                         {/* State */}
-                        <td className="px-4 py-3 text-slate-600 text-sm">
+                        <td className="px-4 py-3 text-slate-600">
                           {p.STATE ?? <span className="text-slate-300">—</span>}
                         </td>
 
                         {/* Overall Score */}
-                        <td className="px-4 py-3 text-slate-700 font-semibold text-sm text-center">
+                        <td className="px-4 py-3 text-slate-700 font-semibold text-center">
                           {hasScore
                             ? p.OVERALL_SCORE
-                            : <span className="text-slate-300 font-normal text-xs">—</span>}
+                            : <span className="text-slate-300 font-normal text-sm">—</span>}
                         </td>
 
                         {/* Field Readiness */}
                         <td className="px-4 py-3">
                           {p.FIELD_READINESS ? (
                             <span
-                              className="text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap"
+                              className="text-sm font-medium px-2 py-0.5 rounded-full whitespace-nowrap"
                               style={readinessBadge(p.FIELD_READINESS)}
                             >
                               {p.FIELD_READINESS}
                             </span>
-                          ) : <span className="text-slate-300 text-xs">—</span>}
+                          ) : <span className="text-slate-300 text-sm">—</span>}
                         </td>
 
                         {/* Actions */}
@@ -1190,131 +1252,184 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   return (
     <div className="relative flex flex-col h-full min-h-0">
 
-      {/* ── Physician context ribbon ──────────────────────────────────────── */}
-      {selectedPhysician && (
-        <div className="shrink-0 px-4 py-2.5 border-b border-slate-100 bg-white">
-          <p className="font-semibold text-slate-900 text-sm leading-tight">
-            {selectedPhysician.name}
-          </p>
-          {(selectedPhysician.specialty || selectedPhysician.segment) && (
-            <p className="text-xs text-slate-500 mt-0.5">
-              {[selectedPhysician.specialty, selectedPhysician.segment].filter(Boolean).join(' · ')}
-            </p>
-          )}
+      {/* ── Video call background (animated gradient, theatre mode) ────────── */}
+      <div
+        className="flex-1 relative overflow-hidden"
+        style={{
+          background: 'linear-gradient(120deg, #FF6B00, #FF9A3C, #00C8FF, #0EA5E9, #FF6B00)',
+          backgroundSize: '400% 400%',
+          animation: 'gradientShift 10s ease infinite',
+        }}
+      >
+        {/* D-ID placeholder */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center select-none pointer-events-none">
+          <VideoOff className="w-14 h-14 text-gray-800/20 mb-3" />
+          <p className="text-gray-800/25 text-xs tracking-widest uppercase">Video avatar coming soon</p>
         </div>
-      )}
 
-      <div className="flex-1 overflow-y-auto pr-1 space-y-4 pb-28">
-        {messages.length === 0 && loading && (
-          <div className="flex items-end gap-2">
-            <div className="w-2.5 h-2.5 rounded-full bg-black shrink-0" />
-            <div className="bg-slate-100 px-4 py-3 rounded-2xl rounded-bl-sm flex items-center gap-2">
-              <Spinner className="w-3.5 h-3.5" />
-              <span className="text-sm text-slate-500">
-                {statusMessage || 'Starting session...'}
-              </span>
-            </div>
-          </div>
-        )}
-
-        {visibleMessages.map((message) => (
-          <div
-            key={message.id}
-            className={`flex items-end gap-2 ${message.role === 'user' ? 'justify-end' : 'justify-start'
-              }`}
+        {/* Back button — top-right, returns to physician list without triggering eval */}
+        <div className="absolute top-3 right-3 z-10">
+          <button
+            onClick={handleBackToPhysicianList}
+            className="flex items-center gap-1.5 bg-white/70 backdrop-blur-sm hover:bg-white/90 text-gray-700 text-sm font-medium px-3 py-1.5 rounded-lg shadow transition-all"
           >
-            {message.role === 'assistant' && (
-              <div className="w-2.5 h-2.5 rounded-full bg-black shrink-0 mb-2" />
-            )}
-            <div
-              className={`max-w-sm lg:max-w-xl px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${message.role === 'user'
-                  ? 'bg-blue-600 text-white rounded-br-sm'
-                  : 'bg-slate-100 text-slate-900 rounded-bl-sm'
-                }`}
-            >
-              {message.content}
-              {message.isEvaluation && (
-                <button
-                  onClick={() => { setEvalPhysicianId(physicianIdRef.current); setEvalOpen(true); }}
-                  className="mt-2 flex items-center gap-1.5 text-blue-600 hover:text-blue-700 font-medium text-xs"
-                >
-                  View Evaluation Report →
-                </button>
-              )}
-            </div>
-            {message.role === 'user' && (
-              <div className="w-2.5 h-2.5 rounded-full bg-blue-600 shrink-0 mb-2" />
-            )}
-          </div>
-        ))}
+            Back
+          </button>
+        </div>
 
-        {/* FIX 1+2: Show streaming content as it arrives token-by-token,
-            replacing the generic spinner once chunks start flowing in. */}
-        {loading && streamingContent && (
-          <div className="flex items-end gap-2">
-            <div className="w-2.5 h-2.5 rounded-full bg-black shrink-0 mb-2" />
-            <div className="max-w-sm lg:max-w-xl px-4 py-3 rounded-2xl rounded-bl-sm bg-slate-100 text-slate-900 text-sm leading-relaxed whitespace-pre-wrap">
-              {streamingContent.replace(/^\[EMOTION:[^\]]+\]\s*/i, '')}
-              <span className="inline-block w-1.5 h-3.5 bg-slate-400 ml-0.5 align-middle animate-pulse" />
+        {/* Physician nameplate — bottom-left overlay */}
+        {selectedPhysician && (
+          <div className="absolute bottom-4 left-4 z-10 bg-white/60 backdrop-blur-sm px-4 py-2 rounded-lg">
+            <p className="text-black font-semibold text-lg leading-tight">
+              {selectedPhysician.name}
+            </p>
+            {(selectedPhysician.specialty || selectedPhysician.segment) && (
+              <p className="text-gray-700 text-sm mt-0.5">
+                {[selectedPhysician.specialty, selectedPhysician.segment].filter(Boolean).join(' · ')}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Loading indicator (session start) */}
+        {messages.length === 0 && loading && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="bg-white/80 backdrop-blur-sm px-5 py-3 rounded-2xl flex items-center gap-3 shadow">
+              <Spinner className="w-4 h-4 text-gray-600" />
+              <span className="text-sm text-gray-700">{statusMessage || 'Starting session...'}</span>
             </div>
           </div>
         )}
-        {loading && !streamingContent && messages.length > 0 && (
-          <div className="flex items-end gap-2">
-            <div className="w-2.5 h-2.5 rounded-full bg-black shrink-0" />
-            <div className="bg-slate-100 px-4 py-3 rounded-2xl rounded-bl-sm flex items-center gap-2">
-              <Spinner className="w-3.5 h-3.5" />
-              <span className="text-sm text-slate-500">
-                {statusMessage || 'Thinking...'}
-              </span>
+
+        {/* Transcript overlay — centered column, comfortable reading width */}
+        {showTranscript && (
+          <div className="absolute inset-0 z-10 flex justify-center overflow-hidden">
+            <div
+              className="w-full max-w-2xl h-full bg-white/80 backdrop-blur-sm overflow-y-auto p-4 space-y-3 shadow-xl"
+              style={{
+                maskImage: 'linear-gradient(to right, transparent 0%, black 6%, black 94%, transparent 100%)',
+                WebkitMaskImage: 'linear-gradient(to right, transparent 0%, black 6%, black 94%, transparent 100%)',
+              }}
+            >
+              {visibleMessages.map((message) => (
+                <div
+                  key={message.id}
+                  className={`flex items-end gap-2 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
+                  {message.role === 'assistant' && (
+                    <div className="w-2 h-2 rounded-full bg-gray-500 shrink-0 mb-1.5" />
+                  )}
+                  <div
+                    className={`max-w-sm lg:max-w-xl px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
+                      message.role === 'user'
+                        ? 'bg-gray-800 text-white rounded-br-sm'
+                        : 'bg-white text-slate-800 rounded-bl-sm shadow-sm'
+                    }`}
+                  >
+                    {message.content}
+                    {message.isEvaluation && (
+                      <button
+                        onClick={() => { setEvalPhysicianId(physicianIdRef.current); setEvalOpen(true); }}
+                        className="mt-2 flex items-center gap-1.5 text-gray-600 hover:text-gray-800 font-medium text-xs"
+                      >
+                        View Evaluation Report →
+                      </button>
+                    )}
+                  </div>
+                  {message.role === 'user' && (
+                    <div className="w-2 h-2 rounded-full bg-gray-500 shrink-0 mb-1.5" />
+                  )}
+                </div>
+              ))}
+              {/* Streaming bubble */}
+              {loading && streamingContent && (
+                <div className="flex items-end gap-2">
+                  <div className="w-2 h-2 rounded-full bg-gray-500 shrink-0 mb-1.5" />
+                  <div className="max-w-sm lg:max-w-xl px-3.5 py-2.5 rounded-2xl rounded-bl-sm bg-white text-slate-800 text-sm leading-relaxed whitespace-pre-wrap shadow-sm">
+                    {streamingContent.replace(/^\[EMOTION:[^\]]+\]\s*/i, '')}
+                    <span className="inline-block w-1.5 h-3.5 bg-gray-600 ml-0.5 align-middle animate-pulse" />
+                  </div>
+                </div>
+              )}
+              {loading && !streamingContent && messages.length > 0 && (
+                <div className="flex items-end gap-2">
+                  <div className="w-2 h-2 rounded-full bg-gray-400 shrink-0" />
+                  <div className="bg-white px-3.5 py-2.5 rounded-2xl rounded-bl-sm flex items-center gap-2 shadow-sm">
+                    <Spinner className="w-3.5 h-3.5 text-gray-500" />
+                    <span className="text-sm text-slate-600">{statusMessage || 'Thinking...'}</span>
+                  </div>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
             </div>
           </div>
         )}
-        <div ref={messagesEndRef} />
+
+        {/* Streaming indicator when transcript is hidden */}
+        {!showTranscript && loading && streamingContent && (
+          <div className="absolute bottom-16 left-0 right-0 flex justify-center px-6 pointer-events-none z-10">
+            <div className="bg-white/85 backdrop-blur-sm px-4 py-2 rounded-xl max-w-md text-center shadow">
+              <p className="text-slate-800 text-sm leading-relaxed">
+                {streamingContent.replace(/^\[EMOTION:[^\]]+\]\s*/i, '')}
+                <span className="inline-block w-1 h-3 bg-gray-700 ml-0.5 align-middle animate-pulse" />
+              </p>
+            </div>
+          </div>
+        )}
+        {!showTranscript && loading && !streamingContent && messages.length > 0 && (
+          <div className="absolute bottom-16 left-0 right-0 flex justify-center pointer-events-none z-10">
+            <div className="bg-white/85 backdrop-blur-sm px-4 py-2 rounded-xl flex items-center gap-2 shadow">
+              <Spinner className="w-3.5 h-3.5 text-gray-600" />
+              <span className="text-sm text-slate-600">{statusMessage || 'Thinking...'}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Eval-generating notification (shown when timer ends, until report is ready) */}
+        {evalGenerating && !evalReady && (
+          <div className="absolute top-4 left-0 right-0 flex justify-center px-4 z-20 pointer-events-none">
+            <div className="flex items-center gap-2.5 bg-white/90 backdrop-blur-sm text-gray-800 text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg border border-gray-200">
+              <Spinner className="w-3.5 h-3.5 text-gray-500 shrink-0" />
+              <span>Session complete · Generating your evaluation report…</span>
+            </div>
+          </div>
+        )}
+
+        {/* Eval-ready toast */}
+        {evalReady && (
+          <div className="absolute top-4 left-0 right-0 flex justify-center px-4 z-20 pointer-events-none">
+            <div className="flex items-center gap-3 bg-green-600 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg pointer-events-auto">
+              <span>Your evaluation report is ready.</span>
+              <button
+                onClick={() => { setEvalPhysicianId(physicianIdRef.current); setEvalOpen(true); }}
+                className="underline underline-offset-2 hover:no-underline font-bold"
+              >
+                View Report
+              </button>
+              <button onClick={() => setEvalReady(false)} className="ml-1 opacity-70 hover:opacity-100 text-base leading-none">×</button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* ── Eval-ready toast ────────────────────────────────────────────────── */}
-      {evalReady && (
-        <div className="absolute bottom-16 left-0 right-0 flex justify-center px-4 z-20 pointer-events-none">
-          <div className="flex items-center gap-3 bg-green-600 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg pointer-events-auto">
-            <span>Your evaluation report is ready.</span>
-            <button
-              onClick={() => { setEvalPhysicianId(physicianIdRef.current); setEvalOpen(true); }}
-              className="underline underline-offset-2 hover:no-underline font-bold"
-            >
-              View Report
-            </button>
-            <button onClick={() => setEvalReady(false)} className="ml-1 opacity-70 hover:opacity-100 text-base leading-none">×</button>
-          </div>
-        </div>
-      )}
-
       {/* ── Bottom bar ─────────────────────────────────────────────────────── */}
-      <div className="absolute bottom-0 left-0 right-0 bg-white pt-2 pb-1">
-        {/* Single row: timer label | progress bar (flex-1) | pinned buttons */}
-        <div className="mb-1 px-1 flex items-center gap-2">
-          {/* Timer label — fixed width so bar doesn't jump */}
-          <div className="w-24 shrink-0">
+      <div className="shrink-0 px-3 pt-2 pb-2" style={{ background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(16px)', borderTop: '1px solid rgba(0,0,0,0.08)' }}>
+        {/* Timer row: label | progress bar | voice+video */}
+        <div className="mb-2 flex items-center gap-2">
+          <div className="w-20 shrink-0">
             {timeRemaining !== null && sessionDuration !== null ? (
               isLastThird ? (
-                <span
-                  className="text-xs font-bold px-2 py-0.5 rounded"
-                  style={{ background: '#b04848', color: 'white' }}
-                >
-                  Time: {timeRemaining}s
+                <span className="text-xs font-bold px-2 py-0.5 rounded" style={{ background: '#b04848', color: 'white' }}>
+                  {timeRemaining}s
                 </span>
               ) : (
-                <p className="text-xs font-medium text-slate-400">
-                  Time: {timeRemaining}s
-                </p>
+                <p className="text-xs font-medium text-gray-600">{timeRemaining}s</p>
               )
             ) : null}
           </div>
-
-          {/* Progress bar — takes all remaining space */}
           <div className="flex-1">
-            {timeRemaining !== null && sessionDuration !== null ? (
-              <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+            {timeRemaining !== null && sessionDuration !== null && (
+              <div className="w-full h-1 bg-gray-200 rounded-full overflow-hidden">
                 <div
                   style={{
                     width: `${(timeRemaining / sessionDuration) * 100}%`,
@@ -1324,112 +1439,102 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                   }}
                 />
               </div>
-            ) : null}
+            )}
           </div>
-
-          {/* Pinned-right controls — never move */}
+          {/* Pinned voice/video toggles */}
           <div className="flex items-center gap-1 shrink-0">
             {!ttsAvailable && (
-              <span
-                className="text-xs text-amber-600 font-medium"
-                title="ElevenLabs returned an error. Check your API key and account credits at elevenlabs.io."
-              >
-                🔇
-              </span>
+              <span className="text-xs text-amber-500" title="TTS unavailable">🔇</span>
             )}
             <Button
-              type="button"
-              size="icon"
-              variant="ghost"
+              type="button" size="icon" variant="ghost"
               onClick={() => {
                 const next = !voiceEnabledRef.current;
                 voiceEnabledRef.current = next;
                 setVoiceEnabled(next);
                 if (!next) stopCurrentAudio();
               }}
-              className="h-7 w-7 rounded-full"
+              className="h-7 w-7 rounded-full text-gray-600 hover:text-gray-800 hover:bg-gray-100"
               title={voiceEnabled ? 'Disable voice' : 'Enable voice'}
             >
-              {voiceEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5 text-slate-400" />}
+              {voiceEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
             </Button>
             <Button
-              type="button"
-              size="icon"
-              variant="ghost"
+              type="button" size="icon" variant="ghost"
               onClick={() => setAvatarEnabled((v) => !v)}
-              className="h-7 w-7 rounded-full"
-              title={avatarEnabled ? 'Disable video avatar' : 'Enable video avatar (coming soon)'}
+              className="h-7 w-7 rounded-full text-gray-400 hover:bg-gray-100"
+              title="Enable video avatar (coming soon)"
               disabled
             >
-              {avatarEnabled ? <Video className="w-3.5 h-3.5" /> : <VideoOff className="w-3.5 h-3.5 text-slate-300" />}
+              <VideoOff className="w-3.5 h-3.5" />
             </Button>
           </div>
         </div>
 
-        <div className="border-t border-slate-200 pt-3">
-          <form onSubmit={handleSubmit} className="flex gap-2 items-center">
-            <AudioInput
-              onTranscript={(text) =>
-                setInputValue((prev) => prev + (prev ? ' ' : '') + text)
+        {/* Input row */}
+        <form onSubmit={handleSubmit} className="flex gap-2 items-center">
+          {/* Transcript toggle */}
+          <Button
+            type="button" size="icon" variant="ghost"
+            onClick={() => setShowTranscript((v) => !v)}
+            className={`h-8 w-8 rounded-full shrink-0 ${showTranscript ? 'bg-gray-200 text-gray-700' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}
+            title={showTranscript ? 'Hide transcript' : 'Show transcript'}
+          >
+            <MessageSquare className="w-4 h-4" />
+          </Button>
+          <AudioInput
+            onTranscript={(text) => setInputValue((prev) => prev + (prev ? ' ' : '') + text)}
+            onAutoSubmit={handleAutoSubmit}
+            onCountdown={(pct) => setTranscriptCountdownActive(pct !== null)}
+            userTyping={userTyping}
+            disabled={loading || sessionEnded}
+          />
+          <textarea
+            ref={textareaRef}
+            rows={1}
+            placeholder={sessionEnded ? 'Session ended' : 'Type your response...'}
+            value={inputValue}
+            onChange={(e) => { setInputValue(e.target.value); setUserTyping(true); }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSubmit(e as unknown as React.FormEvent);
               }
-              onAutoSubmit={handleAutoSubmit}
-              userTyping={userTyping}
-              disabled={loading || sessionEnded}
-            />
-            <textarea
-              ref={textareaRef}
-              rows={1}
-              placeholder={sessionEnded ? 'Session ended' : 'Type your response...'}
-              value={inputValue}
-              onChange={(e) => {
-                setInputValue(e.target.value);
-                setUserTyping(true);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSubmit(e as unknown as React.FormEvent);
-                }
-              }}
-              onFocus={() => setUserTyping(true)}
-              onBlur={() => setUserTyping(false)}
-              disabled={loading || sessionEnded}
-              className="flex-1 resize-none overflow-hidden rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 leading-5 min-h-[38px] max-h-40"
-            />
+            }}
+            onFocus={() => setUserTyping(true)}
+            onBlur={() => setUserTyping(false)}
+            disabled={loading || sessionEnded}
+            className="flex-1 resize-none overflow-hidden rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-gray-400 disabled:cursor-not-allowed disabled:opacity-40 leading-5 min-h-[38px] max-h-40"
+          />
+          <Button
+            type="submit"
+            disabled={loading || !inputValue.trim() || sessionEnded}
+            size="icon"
+            className="rounded-full shrink-0 bg-gray-800 hover:bg-gray-700 text-white"
+          >
+            <Send className="w-4 h-4" />
+          </Button>
+          {sessionEnded ? (
             <Button
-              type="submit"
-              disabled={loading || !inputValue.trim() || sessionEnded}
-              size="icon"
-              className="rounded-full shrink-0"
+              type="button" variant="ghost" size="icon"
+              onClick={handleNewSession}
+              title="New session"
+              className="rounded-full shrink-0 text-gray-600 hover:text-gray-800 hover:bg-gray-100"
             >
-              <Send className="w-4 h-4" />
+              <RotateCcw className="w-4 h-4" />
             </Button>
-            {sessionEnded ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={handleNewSession}
-                title="New session"
-                className="rounded-full shrink-0"
-              >
-                <RotateCcw className="w-4 h-4" />
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={() => sendMessage('done', messagesRef.current)}
-                disabled={loading || sessionEnded}
-                className="rounded-full shrink-0"
-                title="End session"
-              >
-                <Square className="w-4 h-4" />
-              </Button>
-            )}
-          </form>
-        </div>
+          ) : (
+            <Button
+              type="button" variant="ghost" size="icon"
+              onClick={() => sendMessage('done', messagesRef.current)}
+              disabled={loading || sessionEnded}
+              className="rounded-full shrink-0 text-slate-400 hover:text-red-500 hover:bg-red-50"
+              title="End session"
+            >
+              <Square className="w-4 h-4" />
+            </Button>
+          )}
+        </form>
       </div>
 
       <EvaluationPanel
@@ -1438,6 +1543,8 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
         content=""
         username={username}
         physicianId={evalPhysicianId}
+        generating={evalGenerating}
+        refreshTrigger={evalRefreshTrigger}
       />
     </div>
   );
