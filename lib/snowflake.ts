@@ -615,6 +615,104 @@ export class SnowflakeClient {
   }
 
   /**
+   * Per-segment performance summary — most recent 3 sessions per segment.
+   * Returns one row per segment with median scores, mode coaching priority,
+   * and derived FIELD_READINESS.
+   */
+  async queryPerformanceBySegment(appUserId: string): Promise<any[]> {
+    const sql = `
+      WITH ranked AS (
+        SELECT *,
+          ROW_NUMBER() OVER (PARTITION BY SEGMENT_NAME ORDER BY EVALUATED_AT DESC) AS rn
+        FROM CORTEX_TESTING.ML.REPEVAL_RESULTS
+        WHERE APP_USER_ID = ?
+          AND SEGMENT_NAME IS NOT NULL
+      ),
+      top3 AS (
+        SELECT * FROM ranked WHERE rn <= 3
+      ),
+      n_per_seg AS (
+        SELECT SEGMENT_NAME, COUNT(*) AS cnt FROM top3 GROUP BY SEGMENT_NAME
+      ),
+      median_scores AS (
+        SELECT
+          SEGMENT_NAME,
+          MEDIAN(OVERALL_SCORE)              AS OVERALL_SCORE,
+          MEDIAN(CLINICAL_KNOWLEDGE_SCORE)   AS CLINICAL_KNOWLEDGE_SCORE,
+          MEDIAN(OBJECTION_HANDLING_SCORE)   AS OBJECTION_HANDLING_SCORE,
+          MEDIAN(COMPLIANCE_SCORE)           AS COMPLIANCE_SCORE,
+          MEDIAN(TONE_RAPPORT_SCORE)         AS TONE_RAPPORT_SCORE,
+          MEDIAN(CLOSING_SCORE)              AS CLOSING_SCORE
+        FROM top3
+        GROUP BY SEGMENT_NAME
+      ),
+      coaching_mode AS (
+        SELECT SEGMENT_NAME, COACHING_PRIORITY
+        FROM (
+          SELECT SEGMENT_NAME, COACHING_PRIORITY,
+            ROW_NUMBER() OVER (
+              PARTITION BY SEGMENT_NAME
+              ORDER BY COUNT(*) DESC, COACHING_PRIORITY
+            ) AS mode_rn
+          FROM top3
+          WHERE COACHING_PRIORITY IS NOT NULL
+          GROUP BY SEGMENT_NAME, COACHING_PRIORITY
+        )
+        WHERE mode_rn = 1
+      )
+      SELECT
+        ms.SEGMENT_NAME,
+        ms.OVERALL_SCORE,
+        ms.CLINICAL_KNOWLEDGE_SCORE,
+        ms.OBJECTION_HANDLING_SCORE,
+        ms.COMPLIANCE_SCORE,
+        ms.TONE_RAPPORT_SCORE,
+        ms.CLOSING_SCORE,
+        n.cnt                                              AS SESSION_COUNT,
+        cm.COACHING_PRIORITY,
+        CASE
+          WHEN ms.OVERALL_SCORE >= 8 THEN 'Field Ready'
+          WHEN ms.OVERALL_SCORE >= 6 THEN 'Coaching Needed'
+          ELSE 'Not Field Ready'
+        END                                                AS FIELD_READINESS
+      FROM median_scores ms
+      LEFT JOIN n_per_seg n     ON ms.SEGMENT_NAME = n.SEGMENT_NAME
+      LEFT JOIN coaching_mode cm ON ms.SEGMENT_NAME = cm.SEGMENT_NAME
+      ORDER BY ms.SEGMENT_NAME
+    `;
+    return await this.executeQuery(sql, {
+      '1': { type: 'TEXT', value: appUserId },
+    });
+  }
+
+  /**
+   * Daily median scores per segment over the past 12 months.
+   * Returns rows with SEGMENT_NAME — client groups by segment for per-segment charts.
+   */
+  async queryPerformanceTrendBySegment(appUserId: string): Promise<any[]> {
+    const sql = `
+      SELECT
+        SEGMENT_NAME,
+        EVALUATED_AT::DATE                             AS EVALUATED_AT,
+        MEDIAN(OVERALL_SCORE)                          AS OVERALL_SCORE,
+        MEDIAN(CLINICAL_KNOWLEDGE_SCORE)               AS CLINICAL_KNOWLEDGE_SCORE,
+        MEDIAN(OBJECTION_HANDLING_SCORE)               AS OBJECTION_HANDLING_SCORE,
+        MEDIAN(COMPLIANCE_SCORE)                       AS COMPLIANCE_SCORE,
+        MEDIAN(TONE_RAPPORT_SCORE)                     AS TONE_RAPPORT_SCORE,
+        MEDIAN(CLOSING_SCORE)                          AS CLOSING_SCORE
+      FROM CORTEX_TESTING.ML.REPEVAL_RESULTS
+      WHERE APP_USER_ID = ?
+        AND SEGMENT_NAME IS NOT NULL
+        AND EVALUATED_AT >= DATEADD(year, -1, CURRENT_TIMESTAMP)
+      GROUP BY SEGMENT_NAME, EVALUATED_AT::DATE
+      ORDER BY SEGMENT_NAME, EVALUATED_AT::DATE ASC
+    `;
+    return await this.executeQuery(sql, {
+      '1': { type: 'TEXT', value: appUserId },
+    });
+  }
+
+  /**
    * Daily median scores over the past 12 months for a user (all physicians).
    * Used for the trend line chart on the Performance panel.
    */

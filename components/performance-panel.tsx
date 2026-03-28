@@ -50,44 +50,57 @@ function readinessColor(r: string | null) {
   return 'bg-red-100 text-red-700';
 }
 
-// ── Collapsible Overall Score ribbon ────────────────────────────────────
-function OverallRibbon({ summary, trend }: { summary: any; trend: any[] }) {
-  const [expanded, setExpanded] = useState(false);
-
-  const trendData = trend.map((r: any) => ({
-    date: formatDate(r.EVALUATED_AT),
-    Overall: r.OVERALL_SCORE != null ? Number(r.OVERALL_SCORE) : null,
-    CK: r.CLINICAL_KNOWLEDGE_SCORE != null ? Number(r.CLINICAL_KNOWLEDGE_SCORE) : null,
-    OH: r.OBJECTION_HANDLING_SCORE != null ? Number(r.OBJECTION_HANDLING_SCORE) : null,
-    CO: r.COMPLIANCE_SCORE != null ? Number(r.COMPLIANCE_SCORE) : null,
-    TR: r.TONE_RAPPORT_SCORE != null ? Number(r.TONE_RAPPORT_SCORE) : null,
-    CL: r.CLOSING_SCORE != null ? Number(r.CLOSING_SCORE) : null,
+function toChartRows(rows: any[]) {
+  return rows.map((r: any) => ({
+    date:    formatDate(r.EVALUATED_AT),
+    Overall: r.OVERALL_SCORE              != null ? Number(r.OVERALL_SCORE)              : null,
+    CK:      r.CLINICAL_KNOWLEDGE_SCORE   != null ? Number(r.CLINICAL_KNOWLEDGE_SCORE)   : null,
+    OH:      r.OBJECTION_HANDLING_SCORE   != null ? Number(r.OBJECTION_HANDLING_SCORE)   : null,
+    CO:      r.COMPLIANCE_SCORE           != null ? Number(r.COMPLIANCE_SCORE)           : null,
+    TR:      r.TONE_RAPPORT_SCORE         != null ? Number(r.TONE_RAPPORT_SCORE)         : null,
+    CL:      r.CLOSING_SCORE             != null ? Number(r.CLOSING_SCORE)              : null,
   }));
+}
 
-  const score = summary?.OVERALL_SCORE != null ? Number(summary.OVERALL_SCORE) : null;
-  const readiness = summary?.FIELD_READINESS ?? null;
+// ── Shared collapsible ribbon ────────────────────────────────────────────
+function ScoreRibbon({
+  title,
+  subtitle,
+  summary,
+  trendRows,
+}: {
+  title: string;
+  subtitle?: string;
+  summary: any;
+  trendRows: any[];
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const trendData  = toChartRows(trendRows);
+  const score      = summary?.OVERALL_SCORE != null ? Number(summary.OVERALL_SCORE) : null;
+  const readiness  = summary?.FIELD_READINESS ?? null;
   const sessionCount = summary?.SESSION_COUNT ?? 0;
-  const segmentCount = summary?.SEGMENT_COUNT ?? 0;
-  const n = Math.max(segmentCount * 3, 3);
 
   return (
     <div className="border border-slate-200 rounded-xl bg-white overflow-hidden">
-      {/* ── Collapsed header (always visible) ── */}
+      {/* ── Collapsed header ── */}
       <button
         onClick={() => setExpanded(v => !v)}
         className="w-full flex items-center justify-between px-6 py-5 hover:bg-slate-50 transition-colors"
       >
-        <span className="text-sm font-bold text-slate-800 uppercase tracking-wide">
-          Overall Score
-        </span>
+        <div className="text-left">
+          <span className="text-sm font-bold text-slate-800 uppercase tracking-wide">
+            {title}
+          </span>
+          {subtitle && (
+            <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>
+          )}
+        </div>
         <div className="flex items-center gap-6">
-          {/* Field Readiness badge */}
           {readiness && (
             <span className={`text-xs font-bold px-3 py-1 rounded-full ${readinessColor(readiness)}`}>
               {readiness}
             </span>
           )}
-          {/* Overall score */}
           <span className="text-2xl font-bold text-slate-900">
             {score != null ? score.toFixed(1) : '—'}
             <span className="text-sm font-normal text-slate-400"> /10</span>
@@ -100,11 +113,9 @@ function OverallRibbon({ summary, trend }: { summary: any; trend: any[] }) {
       {expanded && (
         <div className="border-t border-slate-100 px-6 pb-6 space-y-5">
           <p className="text-xs text-slate-400 pt-4">
-            Aggregated across {sessionCount} most recent session{sessionCount !== 1 ? 's' : ''}
-            {segmentCount > 0 ? ` (${segmentCount} segment${segmentCount !== 1 ? 's' : ''} × 3)` : ''}.
+            Aggregated across {sessionCount} most recent session{sessionCount !== 1 ? 's' : ''} with this physician segment.
           </p>
 
-          {/* Coaching Priority */}
           {summary?.COACHING_PRIORITY && (
             <div>
               <p className="text-sm font-bold text-slate-800 mb-1">Coaching Priority</p>
@@ -112,15 +123,12 @@ function OverallRibbon({ summary, trend }: { summary: any; trend: any[] }) {
             </div>
           )}
 
-          {/* Trend line chart */}
           <div>
-            <p className="text-sm font-bold text-slate-800 mb-3">
-              Score Trend — Past 12 Months
-            </p>
+            <p className="text-sm font-bold text-slate-800 mb-3">Score Trend — Past 12 Months</p>
             {trendData.length === 0 ? (
               <p className="text-sm text-slate-400">Not enough data yet.</p>
             ) : (
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={280}>
                 <ComposedChart data={trendData} margin={{ top: 5, right: 10, left: 0, bottom: 60 }}>
                   <XAxis
                     dataKey="date"
@@ -134,29 +142,18 @@ function OverallRibbon({ summary, trend }: { summary: any; trend: any[] }) {
                   <Tooltip />
                   <Legend verticalAlign="top" wrapperStyle={{ fontSize: 11, paddingBottom: 8 }} />
                   <Area
-                    type="monotone"
-                    dataKey="Overall"
-                    fill="#dbeafe"
-                    stroke="#6b93c4"
-                    strokeWidth={2}
-                    fillOpacity={0.4}
-                    connectNulls
+                    type="monotone" dataKey="Overall"
+                    fill="#dbeafe" stroke="#6b93c4" strokeWidth={2} fillOpacity={0.4} connectNulls
                   />
                   {DIMS.map((d, i) => (
                     <Line
-                      key={d.short}
-                      type="monotone"
-                      dataKey={d.short}
-                      stroke={DIM_COLORS[i]}
-                      strokeWidth={1.5}
-                      dot={false}
-                      connectNulls
+                      key={d.short} type="monotone" dataKey={d.short}
+                      stroke={DIM_COLORS[i]} strokeWidth={1.5} dot={false} connectNulls
                     />
                   ))}
                 </ComposedChart>
               </ResponsiveContainer>
             )}
-            {/* Legend key */}
             <div className="flex flex-wrap gap-x-5 gap-y-1 mt-2 justify-center">
               {DIMS.map((d, i) => (
                 <span key={d.short} className="flex items-center gap-1.5 text-xs text-slate-500">
@@ -174,11 +171,13 @@ function OverallRibbon({ summary, trend }: { summary: any; trend: any[] }) {
 
 // ── Main panel ───────────────────────────────────────────────────────────
 export default function PerformancePanel({ open, onClose }: PerformancePanelProps) {
-  const [summary, setSummary] = useState<any>(null);
-  const [trend, setTrend] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [noData, setNoData] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [summary, setSummary]                   = useState<any>(null);
+  const [trend, setTrend]                       = useState<any[]>([]);
+  const [segmentSummaries, setSegmentSummaries] = useState<any[]>([]);
+  const [segmentTrends, setSegmentTrends]       = useState<any[]>([]);
+  const [loading, setLoading]                   = useState(false);
+  const [noData, setNoData]                     = useState(false);
+  const [error, setError]                       = useState<string | null>(null);
 
   useEffect(() => {
     if (open) fetchData();
@@ -196,12 +195,22 @@ export default function PerformancePanel({ open, onClose }: PerformancePanelProp
       const data = await res.json();
       setSummary(data.summary);
       setTrend(data.trend ?? []);
+      setSegmentSummaries(data.segmentSummaries ?? []);
+      setSegmentTrends(data.segmentTrends ?? []);
     } catch (e: any) {
       setError(e.message);
     } finally {
       setLoading(false);
     }
   };
+
+  // Group segment trend rows by SEGMENT_NAME
+  const trendBySegment: Record<string, any[]> = {};
+  for (const row of segmentTrends) {
+    const seg = row.SEGMENT_NAME ?? 'Unknown';
+    if (!trendBySegment[seg]) trendBySegment[seg] = [];
+    trendBySegment[seg].push(row);
+  }
 
   return (
     <Dialog open={open} onOpenChange={o => !o && onClose()}>
@@ -231,8 +240,32 @@ export default function PerformancePanel({ open, onClose }: PerformancePanelProp
         )}
 
         {!loading && summary && (
-          <div className="space-y-4">
-            <OverallRibbon summary={summary} trend={trend} />
+          <div className="space-y-3">
+            {/* ── Overall ── */}
+            <ScoreRibbon
+              title="Overall Score"
+              subtitle={`Across ${summary.SEGMENT_COUNT ?? 0} segment${(summary.SEGMENT_COUNT ?? 0) !== 1 ? 's' : ''} × 3 most recent sessions`}
+              summary={summary}
+              trendRows={trend}
+            />
+
+            {/* ── Per-segment ── */}
+            {segmentSummaries.length > 0 && (
+              <>
+                <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 px-1 pt-2">
+                  By Segment
+                </p>
+                {segmentSummaries.map((seg: any) => (
+                  <ScoreRibbon
+                    key={seg.SEGMENT_NAME}
+                    title={seg.SEGMENT_NAME}
+                    subtitle={`${seg.SESSION_COUNT ?? 0} most recent session${(seg.SESSION_COUNT ?? 0) !== 1 ? 's' : ''}`}
+                    summary={seg}
+                    trendRows={trendBySegment[seg.SEGMENT_NAME] ?? []}
+                  />
+                ))}
+              </>
+            )}
           </div>
         )}
       </DialogContent>
