@@ -1227,7 +1227,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                 }}
                 className={`relative flex flex-col justify-between rounded-2xl border p-6 min-h-64 text-left transition-all duration-200 ${
                   active
-                    ? 'border-slate-200 bg-white shadow-sm hover:shadow-md hover:border-transparent cursor-pointer'
+                    ? 'border-slate-200 bg-[#F1EFE9] shadow-sm hover:shadow-md hover:border-transparent cursor-pointer'
                     : 'border-slate-100 bg-slate-50/60 cursor-not-allowed'
                 }`}
               >
