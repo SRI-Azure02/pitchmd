@@ -1291,73 +1291,79 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
 
       {/* ── Bottom bar ─────────────────────────────────────────────────────── */}
       <div className="absolute bottom-0 left-0 right-0 bg-white pt-2 pb-1">
-        <div className="mb-1 px-1">
-          <div className="flex items-center justify-between mb-1">
+        {/* Single row: timer label | progress bar (flex-1) | pinned buttons */}
+        <div className="mb-1 px-1 flex items-center gap-2">
+          {/* Timer label — fixed width so bar doesn't jump */}
+          <div className="w-24 shrink-0">
             {timeRemaining !== null && sessionDuration !== null ? (
               isLastThird ? (
                 <span
                   className="text-xs font-bold px-2 py-0.5 rounded"
                   style={{ background: '#b04848', color: 'white' }}
                 >
-                  Time left: {timeRemaining}s
+                  Time: {timeRemaining}s
                 </span>
               ) : (
                 <p className="text-xs font-medium text-slate-400">
-                  Time left: {timeRemaining}s
+                  Time: {timeRemaining}s
                 </p>
               )
             ) : null}
-
-            <div className="flex items-center gap-1">
-              {!ttsAvailable && (
-                <span
-                  className="text-xs text-amber-600 font-medium mr-1"
-                  title="ElevenLabs returned an error. Check your API key and account credits at elevenlabs.io."
-                >
-                  🔇 Error
-                </span>
-              )}
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                onClick={() => {
-                  const next = !voiceEnabledRef.current;
-                  voiceEnabledRef.current = next;
-                  setVoiceEnabled(next);
-                  if (!next) stopCurrentAudio();
-                }}
-                className="h-7 w-7 rounded-full"
-                title={voiceEnabled ? 'Disable voice' : 'Enable voice'}
-              >
-                {voiceEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5 text-slate-400" />}
-              </Button>
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                onClick={() => setAvatarEnabled((v) => !v)}
-                className="h-7 w-7 rounded-full"
-                title={avatarEnabled ? 'Disable video avatar' : 'Enable video avatar (coming soon)'}
-                disabled
-              >
-                {avatarEnabled ? <Video className="w-3.5 h-3.5" /> : <VideoOff className="w-3.5 h-3.5 text-slate-300" />}
-              </Button>
-            </div>
           </div>
 
-          {timeRemaining !== null && sessionDuration !== null && (
-            <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden mb-1">
-              <div
-                style={{
-                  width: `${(timeRemaining / sessionDuration) * 100}%`,
-                  height: '100%',
-                  background: timerRatio !== null && timerRatio > 2/3 ? '#4e9e6b' : timerRatio !== null && timerRatio > 1/3 ? '#c07c3a' : '#b04848',
-                  transition: 'width 1s linear, background 1s ease',
-                }}
-              />
-            </div>
-          )}
+          {/* Progress bar — takes all remaining space */}
+          <div className="flex-1">
+            {timeRemaining !== null && sessionDuration !== null ? (
+              <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                <div
+                  style={{
+                    width: `${(timeRemaining / sessionDuration) * 100}%`,
+                    height: '100%',
+                    background: timerRatio !== null && timerRatio > 2/3 ? '#4e9e6b' : timerRatio !== null && timerRatio > 1/3 ? '#c07c3a' : '#b04848',
+                    transition: 'width 1s linear, background 1s ease',
+                  }}
+                />
+              </div>
+            ) : null}
+          </div>
+
+          {/* Pinned-right controls — never move */}
+          <div className="flex items-center gap-1 shrink-0">
+            {!ttsAvailable && (
+              <span
+                className="text-xs text-amber-600 font-medium"
+                title="ElevenLabs returned an error. Check your API key and account credits at elevenlabs.io."
+              >
+                🔇
+              </span>
+            )}
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              onClick={() => {
+                const next = !voiceEnabledRef.current;
+                voiceEnabledRef.current = next;
+                setVoiceEnabled(next);
+                if (!next) stopCurrentAudio();
+              }}
+              className="h-7 w-7 rounded-full"
+              title={voiceEnabled ? 'Disable voice' : 'Enable voice'}
+            >
+              {voiceEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5 text-slate-400" />}
+            </Button>
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              onClick={() => setAvatarEnabled((v) => !v)}
+              className="h-7 w-7 rounded-full"
+              title={avatarEnabled ? 'Disable video avatar' : 'Enable video avatar (coming soon)'}
+              disabled
+            >
+              {avatarEnabled ? <Video className="w-3.5 h-3.5" /> : <VideoOff className="w-3.5 h-3.5 text-slate-300" />}
+            </Button>
+          </div>
         </div>
 
         <div className="border-t border-slate-200 pt-3">
