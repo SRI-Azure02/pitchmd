@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   BarChart, Bar, Cell, XAxis, Tooltip, ResponsiveContainer,
@@ -13,6 +13,8 @@ interface EvaluationPanelProps {
   content: string;
   username?: string;
   physicianId?: string | null;
+  generating?: boolean;    // true while REPEVAL is running — show skeleton
+  refreshTrigger?: number; // increment to force a re-fetch
 }
 
 const DIMENSIONS = [
@@ -128,7 +130,95 @@ function CollapsibleDimension({ title, score, rationale, indicators, sessionCoun
   );
 }
 
-export default function EvaluationPanel({ open, onClose, content, username, physicianId }: EvaluationPanelProps) {
+function SkeletonBox({ className, style }: { className?: string; style?: React.CSSProperties }) {
+  return <div className={`bg-slate-100 rounded animate-pulse ${className ?? ''}`} style={style} />;
+}
+
+function EvalSkeleton({ generating }: { generating: boolean }) {
+  return (
+    <div className="space-y-4">
+      {/* Status banner */}
+      {generating && (
+        <div className="flex items-center gap-2.5 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+          <svg className="w-4 h-4 text-amber-500 animate-spin shrink-0" viewBox="0 0 24 24" fill="none">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+          </svg>
+          <p className="text-sm text-amber-700 font-medium">Generating evaluation report… this may take up to 2 minutes.</p>
+        </div>
+      )}
+
+      {/* Top ribbon skeleton */}
+      <div className="border border-slate-200 rounded-lg p-6 bg-white">
+        <div className="flex items-stretch gap-0 mb-6">
+          <div className="flex-1 flex flex-col pr-6 gap-3">
+            <SkeletonBox className="h-4 w-28" />
+            <SkeletonBox className="h-3 w-48" />
+            <div className="flex-1 flex items-center justify-center pt-2">
+              <SkeletonBox className="h-8 w-28 rounded-full" />
+            </div>
+          </div>
+          <div className="w-px bg-slate-200 self-stretch mx-2" />
+          <div className="flex-1 flex flex-col pl-6 gap-3">
+            <SkeletonBox className="h-4 w-24" />
+            <SkeletonBox className="h-3 w-40" />
+            <div className="flex-1 flex items-center justify-center pt-2">
+              <SkeletonBox className="h-12 w-20" />
+            </div>
+          </div>
+        </div>
+        <div className="border-t border-slate-100 pt-4 space-y-2">
+          <SkeletonBox className="h-3 w-32" />
+          <div className="flex gap-6">
+            <SkeletonBox className="h-3 w-28" />
+            <SkeletonBox className="h-3 w-36" />
+            <SkeletonBox className="h-3 w-24" />
+          </div>
+        </div>
+      </div>
+
+      {/* Bar chart skeleton */}
+      <div className="border border-slate-200 rounded-lg p-4 bg-white">
+        <SkeletonBox className="h-4 w-40 mb-4" />
+        <div className="flex items-end gap-4 h-36 px-2">
+          {[65, 80, 55, 70, 60].map((h, i) => (
+            <div key={i} className="flex-1 flex flex-col items-center gap-1">
+              <SkeletonBox className="w-full rounded" style={{ height: `${h}%` }} />
+              <SkeletonBox className="h-3 w-5" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Coaching / recommendations skeleton */}
+      <div className="border border-slate-200 rounded-lg p-5 bg-white space-y-3">
+        <SkeletonBox className="h-4 w-48" />
+        <SkeletonBox className="h-3 w-full" />
+        <SkeletonBox className="h-3 w-5/6" />
+        <SkeletonBox className="h-3 w-4/6" />
+      </div>
+
+      {/* Dimension cards skeleton */}
+      {[1, 2, 3, 4, 5].map((i) => (
+        <div key={i} className="border border-slate-200 rounded-lg p-4 bg-white flex items-center justify-between">
+          <div className="space-y-2 flex-1">
+            <SkeletonBox className="h-4 w-36" />
+            <SkeletonBox className="h-3 w-52" />
+          </div>
+          <SkeletonBox className="h-6 w-12 rounded-full" />
+        </div>
+      ))}
+
+      {/* History chart skeleton */}
+      <div className="border border-slate-200 rounded-lg p-4 bg-white">
+        <SkeletonBox className="h-4 w-44 mb-4" />
+        <SkeletonBox className="h-40 w-full rounded" />
+      </div>
+    </div>
+  );
+}
+
+export default function EvaluationPanel({ open, onClose, content, username, physicianId, generating, refreshTrigger }: EvaluationPanelProps) {
   const [evaluation, setEvaluation] = useState<any>(null);
   const [historyWithPhysician, setHistoryWithPhysician] = useState<any[]>([]);
   const [sessionCount, setSessionCount] = useState<number>(1);
@@ -138,9 +228,19 @@ export default function EvaluationPanel({ open, onClose, content, username, phys
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (open) fetchEvaluation();
+    if (!open) return;
+    if (generating) {
+      // REPEVAL still running — clear any stale data and stay on skeleton
+      setEvaluation(null);
+      setNoData(false);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+    // generating just became false (or panel opened with no active eval) — fetch fresh data
+    fetchEvaluation();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, physicianId]);
+  }, [open, physicianId, generating]);
 
   const fetchEvaluation = async () => {
     setLoading(true);
@@ -243,14 +343,15 @@ export default function EvaluationPanel({ open, onClose, content, username, phys
           </DialogTitle>
           {e && <p className="text-xs text-slate-400 mt-0.5">{aggregationNote}</p>}
         </DialogHeader>
-        {loading && <div className="py-12 text-center text-sm text-slate-500">Loading evaluation...</div>}
-        {!loading && noData && (
+        {/* Skeleton — shown while REPEVAL is running (generating) or while loading fresh data */}
+        {(generating || loading) && <EvalSkeleton generating={!!generating} />}
+        {!generating && !loading && noData && (
           <div className="py-16 text-center">
             <p className="text-slate-500 font-medium">No evaluation on record yet for this physician.</p>
           </div>
         )}
-        {!loading && error && <div className="py-6 text-center text-sm text-red-500">{error}</div>}
-        {e && !loading && (
+        {!generating && !loading && error && <div className="py-6 text-center text-sm text-red-500">{error}</div>}
+        {!generating && e && !loading && (
           <div className="space-y-4">
             <div className="border border-slate-200 rounded-lg p-6 bg-white">
               <div className="flex items-stretch gap-0 mb-6">
