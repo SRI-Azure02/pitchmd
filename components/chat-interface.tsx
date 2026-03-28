@@ -6,7 +6,7 @@ import { Spinner } from '@/components/ui/spinner';
 import AudioInput from './audio-input';
 import EvaluationPanel from './evaluation-panel';
 import PerformancePanel from './performance-panel';
-import { Send, RotateCcw, Square, Volume2, VolumeX, Video, VideoOff, MessageSquare, Search, ChevronDown, X, Check, BarChart2, ArrowUp, ArrowDown, ArrowUpDown, Hash } from 'lucide-react';
+import { Send, RotateCcw, Square, Volume2, VolumeX, Video, VideoOff, MessageSquare, Search, ChevronDown, X, Check, BarChart2, ArrowUp, ArrowDown, ArrowUpDown, Hash, Mic, BookOpen, NotebookPen } from 'lucide-react';
 import { parseEmotion, speakText, stopCurrentAudio } from '@/lib/elevenlabs';
 
 interface Message {
@@ -1166,71 +1166,118 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
       );
     }
 
-    // Default splash
-    const splashBtn = (label: string, action: () => void, description: string) => (
-      <div key={label} className="relative w-44">
-        <p className={`absolute bottom-full mb-1.5 w-44 text-xs text-slate-500 leading-snug transition-opacity duration-150 ${hoveredSplashBtn === label ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-          {description}
-        </p>
-        <Button
-          onClick={action}
-          className="w-44 py-2.5 text-sm rounded-xl border border-slate-200 text-slate-700 transition-all bg-white"
-          onMouseEnter={e => {
-            setHoveredSplashBtn(label);
-            const el = e.currentTarget as HTMLButtonElement;
-            el.style.background = 'linear-gradient(90deg, #FF6B00, #00C8FF)';
-            el.style.color = 'white';
-            el.style.borderColor = 'transparent';
-          }}
-          onMouseLeave={e => {
-            setHoveredSplashBtn(null);
-            const el = e.currentTarget as HTMLButtonElement;
-            el.style.background = 'white';
-            el.style.color = '';
-            el.style.borderColor = '';
-          }}
-        >
-          {label}
-        </Button>
-      </div>
-    );
+    // Default splash — icon grid (Option C)
+    type AppTile = {
+      label: string;
+      description: string;
+      icon: React.ReactNode;
+      badge?: string;
+      action?: () => void;
+    };
+
+    const tiles: AppTile[] = [
+      {
+        label: 'Practice Your Pitch',
+        description: 'Simulate a live sales call with a physician and get real-time coaching.',
+        icon: <Mic className="w-8 h-8" />,
+        badge: 'Pre-Field',
+        action: handleStartSession,
+      },
+      {
+        label: 'Review Performance',
+        description: 'See your scores and detailed feedback from recent sessions.',
+        icon: <BarChart2 className="w-8 h-8" />,
+        badge: 'Pre-Field',
+        action: () => setPerformanceOpen(true),
+      },
+      {
+        label: 'Engagement Playbook',
+        description: 'Walk in with the right message every time — shaped by physician segment, Rx trends, and your last visit notes.',
+        icon: <BookOpen className="w-8 h-8" />,
+        badge: 'In-Field',
+      },
+      {
+        label: 'Call Journal',
+        description: 'Log notes and outcomes after each physician interaction.',
+        icon: <NotebookPen className="w-8 h-8" />,
+        badge: 'Post-Field',
+      },
+    ];
 
     return (
-      <div className="flex flex-col h-full gap-3 px-4 py-8">
+      <div className="flex flex-col h-full items-center justify-center px-6 py-6">
 
-        {/* ── Pre-Field ─────────────────────────────────────────────────── */}
-        <div className="flex-1 flex flex-col justify-between rounded-2xl border border-slate-200 px-6 py-4 shadow-sm" style={{ background: '#F1EFE9' }}>
-          <p className="text-sm font-bold uppercase tracking-widest text-slate-500">Pre-Field</p>
-          <div className="flex flex-wrap gap-4">
-            {splashBtn('Practice Your Pitch', handleStartSession, 'Simulate a live sales call with a physician and get real-time coaching.')}
-            {splashBtn('Review Performance', () => setPerformanceOpen(true), 'See your scores and detailed feedback from recent sessions.')}
-          </div>
-        </div>
+        {/* ── Grid ─────────────────────────────────────────────────────── */}
+        <div className="grid grid-cols-2 gap-x-4 gap-y-8 w-full max-w-3xl">
+          {tiles.map((tile) => {
+            const active = !!tile.action;
+            return (
+              <button
+                key={tile.label}
+                onClick={tile.action}
+                disabled={!active}
+                onMouseEnter={e => {
+                  if (!active) return;
+                  setHoveredSplashBtn(tile.label);
+                  (e.currentTarget as HTMLButtonElement).style.background = 'linear-gradient(135deg, #C47B42, #C49868, #45A8C8)';
+                }}
+                onMouseLeave={e => {
+                  setHoveredSplashBtn(null);
+                  (e.currentTarget as HTMLButtonElement).style.background = '';
+                }}
+                className={`relative flex flex-col justify-between rounded-2xl border p-6 min-h-64 text-left transition-all duration-200 ${
+                  active
+                    ? 'border-slate-200 bg-white shadow-sm hover:shadow-md hover:border-transparent cursor-pointer'
+                    : 'border-slate-100 bg-slate-50/60 cursor-not-allowed'
+                }`}
+              >
+                {/* Badge */}
+                {tile.badge && (
+                  <span className={`self-start text-xs font-semibold uppercase tracking-widest px-2 py-0.5 rounded-full mb-3 transition-colors ${
+                    active
+                      ? hoveredSplashBtn === tile.label ? 'text-white/70' : 'text-slate-400'
+                      : 'text-slate-300'
+                  }`}>
+                    {tile.badge}
+                  </span>
+                )}
 
-        {/* ── In-Field ──────────────────────────────────────────────────── */}
-        <div className="flex-1 flex flex-col justify-between rounded-2xl border border-slate-200 px-6 py-4 shadow-sm" style={{ background: '#F1EFE9' }}>
-          <p className="text-sm font-bold uppercase tracking-widest text-slate-500">In-Field</p>
-          <div className="flex flex-wrap gap-3">
-            <Button
-              disabled
-              className="w-44 py-2.5 text-sm rounded-xl border border-slate-200 bg-white text-slate-400 cursor-not-allowed"
-            >
-              Engagement Playbook
-            </Button>
-          </div>
-        </div>
+                {/* Icon */}
+                <div className={`mb-3 transition-colors ${
+                  active
+                    ? hoveredSplashBtn === tile.label ? 'text-white' : 'text-slate-600'
+                    : 'text-slate-300'
+                }`}>
+                  {tile.icon}
+                </div>
 
-        {/* ── Post-Field ────────────────────────────────────────────────── */}
-        <div className="flex-1 flex flex-col justify-between rounded-2xl border border-slate-200 px-6 py-4 shadow-sm" style={{ background: '#F1EFE9' }}>
-          <p className="text-sm font-bold uppercase tracking-widest text-slate-500">Post-Field</p>
-          <div className="flex flex-wrap gap-3">
-            <Button
-              disabled
-              className="w-44 py-2.5 text-sm rounded-xl border border-slate-200 bg-white text-slate-400 cursor-not-allowed"
-            >
-              Call Journal
-            </Button>
-          </div>
+                {/* Label + description */}
+                <div>
+                  <p className={`font-semibold text-lg leading-snug mb-1 transition-colors ${
+                    active
+                      ? hoveredSplashBtn === tile.label ? 'text-white' : 'text-slate-800'
+                      : 'text-slate-400'
+                  }`}>
+                    {tile.label}
+                  </p>
+                  <p className={`text-base leading-snug transition-colors ${
+                    active
+                      ? hoveredSplashBtn === tile.label ? 'text-white/80' : 'text-slate-500'
+                      : 'text-slate-300'
+                  }`}>
+                    {tile.description}
+                  </p>
+                </div>
+
+                {/* Coming soon pill */}
+                {!active && (
+                  <span className="absolute top-4 right-4 text-xs font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                    Coming soon
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         <EvaluationPanel
