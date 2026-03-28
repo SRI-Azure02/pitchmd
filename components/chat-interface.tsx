@@ -171,6 +171,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [ttsAvailable, setTtsAvailable] = useState(true);
   const [voiceEnabled, setVoiceEnabled] = useState(false); // muted by default; toggle to enable
+  const [evalReady, setEvalReady] = useState(false); // true once REPEVAL finishes — drives persistent toast
   const [avatarEnabled, setAvatarEnabled] = useState(false);
   const voiceEnabledRef = useRef(false); // matches voiceEnabled initial state
 
@@ -332,6 +333,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
 
       if (res.ok) {
         console.log('[eval] ✅ REPEVAL completed — showing report button');
+        setEvalReady(true);
         setMessages((prev) => [...prev, {
           id: `msg_${Date.now()}_eval_ready`,
           role: 'assistant' as const,
@@ -599,6 +601,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                   );
                   speakText(emotionStripped, currentVoiceRef.current, emotion).catch(
                     (err) => {
+                      if (err?.message === 'interrupted' || err?.message === 'canceled') return;
                       console.error('[tts] failed:', err);
                       setTtsAvailable(false);
                     },
@@ -718,6 +721,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     setLoading(false);
     setSessionStarted(false);
     setTtsAvailable(true);
+    setEvalReady(false);
   };
 
   // ── Column header sort ────────────────────────────────────────────────────
@@ -1268,6 +1272,22 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
         )}
         <div ref={messagesEndRef} />
       </div>
+
+      {/* ── Eval-ready toast ────────────────────────────────────────────────── */}
+      {evalReady && (
+        <div className="absolute bottom-16 left-0 right-0 flex justify-center px-4 z-20 pointer-events-none">
+          <div className="flex items-center gap-3 bg-green-600 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg pointer-events-auto">
+            <span>Your evaluation report is ready.</span>
+            <button
+              onClick={() => { setEvalPhysicianId(physicianIdRef.current); setEvalOpen(true); }}
+              className="underline underline-offset-2 hover:no-underline font-bold"
+            >
+              View Report
+            </button>
+            <button onClick={() => setEvalReady(false)} className="ml-1 opacity-70 hover:opacity-100 text-base leading-none">×</button>
+          </div>
+        </div>
+      )}
 
       {/* ── Bottom bar ─────────────────────────────────────────────────────── */}
       <div className="absolute bottom-0 left-0 right-0 bg-white pt-2 pb-1">
