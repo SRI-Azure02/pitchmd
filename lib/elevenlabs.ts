@@ -95,7 +95,13 @@ function speakWithBrowser(text: string, emotion: string): Promise<void> {
     if (preferred) utterance.voice = preferred;
 
     utterance.onend = () => { currentUtterance = null; resolve(); };
-    utterance.onerror = (e) => { currentUtterance = null; reject(new Error(e.error)); };
+    utterance.onerror = (e) => {
+      currentUtterance = null;
+      // "interrupted" / "canceled" are normal side-effects of stopCurrentAudio()
+      // calling speechSynthesis.cancel(). Treat them as a clean end, not an error.
+      if (e.error === 'interrupted' || e.error === 'canceled') { resolve(); return; }
+      reject(new Error(e.error));
+    };
     window.speechSynthesis.speak(utterance);
   });
 }
