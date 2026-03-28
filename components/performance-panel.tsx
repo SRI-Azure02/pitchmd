@@ -75,17 +75,18 @@ function ScoreRibbon({
   trendRows: any[];
 }) {
   const [expanded, setExpanded] = useState(false);
-  const trendData  = toChartRows(trendRows);
-  const score      = summary?.OVERALL_SCORE != null ? Number(summary.OVERALL_SCORE) : null;
-  const readiness  = summary?.FIELD_READINESS ?? null;
-  const sessionCount = summary?.SESSION_COUNT ?? 0;
+  const trendData    = toChartRows(trendRows);
+  const score        = summary?.OVERALL_SCORE != null ? Number(summary.OVERALL_SCORE) : null;
+  const readiness    = summary?.FIELD_READINESS ?? null;
+  const sessionCount = Number(summary?.SESSION_COUNT ?? 0);
+  const isEmpty      = sessionCount === 0;
 
   return (
-    <div className="border border-slate-200 rounded-xl bg-white overflow-hidden">
+    <div className={`border rounded-xl bg-white overflow-hidden ${isEmpty ? 'border-dashed border-slate-200 opacity-60' : 'border-slate-200'}`}>
       {/* ── Collapsed header ── */}
       <button
-        onClick={() => setExpanded(v => !v)}
-        className="w-full flex items-center justify-between px-6 py-5 hover:bg-slate-50 transition-colors"
+        onClick={() => !isEmpty && setExpanded(v => !v)}
+        className={`w-full flex items-center justify-between px-6 py-5 transition-colors ${isEmpty ? 'cursor-default' : 'hover:bg-slate-50'}`}
       >
         <div className="text-left">
           <span className="text-sm font-bold text-slate-800 uppercase tracking-wide">
@@ -96,21 +97,27 @@ function ScoreRibbon({
           )}
         </div>
         <div className="flex items-center gap-6">
-          {readiness && (
-            <span className={`text-xs font-bold px-3 py-1 rounded-full ${readinessColor(readiness)}`}>
-              {readiness}
-            </span>
+          {isEmpty ? (
+            <span className="text-xs text-slate-400 italic">No sessions yet</span>
+          ) : (
+            <>
+              {readiness && (
+                <span className={`text-xs font-bold px-3 py-1 rounded-full ${readinessColor(readiness)}`}>
+                  {readiness}
+                </span>
+              )}
+              <span className="text-2xl font-bold text-slate-900">
+                {score != null ? score.toFixed(1) : '—'}
+                <span className="text-sm font-normal text-slate-400"> /10</span>
+              </span>
+              <span className="text-slate-400 text-lg ml-2">{expanded ? '−' : '+'}</span>
+            </>
           )}
-          <span className="text-2xl font-bold text-slate-900">
-            {score != null ? score.toFixed(1) : '—'}
-            <span className="text-sm font-normal text-slate-400"> /10</span>
-          </span>
-          <span className="text-slate-400 text-lg ml-2">{expanded ? '−' : '+'}</span>
         </div>
       </button>
 
       {/* ── Expanded content ── */}
-      {expanded && (
+      {!isEmpty && expanded && (
         <div className="border-t border-slate-100 px-6 pb-6 space-y-5">
           <p className="text-xs text-slate-400 pt-4">
             Aggregated across {sessionCount} most recent session{sessionCount !== 1 ? 's' : ''} with this physician segment.
