@@ -14,9 +14,11 @@ export async function GET(request: NextRequest) {
   try {
     const client = getSnowflakeClient();
 
-    const [summary, trend] = await Promise.all([
+    const [summary, trend, segmentSummaries, segmentTrends] = await Promise.all([
       client.queryOverallPerformance(appUserId),
       client.queryPerformanceTrend(appUserId),
+      client.queryPerformanceBySegment(appUserId),
+      client.queryPerformanceTrendBySegment(appUserId),
     ]);
 
     if (!summary) {
@@ -26,7 +28,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ summary, trend });
+    return NextResponse.json({ summary, trend, segmentSummaries, segmentTrends });
   } catch (error: any) {
     console.error('[performance] error:', error?.message);
     return NextResponse.json(
