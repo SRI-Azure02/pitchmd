@@ -1303,7 +1303,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
       <div
         className="flex-1 relative overflow-hidden"
         style={{
-          background: 'linear-gradient(120deg, #FF6B00, #FF9A3C, #00C8FF, #0EA5E9, #FF6B00)',
+          background: 'linear-gradient(120deg, #C47B42, #C49868, #45A8C8, #3A8FB5, #C47B42)',
           backgroundSize: '400% 400%',
           animation: 'gradientShift 10s ease infinite',
         }}
