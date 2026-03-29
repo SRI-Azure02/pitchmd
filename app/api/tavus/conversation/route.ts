@@ -3,7 +3,7 @@ import { getSessionFromRequest } from '@/lib/auth';
 
 // ── Replica pools ─────────────────────────────────────────────────────────────
 const MALE_REPLICAS   = ['r92debe21318', 're6220ec0195'];
-const FEMALE_REPLICAS = ['rf4e9d9790f0', 'r291e545fd67', 'r9c55f9312fb'];
+const FEMALE_REPLICAS = ['r291e545fd67', 'r9c55f9312fb'];
 
 function pickReplica(gender: string | null | undefined): string {
   const pool =
