@@ -830,9 +830,13 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
       },
       '*',
     );
-    // Clear speaking lock after estimated duration (~150 WPM)
+    // Clear speaking lock after estimated duration (~150 WPM).
+    // If the session has already ended this was the goodbye — stop the avatar stream.
     const wordCount = text.split(/\s+/).length;
-    setTimeout(() => { avatarSpeakingRef.current = false; }, Math.max(2000, wordCount * 450));
+    setTimeout(() => {
+      avatarSpeakingRef.current = false;
+      if (sessionEndedRef.current) cleanupTavus();
+    }, Math.max(2000, wordCount * 450));
   };
 
   const initTavusAvatar = async (physician: any): Promise<boolean> => {
