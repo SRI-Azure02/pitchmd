@@ -852,7 +852,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
       // Dynamic import — browser-only library
       const DailyIframe = (await import('@daily-co/daily-js')).default;
       const daily = DailyIframe.createCallObject({
-        audioSource: true,
+        audioSource: false,      // AudioInput handles mic; Daily only delivers avatar video/audio
         videoSource: false,
         subscribeToTracksAutomatically: true,
       });
@@ -1716,7 +1716,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
             onAutoSubmit={handleAutoSubmit}
             onCountdown={(pct) => setTranscriptCountdownActive(pct !== null)}
             userTyping={userTyping}
-            disabled={loading || sessionEnded || (avatarEnabled && !!tavusConvId)}
+            disabled={loading || sessionEnded}
           />
           <textarea
             ref={textareaRef}
