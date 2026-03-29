@@ -837,7 +837,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           physicianName: `${physician.FIRST_NAME} ${physician.LAST_NAME}`,
-          physicianFirstName: physician.FIRST_NAME,
+          gender: physician.GENDER,
         }),
       });
       if (!res.ok) throw new Error('Tavus API error');

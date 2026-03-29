@@ -5,37 +5,12 @@ import { getSessionFromRequest } from '@/lib/auth';
 const MALE_REPLICAS   = ['r92debe21318', 're6220ec0195'];
 const FEMALE_REPLICAS = ['rf4e9d9790f0', 'r291e545fd67', 'r9c55f9312fb'];
 
-function pickReplica(isFemale: boolean): string {
-  const pool = isFemale ? FEMALE_REPLICAS : MALE_REPLICAS;
+function pickReplica(gender: string | null | undefined): string {
+  const pool =
+    typeof gender === 'string' && gender.toLowerCase().startsWith('f')
+      ? FEMALE_REPLICAS
+      : MALE_REPLICAS;
   return pool[Math.floor(Math.random() * pool.length)];
-}
-
-// Common female first names to cover the synthetic physician dataset (and beyond).
-const FEMALE_NAMES = new Set([
-  'allison','alice','alicia','amanda','amy','andrea','angela','anna','anne','ashley',
-  'barbara','beth','betty','beverly','bonnie','brenda','brittany',
-  'carol','caroline','catherine','charlotte','cheryl','christina','christine','claire','claudia',
-  'dana','deborah','debra','diana','diane','donna','dorothy',
-  'elena','eleanor','elizabeth','emily','emma','evelyn',
-  'frances','gloria','grace',
-  'hannah','heather','helen','holly',
-  'irene',
-  'jacqueline','jane','janet','jennifer','jessica','joan','joyce','judy','julia','julie',
-  'karen','katherine','kathleen','kathy','katie','kelly','kim','kimberly',
-  'laura','lauren','linda','lisa','lori','lucy',
-  'margaret','maria','marie','marilyn','martha','mary','megan','melissa','meredith','michelle','morgan',
-  'nancy','natalie','nicole',
-  'olivia',
-  'pamela','patricia','paula',
-  'rachel','rebecca','renee','rita','robin','rose','ruth',
-  'samantha','sandra','sara','sarah','sharon','sheila','shirley','stephanie','sue','susan','suzanne',
-  'tammy','teresa','theresa','tiffany','tina','tracy',
-  'valerie','victoria','virginia',
-  'wendy',
-]);
-
-function isFemaleFirstName(firstName: string): boolean {
-  return FEMALE_NAMES.has(firstName.toLowerCase().trim());
 }
 
 // ── Route ────────────────────────────────────────────────────────────────────
@@ -48,10 +23,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Tavus not configured — set TAVUS_API_KEY' }, { status: 500 });
   }
 
-  const { physicianName, physicianFirstName } =
-    await request.json() as { physicianName: string; physicianFirstName: string };
+  const { physicianName, gender } =
+    await request.json() as { physicianName: string; gender: string | null };
 
-  const replicaId = pickReplica(isFemaleFirstName(physicianFirstName));
+  const replicaId = pickReplica(gender);
 
   // Create an echo-mode persona (our app drives dialogue via Claude; Tavus handles video + TTS)
   const personaRes = await fetch('https://tavusapi.com/v2/personas', {
@@ -88,6 +63,6 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     conversationId: conv.conversation_id,
     conversationUrl: conv.conversation_url,
-    replicaId, // for debugging
+    replicaId,
   });
 }
