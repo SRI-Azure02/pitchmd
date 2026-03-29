@@ -194,6 +194,10 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   const [showPhysicianId, setShowPhysicianId] = useState(false);
   const [hoveredSplashBtn, setHoveredSplashBtn] = useState<string | null>(null);
 
+  // ── Tavus avatar state ─────────────────────────────────────────────────────
+  const [tavusConvId, setTavusConvId] = useState<string | null>(null);
+  const [avatarConnecting, setAvatarConnecting] = useState(false);
+
   // FIX 1+2: Incremental streaming state
   // streamingContent holds physician tokens as they arrive so the user sees
   // text appearing word-by-word instead of waiting for the full response.
@@ -227,11 +231,39 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     async () => { },
   );
 
+  // ── Tavus / Daily refs ─────────────────────────────────────────────────────
+  const dailyCallRef = useRef<any>(null);
+  const avatarVideoRef = useRef<HTMLVideoElement>(null);
+  const avatarAudioRef = useRef<HTMLAudioElement | null>(null);
+  const avatarSpeakingRef = useRef(false);
+  const avatarEnabledRef = useRef(false);
+  const tavusConvIdRef = useRef<string | null>(null);
+  const utteranceDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadingRef = useRef(false);
+
   // ── Sync state → refs ─────────────────────────────────────────────────────
   useEffect(() => { inputRef.current = inputValue; }, [inputValue]);
   useEffect(() => { messagesRef.current = messages; }, [messages]);
   useEffect(() => { sessionEndedRef.current = sessionEnded; }, [sessionEnded]);
   useEffect(() => { voiceEnabledRef.current = voiceEnabled; }, [voiceEnabled]);
+  useEffect(() => { avatarEnabledRef.current = avatarEnabled; }, [avatarEnabled]);
+  useEffect(() => { tavusConvIdRef.current = tavusConvId; }, [tavusConvId]);
+  useEffect(() => { loadingRef.current = loading; }, [loading]);
+
+  // Cleanup Daily call on unmount
+  useEffect(() => {
+    return () => {
+      if (dailyCallRef.current) {
+        dailyCallRef.current.leave().catch(() => {});
+        dailyCallRef.current.destroy().catch(() => {});
+      }
+      if (avatarAudioRef.current) {
+        avatarAudioRef.current.pause();
+        avatarAudioRef.current.srcObject = null;
+      }
+      if (utteranceDebounceRef.current) clearTimeout(utteranceDebounceRef.current);
+    };
+  }, []);
 
   // ── Auto-resize textarea ───────────────────────────────────────────────────
   useEffect(() => {
@@ -607,20 +639,22 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                   },
                 ]);
 
-                // Only speak during active roleplay, with a voice model assigned,
-                // and only when voice is currently enabled (ref avoids stale closure).
-                if (roleplayingRef.current && currentVoiceRef.current && voiceEnabledRef.current) {
-                  console.log(
-                    '[tts] speaking | voice:', currentVoiceRef.current,
-                    '| emotion:', emotion,
-                  );
-                  speakText(emotionStripped, currentVoiceRef.current, emotion).catch(
-                    (err) => {
-                      if (err?.message === 'interrupted' || err?.message === 'canceled') return;
-                      console.error('[tts] failed:', err);
-                      setTtsAvailable(false);
-                    },
-                  );
+                // Speak the physician response — via Tavus avatar or ElevenLabs TTS.
+                if (roleplayingRef.current) {
+                  if (avatarEnabledRef.current && dailyCallRef.current && tavusConvIdRef.current) {
+                    // Avatar mode: echo text to Tavus replica
+                    speakViaTavus(emotionStripped);
+                  } else if (currentVoiceRef.current && voiceEnabledRef.current) {
+                    // Normal mode: ElevenLabs TTS
+                    console.log('[tts] speaking | voice:', currentVoiceRef.current, '| emotion:', emotion);
+                    speakText(emotionStripped, currentVoiceRef.current, emotion).catch(
+                      (err) => {
+                        if (err?.message === 'interrupted' || err?.message === 'canceled') return;
+                        console.error('[tts] failed:', err);
+                        setTtsAvailable(false);
+                      },
+                    );
+                  }
                 }
               }
 
@@ -667,7 +701,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     }
   };
 
-  const handlePhysicianSelect = (physician: any) => {
+  const handlePhysicianSelect = async (physician: any) => {
     const id: string = physician.PHYSICIAN_ID;
     const name = `Dr. ${physician.FIRST_NAME} ${physician.LAST_NAME}`;
 
@@ -689,9 +723,12 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     setSessionStarted(true);
     hasStarted.current = true;
 
-    // Kick off roleplay with a silent internal seed message — this triggers
-    // the physician's opening greeting via direct Claude API (no Snowflake hop).
-    // The message is marked internal=true so it is never shown in the chat UI.
+    // If avatar is enabled, connect Tavus first so the opening greeting is spoken by the avatar.
+    if (avatarEnabledRef.current) {
+      await initTavusAvatar(physician);
+    }
+
+    // Kick off roleplay with a silent internal seed message.
     sendMessage('__begin_roleplay__', []);
   };
 
@@ -709,6 +746,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
 
   const handleNewSession = () => {
     stopCurrentAudio();
+    cleanupTavus();
 
     sessionEndedRef.current = false;
     autoEndedRef.current = false;
@@ -742,9 +780,137 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     setShowTranscript(false);
   };
 
+  // ── Tavus avatar helpers ──────────────────────────────────────────────────
+
+  const cleanupTavus = async () => {
+    if (utteranceDebounceRef.current) clearTimeout(utteranceDebounceRef.current);
+    if (dailyCallRef.current) {
+      try { await dailyCallRef.current.leave(); } catch {}
+      try { await dailyCallRef.current.destroy(); } catch {}
+      dailyCallRef.current = null;
+    }
+    if (avatarAudioRef.current) {
+      avatarAudioRef.current.pause();
+      avatarAudioRef.current.srcObject = null;
+      avatarAudioRef.current = null;
+    }
+    if (avatarVideoRef.current) {
+      avatarVideoRef.current.srcObject = null;
+    }
+    avatarSpeakingRef.current = false;
+    setTavusConvId(null);
+    tavusConvIdRef.current = null;
+    setAvatarConnecting(false);
+  };
+
+  const speakViaTavus = (text: string) => {
+    const daily = dailyCallRef.current;
+    const convId = tavusConvIdRef.current;
+    if (!daily || !convId) return;
+    avatarSpeakingRef.current = true;
+    daily.sendAppMessage(
+      {
+        message_type: 'conversation',
+        event_type: 'conversation.echo',
+        conversation_id: convId,
+        properties: {
+          modality: 'text',
+          text,
+          audio: '',
+          sample_rate: 16000,
+          inference_id: `inf_${Date.now()}`,
+          done: true,
+        },
+      },
+      '*',
+    );
+    // Clear speaking lock after estimated duration (~150 WPM)
+    const wordCount = text.split(/\s+/).length;
+    setTimeout(() => { avatarSpeakingRef.current = false; }, Math.max(2000, wordCount * 450));
+  };
+
+  const initTavusAvatar = async (physician: any): Promise<boolean> => {
+    setAvatarConnecting(true);
+    try {
+      const res = await fetch('/api/tavus/conversation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          physicianName: `${physician.FIRST_NAME} ${physician.LAST_NAME}`,
+          physicianFirstName: physician.FIRST_NAME,
+        }),
+      });
+      if (!res.ok) throw new Error('Tavus API error');
+      const { conversationId, conversationUrl } = await res.json();
+
+      // Dynamic import — browser-only library
+      const DailyIframe = (await import('@daily-co/daily-js')).default;
+      const daily = DailyIframe.createCallObject({
+        audioSource: true,
+        videoSource: false,
+        subscribeToTracksAutomatically: true,
+      });
+      dailyCallRef.current = daily;
+
+      // Render avatar video + audio tracks
+      daily.on('track-started', (event: any) => {
+        const { track, participant } = event;
+        if (participant?.local) return;
+        if (track.kind === 'video' && avatarVideoRef.current) {
+          const stream = (avatarVideoRef.current.srcObject as MediaStream | null) ?? new MediaStream();
+          stream.addTrack(track);
+          avatarVideoRef.current.srcObject = stream;
+          avatarVideoRef.current.play().catch(() => {});
+        }
+        if (track.kind === 'audio') {
+          if (avatarAudioRef.current) {
+            avatarAudioRef.current.pause();
+            avatarAudioRef.current.srcObject = null;
+          }
+          const el = new Audio();
+          el.autoplay = true;
+          el.srcObject = new MediaStream([track]);
+          el.play().catch(() => {});
+          avatarAudioRef.current = el;
+        }
+      });
+
+      // Receive user speech transcriptions from Tavus STT
+      daily.on('app-message', (event: any) => {
+        const msg = event?.data;
+        if (msg?.event_type === 'conversation.utterance') {
+          const speech = (msg.properties?.speech as string | undefined)?.trim();
+          if (speech) {
+            if (utteranceDebounceRef.current) clearTimeout(utteranceDebounceRef.current);
+            utteranceDebounceRef.current = setTimeout(() => {
+              if (!avatarSpeakingRef.current && !sessionEndedRef.current && !loadingRef.current) {
+                sendMessageRef.current(speech, messagesRef.current);
+              }
+            }, 300);
+          }
+        }
+      });
+
+      await daily.join({ url: conversationUrl });
+
+      setTavusConvId(conversationId);
+      tavusConvIdRef.current = conversationId;
+      setAvatarConnecting(false);
+      return true;
+    } catch (err) {
+      console.error('[tavus] init failed:', err);
+      setAvatarConnecting(false);
+      setAvatarEnabled(false);
+      avatarEnabledRef.current = false;
+      dailyCallRef.current = null;
+      return false;
+    }
+  };
+
   // ── Back to physician list (no eval triggered) ────────────────────────────
   const handleBackToPhysicianList = () => {
     stopCurrentAudio();
+    cleanupTavus();
 
     // Prevent timer and any in-flight message from triggering eval
     autoEndedRef.current = true;
@@ -1299,20 +1465,40 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   return (
     <div className="relative flex flex-col h-full min-h-0">
 
-      {/* ── Video call background (animated gradient, theatre mode) ────────── */}
+      {/* ── Video call area ───────────────────────────────────────────────────── */}
       <div
         className="flex-1 relative overflow-hidden"
-        style={{
+        style={!(avatarEnabled && tavusConvId) ? {
           background: 'linear-gradient(120deg, #C47B42, #C49868, #45A8C8, #3A8FB5, #C47B42)',
           backgroundSize: '400% 400%',
           animation: 'gradientShift 10s ease infinite',
-        }}
+        } : { background: '#111' }}
       >
-        {/* D-ID placeholder */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center select-none pointer-events-none">
-          <VideoOff className="w-14 h-14 text-gray-800/20 mb-3" />
-          <p className="text-gray-800/25 text-xs tracking-widest uppercase">Video avatar coming soon</p>
-        </div>
+        {/* Tavus avatar video */}
+        <video
+          ref={avatarVideoRef}
+          autoPlay
+          playsInline
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${avatarEnabled && tavusConvId ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        />
+
+        {/* Gradient placeholder (no avatar) */}
+        {!avatarEnabled && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center select-none pointer-events-none">
+            <VideoOff className="w-14 h-14 text-gray-800/20 mb-3" />
+            <p className="text-gray-800/25 text-xs tracking-widest uppercase">Enable avatar to start video</p>
+          </div>
+        )}
+
+        {/* Avatar connecting overlay */}
+        {avatarConnecting && (
+          <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20">
+            <div className="bg-white/90 backdrop-blur-sm px-5 py-3 rounded-2xl flex items-center gap-3 shadow">
+              <Spinner className="w-4 h-4 text-gray-600" />
+              <span className="text-sm text-gray-700">Connecting avatar…</span>
+            </div>
+          </div>
+        )}
 
         {/* Back button — top-right, returns to physician list without triggering eval */}
         <div className="absolute top-3 right-3 z-10">
@@ -1508,12 +1694,21 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
             </Button>
             <Button
               type="button" size="icon" variant="ghost"
-              onClick={() => setAvatarEnabled((v) => !v)}
-              className="h-7 w-7 rounded-full text-gray-400 hover:bg-gray-100"
-              title="Enable video avatar (coming soon)"
-              disabled
+              onClick={async () => {
+                const next = !avatarEnabled;
+                setAvatarEnabled(next);
+                avatarEnabledRef.current = next;
+                if (next && sessionStarted && selectedPhysicianDataRef.current && !dailyCallRef.current) {
+                  // Connect Tavus mid-session
+                  await initTavusAvatar(selectedPhysicianDataRef.current);
+                } else if (!next) {
+                  cleanupTavus();
+                }
+              }}
+              className={`h-7 w-7 rounded-full hover:bg-gray-100 ${avatarEnabled ? 'text-blue-500' : 'text-gray-400'}`}
+              title={avatarEnabled ? 'Disable video avatar' : 'Enable video avatar'}
             >
-              <VideoOff className="w-3.5 h-3.5" />
+              {avatarEnabled ? <Video className="w-3.5 h-3.5" /> : <VideoOff className="w-3.5 h-3.5" />}
             </Button>
           </div>
         </div>
@@ -1534,7 +1729,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
             onAutoSubmit={handleAutoSubmit}
             onCountdown={(pct) => setTranscriptCountdownActive(pct !== null)}
             userTyping={userTyping}
-            disabled={loading || sessionEnded}
+            disabled={loading || sessionEnded || (avatarEnabled && !!tavusConvId)}
           />
           <textarea
             ref={textareaRef}
