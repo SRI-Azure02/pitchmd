@@ -197,6 +197,9 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   // ── Tavus avatar state ─────────────────────────────────────────────────────
   const [tavusConvId, setTavusConvId] = useState<string | null>(null);
   const [avatarConnecting, setAvatarConnecting] = useState(false);
+  // True while the avatar is speaking — used to mute AudioInput so the Web
+  // Speech API doesn't hear the avatar's own audio output and auto-submit it.
+  const [avatarSpeaking, setAvatarSpeaking] = useState(false);
 
   // FIX 1+2: Incremental streaming state
   // streamingContent holds physician tokens as they arrive so the user sees
@@ -804,6 +807,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
       avatarVideoRef.current.srcObject = null;
     }
     avatarSpeakingRef.current = false;
+    setAvatarSpeaking(false);
     setTavusConvId(null);
     tavusConvIdRef.current = null;
     setAvatarConnecting(false);
@@ -814,6 +818,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     const convId = tavusConvIdRef.current;
     if (!daily || !convId) return;
     avatarSpeakingRef.current = true;
+    setAvatarSpeaking(true); // mute AudioInput while avatar speaks
     daily.sendAppMessage(
       {
         message_type: 'conversation',
@@ -831,10 +836,14 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
       '*',
     );
     // Clear speaking lock after estimated duration (~150 WPM).
+    // Re-enable AudioInput and wipe any avatar speech the Web Speech API may
+    // have buffered while it was muted.
     // If the session has already ended this was the goodbye — stop the avatar stream.
     const wordCount = text.split(/\s+/).length;
     setTimeout(() => {
       avatarSpeakingRef.current = false;
+      setAvatarSpeaking(false); // re-enable AudioInput for user's turn
+      setInputValue('');        // discard any phantom text from avatar audio
       if (sessionEndedRef.current) cleanupTavus();
     }, Math.max(2000, wordCount * 450));
   };
@@ -1720,7 +1729,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
             onAutoSubmit={handleAutoSubmit}
             onCountdown={(pct) => setTranscriptCountdownActive(pct !== null)}
             userTyping={userTyping}
-            disabled={loading || sessionEnded}
+            disabled={loading || sessionEnded || avatarSpeaking}
           />
           <textarea
             ref={textareaRef}
