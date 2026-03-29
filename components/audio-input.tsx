@@ -47,13 +47,15 @@ export default function AudioInput({ onTranscript, onAutoSubmit, onCountdown, di
     }
   }, [disabled]);
 
-  // Resume recording when no longer disabled
+  // Resume recording when no longer disabled (or when a previous recording session ends).
+  // Depends on both disabled and isRecording so the effect re-fires once the Web Speech API
+  // onend callback has settled isRecording to false after a stop() call.
   useEffect(() => {
     if (!disabled && supported && !isRecording) {
-      const t = setTimeout(() => startRecording(), 100);
+      const t = setTimeout(() => startRecording(), 150);
       return () => clearTimeout(t);
     }
-  }, [disabled]);
+  }, [disabled, isRecording]);
 
   // Mute mic and cancel countdown when user starts typing
   useEffect(() => {
