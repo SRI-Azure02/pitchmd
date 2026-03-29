@@ -99,10 +99,19 @@ export async function POST(request: NextRequest) {
   try {
     conv = await createConversation(apiKey, personaId, replicaId, convName);
   } catch (firstErr: any) {
+    const firstStatus: number = firstErr.status ?? 0;
     const firstBody = firstErr.tavusBody;
-    console.warn('[tavus] first attempt failed (persona may be stale). status:', firstErr.status, 'body:', JSON.stringify(firstBody));
+    console.warn('[tavus] first attempt failed. status:', firstStatus, 'body:', JSON.stringify(firstBody));
 
-    // Stale persona — invalidate and retry with a brand-new one
+    // 402 = quota exhausted — retrying won't help; surface a clear message immediately.
+    if (firstStatus === 402) {
+      return NextResponse.json(
+        { error: 'Tavus free-tier quota exhausted — upgrade your plan at platform.tavus.io to continue using the avatar.' },
+        { status: 402 },
+      );
+    }
+
+    // Other failures may indicate a stale persona — invalidate and retry once.
     cachedPersonaId = null;
     try {
       personaId = await createPersona(apiKey);
@@ -114,15 +123,13 @@ export async function POST(request: NextRequest) {
     try {
       conv = await createConversation(apiKey, personaId, replicaId, convName);
     } catch (retryErr: any) {
+      const retryStatus: number = retryErr.status ?? 0;
       const retryBody = retryErr.tavusBody;
-      console.error('[tavus] retry also failed. status:', retryErr.status, 'body:', JSON.stringify(retryBody));
-      return NextResponse.json(
-        {
-          error: `Tavus conversation creation failed (HTTP ${retryErr.status})`,
-          details: retryBody,
-        },
-        { status: 500 },
-      );
+      console.error('[tavus] retry also failed. status:', retryStatus, 'body:', JSON.stringify(retryBody));
+      const retryMessage = retryStatus === 402
+        ? 'Tavus free-tier quota exhausted — upgrade your plan at platform.tavus.io'
+        : `Tavus conversation creation failed (HTTP ${retryStatus})`;
+      return NextResponse.json({ error: retryMessage, details: retryBody }, { status: 500 });
     }
   }
 
