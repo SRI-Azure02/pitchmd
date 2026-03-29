@@ -14,25 +14,19 @@ function pickReplica(gender: string | null | undefined): string {
 }
 
 // ── Persona cache ─────────────────────────────────────────────────────────────
-// A single echo-mode persona is reused across all sessions so we only pay
-// for one API call (conversation creation) instead of two per session.
-// Set TAVUS_PERSONA_ID in .env.local to skip creation entirely on cold starts.
-// If the env-pinned persona has been deleted, the route will auto-create a new
-// one and log the replacement ID so .env.local can be updated.
 let cachedPersonaId: string | null = process.env.TAVUS_PERSONA_ID ?? null;
 
 async function createPersona(apiKey: string): Promise<string> {
   const res = await fetch('https://tavusapi.com/v2/personas', {
     method: 'POST',
     headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      persona_name: 'PitchMD Echo',
-      pipeline_mode: 'echo',
-      // replica_id is set per-conversation so a single persona works for all genders
-    }),
+    body: JSON.stringify({ persona_name: 'PitchMD Echo', pipeline_mode: 'echo' }),
   });
-  const persona = await res.json();
-  if (!persona.persona_id) throw new Error(`Persona creation failed: ${JSON.stringify(persona)}`);
+  const rawText = await res.text();
+  console.log(`[tavus] POST /personas → HTTP ${res.status}: ${rawText}`);
+  let persona: any;
+  try { persona = JSON.parse(rawText); } catch { persona = {}; }
+  if (!persona.persona_id) throw new Error(`Persona creation failed (${res.status}): ${rawText}`);
 
   cachedPersonaId = persona.persona_id;
   console.log(`[tavus] created persona ${cachedPersonaId} — update TAVUS_PERSONA_ID=${cachedPersonaId} in .env.local`);
@@ -44,27 +38,32 @@ async function getOrCreatePersona(apiKey: string): Promise<string> {
   return createPersona(apiKey);
 }
 
-// ── Conversation creation (with one retry on stale persona) ───────────────────
+// ── Conversation creation ─────────────────────────────────────────────────────
 async function createConversation(
   apiKey: string,
   personaId: string,
   replicaId: string,
   conversationName: string,
 ): Promise<{ conversation_id: string; conversation_url: string }> {
+  const payload = { persona_id: personaId, replica_id: replicaId, conversation_name: conversationName };
+  console.log('[tavus] POST /conversations payload:', JSON.stringify(payload));
+
   const res = await fetch('https://tavusapi.com/v2/conversations', {
     method: 'POST',
     headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      persona_id: personaId,
-      replica_id: replicaId,
-      conversation_name: conversationName,
-    }),
+    body: JSON.stringify(payload),
   });
-  const body = await res.json();
+
+  const rawText = await res.text();
+  console.log(`[tavus] POST /conversations → HTTP ${res.status}: ${rawText}`);
+
+  let body: any;
+  try { body = JSON.parse(rawText); } catch { body = { _raw: rawText }; }
+
   if (!body.conversation_id) {
     throw Object.assign(
-      new Error(`Tavus conversation creation failed: ${JSON.stringify(body)}`),
-      { tavusBody: body },
+      new Error(`Tavus /conversations returned HTTP ${res.status}`),
+      { status: res.status, tavusBody: body },
     );
   }
   return body;
@@ -86,31 +85,42 @@ export async function POST(request: NextRequest) {
   const replicaId = pickReplica(gender);
   const convName = `${physicianName} — ${new Date().toISOString()}`;
 
-  // Get (or create) a persona, then create the conversation.
-  // If conversation creation fails with the cached/env persona (e.g. it was
-  // deleted), invalidate the cache, create a fresh persona, and retry once.
+  // ── Step 1: Get or create persona ─────────────────────────────────────────
   let personaId: string;
   try {
     personaId = await getOrCreatePersona(apiKey);
   } catch (err: any) {
-    console.error('[tavus] persona creation error:', err.message);
+    console.error('[tavus] persona error:', err.message);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 
+  // ── Step 2: Create conversation; retry with fresh persona if it fails ──────
   let conv: { conversation_id: string; conversation_url: string };
   try {
     conv = await createConversation(apiKey, personaId, replicaId, convName);
   } catch (firstErr: any) {
-    console.warn('[tavus] conversation creation failed — persona may be stale, retrying with new persona:', firstErr.message);
-    // Invalidate the cached persona (it may have been deleted) and create a fresh one.
+    const firstBody = firstErr.tavusBody;
+    console.warn('[tavus] first attempt failed (persona may be stale). status:', firstErr.status, 'body:', JSON.stringify(firstBody));
+
+    // Stale persona — invalidate and retry with a brand-new one
     cachedPersonaId = null;
     try {
       personaId = await createPersona(apiKey);
+    } catch (personaErr: any) {
+      console.error('[tavus] persona re-creation failed:', personaErr.message);
+      return NextResponse.json({ error: personaErr.message }, { status: 500 });
+    }
+
+    try {
       conv = await createConversation(apiKey, personaId, replicaId, convName);
     } catch (retryErr: any) {
-      console.error('[tavus] retry also failed:', retryErr.message);
+      const retryBody = retryErr.tavusBody;
+      console.error('[tavus] retry also failed. status:', retryErr.status, 'body:', JSON.stringify(retryBody));
       return NextResponse.json(
-        { error: 'Failed to create Tavus conversation', details: (retryErr as any).tavusBody ?? retryErr.message },
+        {
+          error: `Tavus conversation creation failed (HTTP ${retryErr.status})`,
+          details: retryBody,
+        },
         { status: 500 },
       );
     }
