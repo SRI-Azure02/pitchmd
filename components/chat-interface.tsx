@@ -859,7 +859,13 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
           gender: physician.GENDER,
         }),
       });
-      if (!res.ok) throw new Error('Tavus API error');
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        const msg = (errBody as any)?.error ?? `HTTP ${res.status}`;
+        const details = (errBody as any)?.details;
+        console.error('[tavus] API error:', msg, details ?? '');
+        throw new Error(msg);
+      }
       const { conversationId, conversationUrl } = await res.json();
 
       // Dynamic import — browser-only library
