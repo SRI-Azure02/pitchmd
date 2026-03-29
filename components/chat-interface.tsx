@@ -726,15 +726,11 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     setSessionStarted(true);
     hasStarted.current = true;
 
-    // If avatar is enabled, connect Tavus first.
-    // Do NOT start dialogue if Tavus fails to connect.
+    // If avatar is enabled, try to connect Tavus first.
+    // On failure (e.g. quota exhausted, network error) the avatar is disabled
+    // automatically inside initTavusAvatar and we continue in text-only mode.
     if (avatarEnabledRef.current) {
-      const ok = await initTavusAvatar(physician);
-      if (!ok) {
-        // Avatar failed — return to physician list without starting the session.
-        handleBackToPhysicianList();
-        return;
-      }
+      await initTavusAvatar(physician);
     }
 
     // Kick off roleplay with a silent internal seed message.
