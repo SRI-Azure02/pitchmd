@@ -176,7 +176,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   const [evalRefreshTrigger, setEvalRefreshTrigger] = useState(0); // incremented to force EvaluationPanel re-fetch
   const [showTranscript, setShowTranscript] = useState(false);
   const [transcriptCountdownActive, setTranscriptCountdownActive] = useState(false);
-  const [avatarEnabled, setAvatarEnabled] = useState(false);
+  const [avatarEnabled, setAvatarEnabled] = useState(true);
   const voiceEnabledRef = useRef(false); // matches voiceEnabled initial state
 
   // ── Physician selection state ─────────────────────────────────────────────
@@ -723,9 +723,15 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     setSessionStarted(true);
     hasStarted.current = true;
 
-    // If avatar is enabled, connect Tavus first so the opening greeting is spoken by the avatar.
+    // If avatar is enabled, connect Tavus first.
+    // Do NOT start dialogue if Tavus fails to connect.
     if (avatarEnabledRef.current) {
-      await initTavusAvatar(physician);
+      const ok = await initTavusAvatar(physician);
+      if (!ok) {
+        // Avatar failed — return to physician list without starting the session.
+        handleBackToPhysicianList();
+        return;
+      }
     }
 
     // Kick off roleplay with a silent internal seed message.
@@ -1259,7 +1265,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                         {/* Overall Score */}
                         <td className="px-4 py-3 text-slate-700 font-semibold text-center">
                           {hasScore
-                            ? p.OVERALL_SCORE
+                            ? Number(p.OVERALL_SCORE).toFixed(1)
                             : <span className="text-slate-300 font-normal text-sm">—</span>}
                         </td>
 
@@ -1598,25 +1604,6 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
           </div>
         )}
 
-        {/* Streaming indicator when transcript is hidden */}
-        {!showTranscript && loading && streamingContent && (
-          <div className="absolute bottom-16 left-0 right-0 flex justify-center px-6 pointer-events-none z-10">
-            <div className="bg-white/85 backdrop-blur-sm px-4 py-2 rounded-xl max-w-md text-center shadow">
-              <p className="text-slate-800 text-sm leading-relaxed">
-                {streamingContent.replace(/^\[EMOTION:[^\]]+\]\s*/i, '')}
-                <span className="inline-block w-1 h-3 bg-gray-700 ml-0.5 align-middle animate-pulse" />
-              </p>
-            </div>
-          </div>
-        )}
-        {!showTranscript && loading && !streamingContent && messages.length > 0 && (
-          <div className="absolute bottom-16 left-0 right-0 flex justify-center pointer-events-none z-10">
-            <div className="bg-white/85 backdrop-blur-sm px-4 py-2 rounded-xl flex items-center gap-2 shadow">
-              <Spinner className="w-3.5 h-3.5 text-gray-600" />
-              <span className="text-sm text-slate-600">{statusMessage || 'Thinking...'}</span>
-            </div>
-          </div>
-        )}
 
         {/* Eval-generating notification (shown when timer ends, until report is ready) */}
         {evalGenerating && !evalReady && (

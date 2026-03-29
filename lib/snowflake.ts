@@ -208,7 +208,7 @@ export class SnowflakeClient {
         pc.PHYSICIAN_CITY           AS CITY,
         pc.PHYSICIAN_STATE          AS STATE,
         pc.VOICE_MODEL,
-        pc.GENDER,
+        pc.PHYSICIAN_GENDER         AS GENDER,
         ps.SEGMENT_NAME,
         ps.ATTITUDINAL_DESCRIPTION
       FROM CORTEX_TESTING.PUBLIC.SYNTHETIC_PHYSICIAN_CHARS pc
@@ -269,7 +269,7 @@ export class SnowflakeClient {
         pc.PHYSICIAN_CITY           AS CITY,
         pc.PHYSICIAN_STATE          AS STATE,
         pc.VOICE_MODEL,
-        pc.GENDER,
+        pc.PHYSICIAN_GENDER         AS GENDER,
         ps.SEGMENT_NAME,
         ps.ATTITUDINAL_DESCRIPTION,
         ms.OVERALL_SCORE,
