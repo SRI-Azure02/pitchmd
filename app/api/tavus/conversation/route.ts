@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionFromRequest } from '@/lib/auth';
 
-// ── Replica pools ────────────────────────────────────────────────────────────
+// ── Replica pools ─────────────────────────────────────────────────────────────
 const MALE_REPLICAS   = ['r92debe21318', 're6220ec0195'];
 const FEMALE_REPLICAS = ['rf4e9d9790f0', 'r291e545fd67', 'r9c55f9312fb'];
 
@@ -13,7 +13,33 @@ function pickReplica(gender: string | null | undefined): string {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-// ── Route ────────────────────────────────────────────────────────────────────
+// ── Persona cache ─────────────────────────────────────────────────────────────
+// A single echo-mode persona is reused across all sessions so we only pay
+// for one API call (conversation creation) instead of two per session.
+// Set TAVUS_PERSONA_ID in .env.local to skip creation entirely on cold starts.
+let cachedPersonaId: string | null = process.env.TAVUS_PERSONA_ID ?? null;
+
+async function getOrCreatePersona(apiKey: string): Promise<string> {
+  if (cachedPersonaId) return cachedPersonaId;
+
+  const res = await fetch('https://tavusapi.com/v2/personas', {
+    method: 'POST',
+    headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      persona_name: 'PitchMD Echo',
+      pipeline_mode: 'echo',
+      // replica_id is set per-conversation so a single persona works for all genders
+    }),
+  });
+  const persona = await res.json();
+  if (!persona.persona_id) throw new Error(`Persona creation failed: ${JSON.stringify(persona)}`);
+
+  cachedPersonaId = persona.persona_id;
+  console.log(`[tavus] created persona ${cachedPersonaId} — add TAVUS_PERSONA_ID=${cachedPersonaId} to .env.local to skip this on cold starts`);
+  return cachedPersonaId;
+}
+
+// ── Route ─────────────────────────────────────────────────────────────────────
 export async function POST(request: NextRequest) {
   const session = await getSessionFromRequest(request);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -28,28 +54,20 @@ export async function POST(request: NextRequest) {
 
   const replicaId = pickReplica(gender);
 
-  // Create an echo-mode persona (our app drives dialogue via Claude; Tavus handles video + TTS)
-  const personaRes = await fetch('https://tavusapi.com/v2/personas', {
-    method: 'POST',
-    headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      persona_name: `PitchMD - ${physicianName}`,
-      pipeline_mode: 'echo',
-      default_replica_id: replicaId,
-    }),
-  });
-  const persona = await personaRes.json();
-  if (!persona.persona_id) {
-    console.error('[tavus] persona creation failed:', persona);
-    return NextResponse.json({ error: 'Failed to create Tavus persona', details: persona }, { status: 500 });
+  let personaId: string;
+  try {
+    personaId = await getOrCreatePersona(apiKey);
+  } catch (err: any) {
+    console.error('[tavus] persona error:', err.message);
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 
-  // Create a conversation for this session
+  // Create a conversation — only API call needed on warm instances
   const convRes = await fetch('https://tavusapi.com/v2/conversations', {
     method: 'POST',
     headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      persona_id: persona.persona_id,
+      persona_id: personaId,
       replica_id: replicaId,
       conversation_name: `${physicianName} — ${new Date().toISOString()}`,
     }),
