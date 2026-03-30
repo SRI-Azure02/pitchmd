@@ -647,9 +647,9 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                   if (avatarEnabledRef.current && dailyCallRef.current && tavusConvIdRef.current) {
                     // Avatar mode: echo text to Tavus replica
                     speakViaTavus(emotionStripped);
-                  } else if (currentVoiceRef.current && voiceEnabledRef.current) {
-                    // Normal mode: ElevenLabs TTS
-                    console.log('[tts] speaking | voice:', currentVoiceRef.current, '| emotion:', emotion);
+                  } else if (voiceEnabledRef.current) {
+                    // Audio-only mode: ElevenLabs if available, otherwise browser TTS.
+                    console.log('[tts] speaking | voice:', currentVoiceRef.current ?? 'browser', '| emotion:', emotion);
                     speakText(emotionStripped, currentVoiceRef.current, emotion).catch(
                       (err) => {
                         if (err?.message === 'interrupted' || err?.message === 'canceled') return;
@@ -924,6 +924,9 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
       setAvatarEnabled(false);
       avatarEnabledRef.current = false;
       dailyCallRef.current = null;
+      // Avatar unavailable — fall back to audio-only mode automatically.
+      setVoiceEnabled(true);
+      voiceEnabledRef.current = true;
       return false;
     }
   };

@@ -107,31 +107,38 @@ function speakWithBrowser(text: string, emotion: string): Promise<void> {
 }
 
 /**
- * ✅ Feature-flagged TTS with browser fallback
- * NEXT_PUBLIC_FEATURE_TTS=stub | real
+ * ✅ TTS with automatic fallback chain:
+ *    ElevenLabs (when NEXT_PUBLIC_FEATURE_TTS=real AND voiceId provided)
+ *      → Browser Web Speech API (always available, no key required)
+ *
+ * In stub mode or when no voiceId is supplied, browser TTS is used directly.
  */
 export async function speakText(
   text: string,
-  voiceId: string,
+  voiceId: string | null | undefined,
   emotion: string
 ): Promise<void> {
-  const mode = process.env.NEXT_PUBLIC_FEATURE_TTS ?? 'stub';
-
-  if (mode === 'stub') {
-    console.info('[tts] stub mode — audio skipped');
-    return;
-  }
-
   cancelCurrentAudio();
-
-  const settings = EMOTION_SETTINGS[emotion] ?? EMOTION_SETTINGS.neutral;
 
   const ttsText = text
     .replace(/\*([^*]+)\*/g, '$1')
     .replace(/\*+/g, '')
     .trim();
 
-  // Try ElevenLabs first
+  const mode = process.env.NEXT_PUBLIC_FEATURE_TTS ?? 'stub';
+
+  // Skip ElevenLabs if not configured or no voice ID — go straight to browser TTS.
+  if (mode !== 'real' || !voiceId) {
+    if (mode === 'stub' && voiceId) {
+      // Developer stub mode with a voice model — log and use browser TTS.
+      console.info('[tts] stub mode — using browser TTS');
+    }
+    await speakWithBrowser(ttsText, emotion);
+    return;
+  }
+
+  // Try ElevenLabs first; fall back to browser TTS on any failure.
+  const settings = EMOTION_SETTINGS[emotion] ?? EMOTION_SETTINGS.neutral;
   try {
     const response = await fetch('/api/tts', {
       method: 'POST',
@@ -147,7 +154,7 @@ export async function speakText(
 
     if (!response.ok) {
       const body = await response.json().catch(() => null);
-      console.warn('[tts] ElevenLabs failed, falling back to browser TTS:', response.status, body?.detail ?? '');
+      console.warn('[tts] ElevenLabs failed (HTTP', response.status, body?.detail ?? '', ') — falling back to browser TTS');
       await speakWithBrowser(ttsText, emotion);
       return;
     }
@@ -162,7 +169,7 @@ export async function speakText(
     await audio.play();
 
   } catch (err) {
-    console.warn('[tts] ElevenLabs error, falling back to browser TTS:', err);
+    console.warn('[tts] ElevenLabs error — falling back to browser TTS:', err);
     await speakWithBrowser(ttsText, emotion);
   }
 }
