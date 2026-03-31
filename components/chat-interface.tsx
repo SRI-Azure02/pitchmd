@@ -719,6 +719,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   };
 
   const handlePhysicianSelect = async (physician: any) => {
+    setHoveredBtnKey(null); // clear hover state — mouseLeave never fires on click-through
     const id: string = physician.PHYSICIAN_ID;
     const name = `Dr. ${physician.FIRST_NAME} ${physician.LAST_NAME}`;
 
@@ -1373,10 +1374,10 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
       );
     }
 
-    // Default splash — three-stack layout
-    // Stack 1 (left):  Practice Your Pitch + Review Performance
-    // Stack 2 (centre): Engagement Playbook (full height)
-    // Stack 3 (right): Call Journal + Loop Back
+    // Default splash — three horizontal rows
+    // Row 1 (top):    Practice Your Pitch  |  Review Performance
+    // Row 2 (middle): Engagement Playbook (full width)
+    // Row 3 (bottom): Call Journal  |  Loop Back
 
     const splashTile = (
       label: string,
@@ -1395,26 +1396,27 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
           style={hoveredSplashBtn === label ? { background: 'linear-gradient(135deg, #C47B42, #C49868, #45A8C8)' } : {}}
           onMouseEnter={() => { if (active) setHoveredSplashBtn(label); }}
           onMouseLeave={() => setHoveredSplashBtn(null)}
-          className={`relative flex flex-col justify-between rounded-2xl border p-6 text-left transition-all duration-200 ${
+          className={`relative flex items-center gap-5 rounded-2xl border px-6 py-5 text-left transition-all duration-200 ${
             active
               ? 'border-slate-200 bg-[#F1EFE9] shadow-sm hover:shadow-md hover:border-transparent cursor-pointer'
               : 'border-slate-100 bg-slate-50/60 cursor-not-allowed'
           } ${extraClass}`}
         >
-          <span className={`self-start text-xs font-semibold uppercase tracking-widest px-2 py-0.5 rounded-full mb-3 transition-colors ${
-            active ? (hoveredSplashBtn === label ? 'text-white/70' : 'text-slate-400') : 'text-slate-300'
-          }`}>
-            {badge}
-          </span>
-
-          <div className={`mb-3 transition-colors ${
-            active ? (hoveredSplashBtn === label ? 'text-white' : 'text-slate-600') : 'text-slate-300'
+          {/* Icon */}
+          <div className={`shrink-0 transition-colors ${
+            active ? (hoveredSplashBtn === label ? 'text-white' : 'text-slate-500') : 'text-slate-300'
           }`}>
             {icon}
           </div>
 
-          <div>
-            <p className={`font-semibold text-lg leading-snug mb-1 transition-colors ${
+          {/* Text */}
+          <div className="flex flex-col min-w-0">
+            <span className={`text-xs font-semibold uppercase tracking-widest mb-1 transition-colors ${
+              active ? (hoveredSplashBtn === label ? 'text-white/70' : 'text-slate-400') : 'text-slate-300'
+            }`}>
+              {badge}
+            </span>
+            <p className={`font-semibold text-base leading-snug mb-0.5 transition-colors ${
               active ? (hoveredSplashBtn === label ? 'text-white' : 'text-slate-800') : 'text-slate-400'
             }`}>
               {label}
@@ -1427,7 +1429,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
           </div>
 
           {!active && (
-            <span className="absolute top-4 right-4 text-xs font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+            <span className="absolute top-3 right-4 text-xs font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
               Coming soon
             </span>
           )}
@@ -1438,58 +1440,58 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     return (
       <div className="flex flex-col h-full items-center justify-center px-6 py-6">
 
-        {/* ── Three-stack layout ───────────────────────────────────────── */}
-        <div className="flex gap-4 w-full max-w-4xl">
+        {/* ── Three-row layout ──────────────────────────────────────────── */}
+        <div className="flex flex-col gap-4 w-full max-w-4xl">
 
-          {/* Stack 1 — Pre-Field */}
-          <div className="flex flex-col gap-4 flex-1">
+          {/* Row 1 — Pre-Field */}
+          <div className="flex gap-4">
             {splashTile(
               'Practice Your Pitch',
               'Simulate a live sales call with a physician and get real-time coaching.',
-              <Mic className="w-8 h-8" />,
+              <Mic className="w-7 h-7" />,
               'Pre-Field',
               handleStartSession,
-              'flex-1 min-h-52',
+              'flex-1',
             )}
             {splashTile(
               'Review Performance',
               'See your scores and detailed feedback from recent sessions.',
-              <BarChart2 className="w-8 h-8" />,
+              <BarChart2 className="w-7 h-7" />,
               'Pre-Field',
               () => setPerformanceOpen(true),
-              'flex-1 min-h-52',
-            )}
-          </div>
-
-          {/* Stack 2 — In-Field (full height) */}
-          <div className="flex flex-col flex-1">
-            {splashTile(
-              'Engagement Playbook',
-              'Walk in with the right message every time — shaped by physician segment, Rx trends, and your last visit notes.',
-              <BookOpen className="w-8 h-8" />,
-              'In-Field',
-              undefined,
               'flex-1',
             )}
           </div>
 
-          {/* Stack 3 — Post-Field */}
-          <div className="flex flex-col gap-4 flex-1">
+          {/* Row 2 — In-Field (full width) */}
+          <div className="flex">
+            {splashTile(
+              'Engagement Playbook',
+              'Walk in with the right message every time — shaped by physician segment, Rx trends, and your last visit notes.',
+              <BookOpen className="w-7 h-7" />,
+              'In-Field',
+              undefined,
+              'w-full',
+            )}
+          </div>
+
+          {/* Row 3 — Post-Field */}
+          <div className="flex gap-4">
             {splashTile(
               'Call Journal',
               'Log notes and outcomes after each physician interaction.',
-              <NotebookPen className="w-8 h-8" />,
+              <NotebookPen className="w-7 h-7" />,
               'Post-Field',
               undefined,
-              'flex-1 min-h-52',
+              'flex-1',
             )}
             {splashTile(
               'Loop Back',
               'Track commitments made during your calls and follow through on every promise.',
-              <RotateCcw className="w-8 h-8" />,
+              <RotateCcw className="w-7 h-7" />,
               'Post-Field',
               undefined,
-              'flex-1 min-h-52',
+              'flex-1',
             )}
           </div>
 
