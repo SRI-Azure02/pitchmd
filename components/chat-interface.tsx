@@ -194,6 +194,12 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   const [showPhysicianId, setShowPhysicianId] = useState(false);
   const [hoveredSplashBtn, setHoveredSplashBtn] = useState<string | null>(null);
 
+  // ── Physician-list button hover state ─────────────────────────────────────
+  // Key format: "<physicianId>-practice" | "<physicianId>-eval"
+  // Stored in state (not inline DOM style) so React resets it on re-render and
+  // it can't get stuck when the user clicks through to a session while hovering.
+  const [hoveredBtnKey, setHoveredBtnKey] = useState<string | null>(null);
+
   // ── Tavus avatar state ─────────────────────────────────────────────────────
   const [tavusConvId, setTavusConvId] = useState<string | null>(null);
   const [avatarConnecting, setAvatarConnecting] = useState(false);
@@ -649,14 +655,22 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                     speakViaTavus(emotionStripped);
                   } else if (voiceEnabledRef.current) {
                     // Audio-only mode: ElevenLabs if available, otherwise browser TTS.
+                    // Mute AudioInput for the duration so the Web Speech API doesn't
+                    // pick up TTS audio from the speakers and auto-submit it as user speech.
                     console.log('[tts] speaking | voice:', currentVoiceRef.current ?? 'browser', '| emotion:', emotion);
-                    speakText(emotionStripped, currentVoiceRef.current, emotion).catch(
-                      (err) => {
+                    setAvatarSpeaking(true);
+                    speakText(emotionStripped, currentVoiceRef.current, emotion)
+                      .then(() => {
+                        setAvatarSpeaking(false);
+                        setInputValue(''); // discard any phantom text captured while physician spoke
+                      })
+                      .catch((err) => {
+                        setAvatarSpeaking(false);
+                        setInputValue('');
                         if (err?.message === 'interrupted' || err?.message === 'canceled') return;
                         console.error('[tts] failed:', err);
                         setTtsAvailable(false);
-                      },
-                    );
+                      });
                   }
                 }
               }
@@ -935,6 +949,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   const handleBackToPhysicianList = () => {
     stopCurrentAudio();
     cleanupTavus();
+    setHoveredBtnKey(null); // reset any stuck hover style on action buttons
 
     // Prevent timer and any in-flight message from triggering eval
     autoEndedRef.current = true;
@@ -1307,8 +1322,9 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                               title="Practice your pitch"
                               onClick={() => handlePhysicianSelect(p)}
                               className="w-10 h-10 rounded-full flex items-center justify-center border border-slate-200 bg-white text-slate-500 hover:text-white hover:border-transparent transition-all"
-                              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'linear-gradient(135deg, #FF6B00, #00C8FF)'; }}
-                              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = ''; }}
+                              style={hoveredBtnKey === `${p.PHYSICIAN_ID}-practice` ? { background: 'linear-gradient(135deg, #FF6B00, #00C8FF)' } : {}}
+                              onMouseEnter={() => setHoveredBtnKey(`${p.PHYSICIAN_ID}-practice`)}
+                              onMouseLeave={() => setHoveredBtnKey(null)}
                             >
                               <MessageSquare className="w-4 h-4" />
                             </button>
@@ -1323,8 +1339,9 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                                   ? 'border-slate-200 bg-white text-slate-500 hover:text-white hover:border-transparent cursor-pointer'
                                   : 'border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed'
                               }`}
-                              onMouseEnter={e => { if (hasEval) (e.currentTarget as HTMLButtonElement).style.background = 'linear-gradient(135deg, #FF6B00, #00C8FF)'; }}
-                              onMouseLeave={e => { if (hasEval) (e.currentTarget as HTMLButtonElement).style.background = ''; }}
+                              style={hasEval && hoveredBtnKey === `${p.PHYSICIAN_ID}-eval` ? { background: 'linear-gradient(135deg, #FF6B00, #00C8FF)' } : {}}
+                              onMouseEnter={() => { if (hasEval) setHoveredBtnKey(`${p.PHYSICIAN_ID}-eval`); }}
+                              onMouseLeave={() => { if (hasEval) setHoveredBtnKey(null); }}
                             >
                               <BarChart2 className="w-4 h-4" />
                             </button>
@@ -1734,7 +1751,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
             onAutoSubmit={handleAutoSubmit}
             onCountdown={(pct) => setTranscriptCountdownActive(pct !== null)}
             userTyping={userTyping}
-            disabled={loading || sessionEnded || avatarSpeaking}
+            disabled={loading || sessionEnded || avatarSpeaking || !roleplaying}
           />
           <textarea
             ref={textareaRef}

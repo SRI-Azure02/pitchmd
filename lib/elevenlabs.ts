@@ -164,9 +164,12 @@ export async function speakText(
     currentObjectUrl = audioUrl;
     const audio = new Audio(audioUrl);
     currentAudio = audio;
-    audio.onended = cancelCurrentAudio;
-    audio.onerror = cancelCurrentAudio;
-    await audio.play();
+    // Wait for playback to finish (not just start) so callers know when speech ends.
+    await new Promise<void>((resolve) => {
+      audio.onended = () => { cancelCurrentAudio(); resolve(); };
+      audio.onerror = () => { cancelCurrentAudio(); resolve(); };
+      audio.play().catch(() => { cancelCurrentAudio(); resolve(); });
+    });
 
   } catch (err) {
     console.warn('[tts] ElevenLabs error — falling back to browser TTS:', err);

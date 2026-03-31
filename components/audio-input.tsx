@@ -12,7 +12,7 @@ interface AudioInputProps {
   userTyping?: boolean;
 }
 
-const SILENCE_TIMEOUT = 3000;
+const SILENCE_TIMEOUT = 5000; // 5 s — gives users enough time to finish a sentence
 const RING_R = 20;
 const CIRCUMFERENCE = 2 * Math.PI * RING_R;
 
@@ -24,25 +24,21 @@ export default function AudioInput({ onTranscript, onAutoSubmit, onCountdown, di
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const hasTranscriptRef = useRef(false);
-  const autoStartedRef = useRef(false);
+  // Synchronous guard — prevents a second SpeechRecognition instance from
+  // being created before React has flushed the isRecording state update.
+  const recordingActiveRef = useRef(false);
 
   useEffect(() => {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (SR) setSupported(true);
   }, []);
 
-  useEffect(() => {
-    if (supported && !disabled && !autoStartedRef.current) {
-      autoStartedRef.current = true;
-      setTimeout(() => startRecording(), 100);
-    }
-  }, [supported]);
-
   // Stop recording immediately when disabled (e.g. while message is sending)
   useEffect(() => {
     if (disabled && isRecording) {
       clearTimers();
       recognitionRef.current?.stop();
+      // recordingActiveRef is cleared in onend
       setIsRecording(false);
     }
   }, [disabled]);
@@ -100,8 +96,11 @@ export default function AudioInput({ onTranscript, onAutoSubmit, onCountdown, di
 
   const startRecording = () => {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR || isRecording) return;
+    // Use the ref (not isRecording state) to prevent a second instance from being
+    // created before React has flushed the previous setIsRecording(true) call.
+    if (!SR || recordingActiveRef.current) return;
 
+    recordingActiveRef.current = true;
     const recognition = new SR();
     recognition.lang = 'en-US';
     recognition.continuous = true;
@@ -120,8 +119,13 @@ export default function AudioInput({ onTranscript, onAutoSubmit, onCountdown, di
       }
     };
 
-    recognition.onerror = () => { clearTimers(); setIsRecording(false); };
+    recognition.onerror = () => {
+      recordingActiveRef.current = false;
+      clearTimers();
+      setIsRecording(false);
+    };
     recognition.onend = () => {
+      recordingActiveRef.current = false;
       clearTimers();
       setIsRecording(false);
     };
@@ -134,6 +138,7 @@ export default function AudioInput({ onTranscript, onAutoSubmit, onCountdown, di
   const stopRecording = () => {
     clearTimers();
     recognitionRef.current?.stop();
+    // recordingActiveRef will be cleared by onend; no need to reset here.
     setIsRecording(false);
   };
 
