@@ -1268,7 +1268,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                     };
 
                     return (
-                      <tr key={p.PHYSICIAN_ID} className="group border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                      <tr key={p.PHYSICIAN_ID} className="group border-b border-slate-100 hover:bg-slate-100/70 transition-colors">
                         {/* Physician ID (hidden by default) */}
                         {showPhysicianId && (
                           <td className="px-4 py-3 text-slate-500 text-sm font-mono">
@@ -1316,18 +1316,19 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                         </td>
 
                         {/* Actions */}
-                        <td className="sticky right-0 bg-white group-hover:bg-slate-50 px-4 py-3 shadow-[-1px_0_0_0_#e2e8f0] transition-colors">
+                        <td className="sticky right-0 bg-white group-hover:bg-slate-100/70 px-4 py-2.5 shadow-[-1px_0_0_0_#e2e8f0] transition-colors">
                           <div className="flex items-center gap-2">
                             {/* Practice your pitch */}
                             <button
                               title="Practice your pitch"
                               onClick={() => handlePhysicianSelect(p)}
-                              className="w-10 h-10 rounded-full flex items-center justify-center border border-slate-200 bg-white text-slate-500 hover:text-white hover:border-transparent transition-all"
+                              className="h-9 px-4 rounded-full flex items-center gap-2 border border-slate-200 bg-white text-slate-500 text-sm font-medium hover:text-white hover:border-transparent transition-all whitespace-nowrap"
                               style={hoveredBtnKey === `${p.PHYSICIAN_ID}-practice` ? { background: 'linear-gradient(135deg, #FF6B00, #00C8FF)' } : {}}
                               onMouseEnter={() => setHoveredBtnKey(`${p.PHYSICIAN_ID}-practice`)}
                               onMouseLeave={() => setHoveredBtnKey(null)}
                             >
-                              <MessageSquare className="w-4 h-4" />
+                              <MessageSquare className="w-3.5 h-3.5 shrink-0" />
+                              Practice Pitch
                             </button>
 
                             {/* View evaluation report */}
@@ -1335,7 +1336,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                               title="View evaluation report"
                               onClick={() => { if (hasEval) { setEvalPhysicianId(p.PHYSICIAN_ID); setEvalOpen(true); } }}
                               disabled={!hasEval}
-                              className={`w-10 h-10 rounded-full flex items-center justify-center border transition-all ${
+                              className={`h-9 px-4 rounded-full flex items-center gap-2 border text-sm font-medium transition-all whitespace-nowrap ${
                                 hasEval
                                   ? 'border-slate-200 bg-white text-slate-500 hover:text-white hover:border-transparent cursor-pointer'
                                   : 'border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed'
@@ -1344,7 +1345,8 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                               onMouseEnter={() => { if (hasEval) setHoveredBtnKey(`${p.PHYSICIAN_ID}-eval`); }}
                               onMouseLeave={() => { if (hasEval) setHoveredBtnKey(null); }}
                             >
-                              <BarChart2 className="w-4 h-4" />
+                              <BarChart2 className="w-3.5 h-3.5 shrink-0" />
+                              Evaluation
                             </button>
                           </div>
                         </td>
