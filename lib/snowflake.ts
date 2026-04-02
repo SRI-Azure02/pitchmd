@@ -745,6 +745,128 @@ export class SnowflakeClient {
       '1': { type: 'TEXT', value: appUserId },
     });
   }
+
+  // ─── Call Journal Queries ───────────────────────────────────────────
+
+  /**
+   * Returns physicians with face-to-face or telephonic activity on a given date,
+   * joined with scores from the rep's most recent 3 REPEVAL sessions.
+   */
+  async queryActivityByDate(date: string, appUserId: string): Promise<any[]> {
+    const sql = `
+      WITH activity AS (
+        SELECT DISTINCT a.PHYSICIAN_ID, a.PROMOTION_CHANNEL, a.MESSAGE_DELIVERED
+        FROM CORTEX_TESTING.PUBLIC.SYNTHETIC_ACTIVITY a
+        WHERE a.TRANSACTION_DATE = :1
+          AND a.PROMOTION_CHANNEL IN ('Face to face', 'Telephonic')
+      ),
+      last3 AS (
+        SELECT
+          PHYSICIAN_ID,
+          OVERALL_SCORE,
+          FIELD_READINESS,
+          ROW_NUMBER() OVER (PARTITION BY PHYSICIAN_ID ORDER BY EVALUATED_AT DESC) AS rn
+        FROM CORTEX_TESTING.ML.REPEVAL_RESULTS
+        WHERE APP_USER_ID = :2
+      ),
+      median_scores AS (
+        SELECT PHYSICIAN_ID, MEDIAN(OVERALL_SCORE) AS OVERALL_SCORE
+        FROM last3 WHERE rn <= 3
+        GROUP BY PHYSICIAN_ID
+      ),
+      readiness_counts AS (
+        SELECT PHYSICIAN_ID, FIELD_READINESS, COUNT(*) AS cnt
+        FROM last3 WHERE rn <= 3 AND FIELD_READINESS IS NOT NULL
+        GROUP BY PHYSICIAN_ID, FIELD_READINESS
+      ),
+      mode_readiness AS (
+        SELECT PHYSICIAN_ID, FIELD_READINESS
+        FROM (
+          SELECT PHYSICIAN_ID, FIELD_READINESS,
+            ROW_NUMBER() OVER (PARTITION BY PHYSICIAN_ID ORDER BY cnt DESC, FIELD_READINESS) AS mode_rn
+          FROM readiness_counts
+        ) WHERE mode_rn = 1
+      )
+      SELECT
+        pc.PHYSICIAN_ID,
+        pc.PHYSICIAN_FIRST_NAME  AS FIRST_NAME,
+        pc.PHYSICIAN_LAST_NAME   AS LAST_NAME,
+        pc.PHYSICIAN_SPECIALTY   AS SPECIALTY,
+        pc.PHYSICIAN_STATE       AS STATE,
+        ps.SEGMENT_NAME,
+        act.PROMOTION_CHANNEL,
+        act.MESSAGE_DELIVERED,
+        ms.OVERALL_SCORE,
+        mr.FIELD_READINESS
+      FROM activity act
+      JOIN CORTEX_TESTING.PUBLIC.SYNTHETIC_PHYSICIAN_CHARS pc ON act.PHYSICIAN_ID = pc.PHYSICIAN_ID
+      LEFT JOIN CORTEX_TESTING.PUBLIC.SYNTHETIC_PHYSICIAN_SEGMENT ps ON pc.PHYSICIAN_ID = ps.PHYSICIAN_ID
+      LEFT JOIN median_scores ms  ON pc.PHYSICIAN_ID = ms.PHYSICIAN_ID
+      LEFT JOIN mode_readiness mr ON pc.PHYSICIAN_ID = mr.PHYSICIAN_ID
+      ORDER BY pc.PHYSICIAN_LAST_NAME, pc.PHYSICIAN_FIRST_NAME
+    `;
+    return await this.executeQuery(sql, {
+      '1': { type: 'TEXT', value: date },
+      '2': { type: 'TEXT', value: appUserId },
+    });
+  }
+
+  /** Fetch existing call notes for a user on a given date. */
+  async getCallNotes(appUserId: string, date: string): Promise<any[]> {
+    const sql = `
+      SELECT NOTE_ID, PHYSICIAN_ID, CALL_DATE, CALL_TIMESTAMP,
+             TRANSCRIPT, AI_SUMMARY, CREATED_AT, UPDATED_AT
+      FROM CORTEX_TESTING.PUBLIC.REP_CALL_NOTES
+      WHERE APP_USER_ID = :1 AND CALL_DATE = :2
+      ORDER BY CALL_TIMESTAMP DESC
+    `;
+    return await this.executeQuery(sql, {
+      '1': { type: 'TEXT', value: appUserId },
+      '2': { type: 'TEXT', value: date },
+    });
+  }
+
+  /** Insert a new call note. */
+  async saveCallNote(
+    appUserId: string,
+    physicianId: string,
+    callDate: string,
+    callTimestamp: string,
+    transcript: string,
+    aiSummary: string,
+  ): Promise<void> {
+    const sql = `
+      INSERT INTO CORTEX_TESTING.PUBLIC.REP_CALL_NOTES
+        (NOTE_ID, APP_USER_ID, PHYSICIAN_ID, CALL_DATE, CALL_TIMESTAMP, TRANSCRIPT, AI_SUMMARY)
+      VALUES (UUID_STRING(), :1, :2, :3, :4, :5, :6)
+    `;
+    await this.executeQuery(sql, {
+      '1': { type: 'TEXT', value: appUserId },
+      '2': { type: 'TEXT', value: physicianId },
+      '3': { type: 'TEXT', value: callDate },
+      '4': { type: 'TEXT', value: callTimestamp },
+      '5': { type: 'TEXT', value: transcript },
+      '6': { type: 'TEXT', value: aiSummary },
+    });
+  }
+
+  /** Update an existing call note. */
+  async updateCallNote(
+    noteId: string,
+    transcript: string,
+    aiSummary: string,
+  ): Promise<void> {
+    const sql = `
+      UPDATE CORTEX_TESTING.PUBLIC.REP_CALL_NOTES
+      SET TRANSCRIPT = :1, AI_SUMMARY = :2, UPDATED_AT = CURRENT_TIMESTAMP()
+      WHERE NOTE_ID = :3
+    `;
+    await this.executeQuery(sql, {
+      '1': { type: 'TEXT', value: transcript },
+      '2': { type: 'TEXT', value: aiSummary },
+      '3': { type: 'TEXT', value: noteId },
+    });
+  }
 }
 
 // ─── Singleton ─────────────────────────────────────────────────────────
