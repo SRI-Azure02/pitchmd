@@ -6,6 +6,7 @@ import { Spinner } from '@/components/ui/spinner';
 import AudioInput from './audio-input';
 import EvaluationPanel from './evaluation-panel';
 import PerformancePanel from './performance-panel';
+import CallJournal from './call-journal';
 import { Send, RotateCcw, Square, Volume2, VolumeX, Video, VideoOff, MessageSquare, Search, ChevronDown, X, Check, BarChart2, ArrowUp, ArrowDown, ArrowUpDown, Hash, Mic, BookOpen, NotebookPen } from 'lucide-react';
 import { parseEmotion, speakText, stopCurrentAudio } from '@/lib/elevenlabs';
 
@@ -73,7 +74,7 @@ function PhysicianFilterDropdown({
       {isOpen && <div className="fixed inset-0 z-40" onClick={onToggle} />}
       <button
         onClick={onToggle}
-        className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border text-base font-medium transition-colors ${
+        className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full border text-base font-medium transition-colors ${
           isActive
             ? 'border-blue-400 bg-blue-50 text-blue-700'
             : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
@@ -166,6 +167,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   const [evalOpen, setEvalOpen] = useState(false);
   const [evalPhysicianId, setEvalPhysicianId] = useState<string | null>(null);
   const [performanceOpen, setPerformanceOpen] = useState(false);
+  const [callJournalMode, setCallJournalMode] = useState(false);
   const [userTyping, setUserTyping] = useState(false);
   const [sessionDuration, setSessionDuration] = useState<number | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
@@ -1084,6 +1086,11 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     return { background: '#f1f5f9', color: '#475569' };
   };
 
+  // ── Call Journal full-screen view ────────────────────────────────────────
+  if (callJournalMode) {
+    return <CallJournal username={username ?? 'Rep'} onBack={() => setCallJournalMode(false)} />;
+  }
+
   // ── Pre-session splash ────────────────────────────────────────────────────
   if (!sessionStarted) {
     // Physician selection grid
@@ -1096,9 +1103,9 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
               <p className="text-lg font-semibold text-slate-900">Select a Physician</p>
               <p className="text-sm text-slate-400">Choose who you'd like to practice with today</p>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => setPhysicianSelectionMode(false)} className="text-sm text-slate-400">
+            <button onClick={() => setPhysicianSelectionMode(false)} className="text-sm text-slate-400 hover:text-slate-700 px-3 py-1 rounded-full hover:bg-slate-100 transition-colors">
               Back
-            </Button>
+            </button>
           </div>
 
           {/* ── Filter ribbon ───────────────────────────────────────────── */}
@@ -1124,7 +1131,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
               {/* Physician ID column toggle */}
               <button
                 onClick={() => setShowPhysicianId(v => !v)}
-                className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-base font-medium transition-colors ${
+                className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full border text-base font-medium transition-colors ${
                   showPhysicianId
                     ? 'border-blue-300 bg-blue-50 text-blue-700'
                     : 'border-slate-200 bg-white text-slate-400 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-600'
@@ -1182,7 +1189,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                     setSortConfig(null);
                     setFilterValues({ segment: null, specialty: null, overallScore: null, fieldReadiness: null });
                   }}
-                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-sm text-slate-500 hover:text-red-500 hover:bg-red-50 border border-transparent hover:border-red-200 transition-colors"
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-sm text-slate-500 hover:text-red-500 hover:bg-red-50 border border-transparent hover:border-red-200 transition-colors"
                 >
                   <X className="w-3 h-3" />
                   Clear
@@ -1268,7 +1275,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                     };
 
                     return (
-                      <tr key={p.PHYSICIAN_ID} className="group border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                      <tr key={p.PHYSICIAN_ID} className="group border-b border-slate-100 hover:bg-slate-100/70 transition-colors">
                         {/* Physician ID (hidden by default) */}
                         {showPhysicianId && (
                           <td className="px-4 py-3 text-slate-500 text-sm font-mono">
@@ -1316,18 +1323,19 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                         </td>
 
                         {/* Actions */}
-                        <td className="sticky right-0 bg-white group-hover:bg-slate-50 px-4 py-3 shadow-[-1px_0_0_0_#e2e8f0] transition-colors">
+                        <td className="sticky right-0 bg-white group-hover:bg-slate-100/70 px-4 py-2.5 shadow-[-1px_0_0_0_#e2e8f0] transition-colors">
                           <div className="flex items-center gap-2">
                             {/* Practice your pitch */}
                             <button
                               title="Practice your pitch"
                               onClick={() => handlePhysicianSelect(p)}
-                              className="w-10 h-10 rounded-full flex items-center justify-center border border-slate-200 bg-white text-slate-500 hover:text-white hover:border-transparent transition-all"
+                              className="h-9 px-4 rounded-full flex items-center gap-2 border border-slate-200 bg-white text-slate-500 text-sm font-medium hover:text-white hover:border-transparent transition-all whitespace-nowrap"
                               style={hoveredBtnKey === `${p.PHYSICIAN_ID}-practice` ? { background: 'linear-gradient(135deg, #FF6B00, #00C8FF)' } : {}}
                               onMouseEnter={() => setHoveredBtnKey(`${p.PHYSICIAN_ID}-practice`)}
                               onMouseLeave={() => setHoveredBtnKey(null)}
                             >
-                              <MessageSquare className="w-4 h-4" />
+                              <MessageSquare className="w-3.5 h-3.5 shrink-0" />
+                              Practice Pitch
                             </button>
 
                             {/* View evaluation report */}
@@ -1335,7 +1343,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                               title="View evaluation report"
                               onClick={() => { if (hasEval) { setEvalPhysicianId(p.PHYSICIAN_ID); setEvalOpen(true); } }}
                               disabled={!hasEval}
-                              className={`w-10 h-10 rounded-full flex items-center justify-center border transition-all ${
+                              className={`h-9 px-4 rounded-full flex items-center gap-2 border text-sm font-medium transition-all whitespace-nowrap ${
                                 hasEval
                                   ? 'border-slate-200 bg-white text-slate-500 hover:text-white hover:border-transparent cursor-pointer'
                                   : 'border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed'
@@ -1344,7 +1352,8 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                               onMouseEnter={() => { if (hasEval) setHoveredBtnKey(`${p.PHYSICIAN_ID}-eval`); }}
                               onMouseLeave={() => { if (hasEval) setHoveredBtnKey(null); }}
                             >
-                              <BarChart2 className="w-4 h-4" />
+                              <BarChart2 className="w-3.5 h-3.5 shrink-0" />
+                              Evaluation
                             </button>
                           </div>
                         </td>
@@ -1396,7 +1405,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
           style={hoveredSplashBtn === label ? { background: 'linear-gradient(135deg, #C47B42, #C49868, #45A8C8)' } : {}}
           onMouseEnter={() => { if (active) setHoveredSplashBtn(label); }}
           onMouseLeave={() => setHoveredSplashBtn(null)}
-          className={`relative flex items-center gap-5 rounded-2xl border px-6 py-5 text-left transition-all duration-200 ${
+          className={`relative flex items-center gap-5 rounded-2xl border px-6 py-12 text-left transition-all duration-200 ${
             active
               ? 'border-slate-200 bg-[#F1EFE9] shadow-sm hover:shadow-md hover:border-transparent cursor-pointer'
               : 'border-slate-100 bg-slate-50/60 cursor-not-allowed'
@@ -1410,13 +1419,13 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
           </div>
 
           {/* Text */}
-          <div className="flex flex-col min-w-0">
-            <span className={`text-xs font-semibold uppercase tracking-widest mb-1 transition-colors ${
+          <div className="flex flex-col justify-between min-w-0 gap-3">
+            <span className={`text-xs font-semibold uppercase tracking-widest transition-colors ${
               active ? (hoveredSplashBtn === label ? 'text-white/70' : 'text-slate-400') : 'text-slate-300'
             }`}>
               {badge}
             </span>
-            <p className={`font-semibold text-base leading-snug mb-0.5 transition-colors ${
+            <p className={`font-semibold text-base leading-snug transition-colors ${
               active ? (hoveredSplashBtn === label ? 'text-white' : 'text-slate-800') : 'text-slate-400'
             }`}>
               {label}
@@ -1482,7 +1491,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
               'Log notes and outcomes after each physician interaction.',
               <NotebookPen className="w-7 h-7" />,
               'Post-Field',
-              undefined,
+              () => setCallJournalMode(true),
               'flex-1',
             )}
             {splashTile(
@@ -1555,7 +1564,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
         <div className="absolute top-3 right-3 z-10">
           <button
             onClick={handleBackToPhysicianList}
-            className="flex items-center gap-1.5 bg-white/70 backdrop-blur-sm hover:bg-white/90 text-gray-700 text-sm font-medium px-3 py-1.5 rounded-lg shadow transition-all"
+            className="flex items-center gap-1.5 bg-white/70 backdrop-blur-sm hover:bg-white/90 text-gray-700 text-sm font-medium px-3 py-1.5 rounded-full shadow transition-all"
           >
             Back
           </button>
