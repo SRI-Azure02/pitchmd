@@ -143,8 +143,18 @@ function NoteRow({ physician, existingNote, callDate, onSaved, onClose }: NoteRo
   const handleFinal = useCallback((t: string) => setEditText(prev => prev ? prev + ' ' + t : t), []);
   const recorder = useVoiceRecorder(handleFinal);
 
+  // Auto-start mic when note row opens for a new note
+  useEffect(() => {
+    if (editing && !existingNote) {
+      recorder.start();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleSubmit = async () => {
     const text = editText.trim(); if (!text) return;
+    // Stop recording if still active before submitting
+    if (recorder.state.recording) recorder.stop();
     setSaving(true);
     try {
       const sumRes = await fetch('/api/call-journal/summarize', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ transcript: text }) });
@@ -163,7 +173,7 @@ function NoteRow({ physician, existingNote, callDate, onSaved, onClose }: NoteRo
   };
 
   return (
-    <div className="bg-slate-50 border-t border-slate-100 px-6 py-4 space-y-3">
+    <div className="bg-slate-100/70 border-t border-slate-100 px-6 py-4 space-y-3">
       {editing && (
         <div className="flex items-center gap-4">
           <button onClick={recorder.state.recording ? recorder.stop : recorder.start}
@@ -194,11 +204,11 @@ function NoteRow({ physician, existingNote, callDate, onSaved, onClose }: NoteRo
         </div>
       )}
       <div className="flex items-center gap-2 justify-end">
-        <button onClick={onClose} className="h-8 px-3 rounded-full text-xs text-slate-500 hover:bg-slate-200 transition-colors">Close</button>
-        {!editing && <button onClick={() => setEditing(true)} className="h-8 px-3 rounded-full flex items-center gap-1.5 text-xs border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors"><Edit2 className="w-3 h-3" /> Edit</button>}
+        <button onClick={onClose} className="h-8 px-4 rounded-full text-xs text-slate-500 hover:bg-slate-200 transition-colors">Close</button>
+        {!editing && <button onClick={() => setEditing(true)} className="h-8 px-4 rounded-full flex items-center gap-1.5 text-xs border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors"><Edit2 className="w-3 h-3" /> Edit</button>}
         {editing && (
           <button onClick={handleSubmit} disabled={saving || !editText.trim()}
-            className="h-8 px-4 rounded-full flex items-center gap-1.5 text-xs font-medium text-white disabled:opacity-50"
+            className="h-8 px-5 rounded-full flex items-center gap-1.5 text-xs font-medium text-white disabled:opacity-50"
             style={{ background: 'linear-gradient(135deg,#FF6B00,#00C8FF)' }}>
             <Send className="w-3 h-3" />{saving ? 'Saving…' : 'Submit'}
           </button>
@@ -237,7 +247,7 @@ function PhysicianPicker({ onSelect, onClose }: PhysicianPickerProps) {
       </div>
       <div className="px-4 py-2 border-b border-slate-100">
         <input
-          className="w-full text-sm px-3 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-200"
+          className="w-full text-sm px-3 py-1.5 rounded-full border border-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-200"
           placeholder="Search by name or specialty…"
           value={search}
           onChange={e => setSearch(e.target.value)}
@@ -301,11 +311,11 @@ function PhysicianTable({ physicians, notes, expandedRow, callDate, onToggleRow,
             const isExpanded = expandedRow === p.PHYSICIAN_ID;
             const channel = p.PROMOTION_CHANNEL ?? 'Manual';
             const isTelephonic = channel.toLowerCase().includes('telephonic');
+            const rowBg = isExpanded ? 'bg-slate-100/70' : 'hover:bg-slate-100/70';
 
             return (
               <React.Fragment key={p.PHYSICIAN_ID}>
-                <tr
-                  className={`group border-b border-slate-100 transition-colors ${isExpanded ? 'bg-slate-50' : 'hover:bg-slate-100/70'}`}>
+                <tr className={`group border-b border-slate-100 transition-colors ${rowBg}`}>
                   <td className="px-4 py-3 font-semibold text-slate-900 whitespace-nowrap">Dr. {p.FIRST_NAME} {p.LAST_NAME}</td>
                   <td className="px-4 py-3 text-slate-600">{p.SPECIALTY ?? <span className="text-slate-300">—</span>}</td>
                   <td className="px-4 py-3 text-slate-600">{p.SEGMENT_NAME ?? <span className="text-slate-300">—</span>}</td>
@@ -324,7 +334,8 @@ function PhysicianTable({ physicians, notes, expandedRow, callDate, onToggleRow,
                       {channel}
                     </span>
                   </td>
-                  <td className="sticky right-0 bg-white group-hover:bg-slate-100/70 px-4 py-2.5 shadow-[-1px_0_0_0_#e2e8f0] transition-colors">
+                  {/* Sticky Notes column — same bg as row so no white bleed */}
+                  <td className={`sticky right-0 px-4 py-2.5 shadow-[-1px_0_0_0_#e2e8f0] transition-colors ${isExpanded ? 'bg-slate-100/70' : 'bg-white group-hover:bg-slate-100/70'}`}>
                     <button
                       onClick={() => onToggleRow(p.PHYSICIAN_ID)}
                       className="h-9 px-4 rounded-full flex items-center gap-2 border text-sm font-medium transition-all whitespace-nowrap"
@@ -367,9 +378,30 @@ interface CallJournalProps { username: string; onBack: () => void; }
 export default function CallJournal({ username, onBack }: CallJournalProps) {
   const today = new Date(); today.setHours(0,0,0,0);
 
+  // Week anchor — Mon of displayed week
+  const [weekAnchor, setWeekAnchor] = useState<Date>(() => {
+    const d = new Date(today);
+    const dow = d.getDay();
+    d.setDate(d.getDate() - (dow === 0 ? 6 : dow - 1));
+    return d;
+  });
   const [selectedDate, setSelectedDate] = useState<Date>(today);
   const [monthExpanded, setMonthExpanded] = useState(false);
   const [monthAnchor, setMonthAnchor] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
+
+  const ribbonRef = useRef<HTMLDivElement>(null);
+
+  // Close month view on outside click
+  useEffect(() => {
+    if (!monthExpanded) return;
+    const handler = (e: MouseEvent) => {
+      if (ribbonRef.current && !ribbonRef.current.contains(e.target as Node)) {
+        setMonthExpanded(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [monthExpanded]);
 
   // Activity date highlighting
   const [activityDates, setActivityDates] = useState<Set<string>>(new Set());
@@ -382,10 +414,19 @@ export default function CallJournal({ username, onBack }: CallJournalProps) {
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [showPicker, setShowPicker] = useState(false);
 
-  const weekDays = getWeekDays(today);
+  const weekDays = getWeekDays(weekAnchor);
   const monthDays = monthExpanded ? getMonthWeekdays(monthAnchor) : [];
 
-  // Load activity dates for visible range (week + current month view)
+  // Navigate weeks
+  const prevWeek = () => setWeekAnchor(d => { const n = new Date(d); n.setDate(d.getDate()-7); return n; });
+  const nextWeek = () => {
+    const next = new Date(weekAnchor); next.setDate(weekAnchor.getDate()+7);
+    // Don't allow navigating past the week containing today
+    if (next <= today) setWeekAnchor(next);
+  };
+  const nextWeekDisabled = (() => { const n = new Date(weekAnchor); n.setDate(weekAnchor.getDate()+7); return n > today; })();
+
+  // Load activity dates when range changes
   useEffect(() => {
     const from = toIso(weekDays[0]);
     const to = monthExpanded
@@ -396,9 +437,9 @@ export default function CallJournal({ username, onBack }: CallJournalProps) {
       .then(d => setActivityDates(new Set(d.dates ?? [])))
       .catch(console.error);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [monthExpanded, monthAnchor]);
+  }, [weekAnchor, monthExpanded, monthAnchor]);
 
-  // Also reload activity dates when month view navigates
+  // Reload when month view navigates
   useEffect(() => {
     if (!monthExpanded) return;
     const from = toIso(new Date(monthAnchor.getFullYear(), monthAnchor.getMonth(), 1));
@@ -449,56 +490,50 @@ export default function CallJournal({ username, onBack }: CallJournalProps) {
   const isSelected   = (d: Date) => toIso(d) === callDate;
   const hasActivity  = (d: Date) => activityDates.has(toIso(d));
 
-  // Week button: circle with small abbr + number
+  // Week buttons — flex-1 pill-shaped, stretch across full width
   const renderWeekBtn = (d: Date) => {
-    const sel = isSelected(d); const sel_ok = isSelectable(d);
+    const sel = isSelected(d); const ok = isSelectable(d);
     const holiday = isHoliday(d); const activity = hasActivity(d);
     const abbr = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
 
-    let cls = 'flex flex-col items-center justify-center w-12 h-12 rounded-full border transition-all ';
+    let cls = 'relative flex-1 flex flex-col items-center justify-center min-w-0 rounded-full border py-2 transition-all ';
     let style: React.CSSProperties = {};
-    if (!sel_ok) { cls += 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed'; }
-    else if (sel) { cls += 'text-white border-transparent'; style = { background: 'linear-gradient(135deg,#FF6B00,#00C8FF)' }; }
+    if (!ok)       { cls += 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed'; }
+    else if (sel)  { cls += 'text-white border-transparent'; style = { background:'linear-gradient(135deg,#FF6B00,#00C8FF)' }; }
     else if (holiday) { cls += 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 cursor-pointer'; }
     else if (isToday(d)) { cls += 'bg-slate-100 text-slate-800 border-slate-300 hover:bg-slate-200 cursor-pointer'; }
-    else { cls += 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 cursor-pointer'; }
+    else           { cls += 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 cursor-pointer'; }
 
     return (
-      <button key={toIso(d)} disabled={!sel_ok} onClick={() => sel_ok && setSelectedDate(new Date(d))}
-        className={`relative ${cls}`} style={style}>
+      <button key={toIso(d)} disabled={!ok} onClick={() => ok && setSelectedDate(new Date(d))}
+        className={cls} style={style}>
         <span className="text-[9px] font-medium uppercase tracking-wide leading-none">{abbr}</span>
         <span className="text-sm font-bold leading-tight">{d.getDate()}</span>
-        {/* Activity dot */}
-        {activity && !sel && (
-          <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-emerald-400" />
-        )}
-        {/* Holiday dot */}
-        {holiday && !sel && (
-          <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-amber-400" />
-        )}
+        {activity && !sel && <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-emerald-400" />}
+        {holiday  && !sel && <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-amber-400" />}
       </button>
     );
   };
 
-  // Month button: smaller circle, number only
+  // Month buttons — pill-shaped, centered, stretch per column
   const renderMonthBtn = (d: Date) => {
-    const sel = isSelected(d); const sel_ok = isSelectable(d);
+    const sel = isSelected(d); const ok = isSelectable(d);
     const holiday = isHoliday(d); const activity = hasActivity(d);
 
-    let cls = 'relative flex items-center justify-center w-9 h-9 rounded-full border text-sm font-semibold transition-all ';
+    let cls = 'relative w-full flex items-center justify-center rounded-full border py-1.5 text-sm font-semibold transition-all ';
     let style: React.CSSProperties = {};
-    if (!sel_ok) { cls += 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed'; }
-    else if (sel) { cls += 'text-white border-transparent'; style = { background: 'linear-gradient(135deg,#FF6B00,#00C8FF)' }; }
+    if (!ok)       { cls += 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed'; }
+    else if (sel)  { cls += 'text-white border-transparent'; style = { background:'linear-gradient(135deg,#FF6B00,#00C8FF)' }; }
     else if (holiday) { cls += 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 cursor-pointer'; }
     else if (isToday(d)) { cls += 'bg-slate-100 text-slate-800 border-slate-300 hover:bg-slate-200 cursor-pointer'; }
     else if (activity) { cls += 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 cursor-pointer'; }
-    else { cls += 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 cursor-pointer'; }
+    else           { cls += 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 cursor-pointer'; }
 
     return (
-      <button key={toIso(d)} disabled={!sel_ok} onClick={() => sel_ok && setSelectedDate(new Date(d))}
+      <button key={toIso(d)} disabled={!ok} onClick={() => ok && setSelectedDate(new Date(d))}
         className={cls} style={style} title={toIso(d)}>
         {d.getDate()}
-        {holiday && !sel && <span className="absolute top-0 right-0 w-1.5 h-1.5 rounded-full bg-amber-400" />}
+        {holiday && !sel && <span className="absolute top-0 right-0.5 w-1.5 h-1.5 rounded-full bg-amber-400" />}
       </button>
     );
   };
@@ -507,23 +542,44 @@ export default function CallJournal({ username, onBack }: CallJournalProps) {
 
   return (
     <div className="flex flex-col h-full min-h-screen bg-[#F5F4EF]">
-      {/* Header */}
-      <div className="flex items-center gap-3 px-6 py-4 border-b border-slate-200 bg-white/80 backdrop-blur-sm">
-        <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 transition-colors">
-          <ArrowLeft className="w-4 h-4" /> Back
+      {/* Header — consistent with physician selection screen */}
+      <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-slate-100 bg-white shrink-0">
+        <div>
+          <p className="text-lg font-semibold text-slate-900">Call Journal</p>
+          <p className="text-sm text-slate-400">Log your call notes for each physician</p>
+        </div>
+        <button
+          onClick={onBack}
+          className="text-sm text-slate-400 hover:text-slate-700 transition-colors px-3 py-1 rounded-full hover:bg-slate-100"
+        >
+          Back
         </button>
-        <div className="w-px h-5 bg-slate-200" />
-        <h1 className="text-lg font-semibold text-slate-900">Call Journal</h1>
       </div>
 
       {/* Week ribbon */}
-      <div className="bg-white border-b border-slate-200 px-6 py-3">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">{weekDays.map(renderWeekBtn)}</div>
+      <div ref={ribbonRef} className="bg-white border-b border-slate-200 px-4 py-3">
+        <div className="flex items-center gap-2">
+          {/* Prev week */}
+          <button onClick={prevWeek} className="p-1.5 rounded-full hover:bg-slate-100 transition-colors shrink-0">
+            <ChevronLeft className="w-4 h-4 text-slate-400" />
+          </button>
+
+          {/* Week day buttons — stretch full width */}
+          <div className="flex flex-1 gap-1.5">
+            {weekDays.map(renderWeekBtn)}
+          </div>
+
+          {/* Next week */}
+          <button onClick={nextWeek} disabled={nextWeekDisabled}
+            className="p-1.5 rounded-full hover:bg-slate-100 transition-colors shrink-0 disabled:opacity-30 disabled:cursor-not-allowed">
+            <ChevronRight className="w-4 h-4 text-slate-400" />
+          </button>
+
+          {/* Month expand chevron */}
           <button onClick={() => setMonthExpanded(v => !v)}
-            className="ml-auto flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 shrink-0 transition-colors"
+            className="p-1.5 rounded-full hover:bg-slate-100 transition-colors shrink-0"
             title={monthExpanded ? 'Collapse' : 'Expand to month'}>
-            {monthExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            {monthExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
           </button>
         </div>
 
@@ -542,12 +598,12 @@ export default function CallJournal({ username, onBack }: CallJournalProps) {
                 <ChevronRight className="w-4 h-4 text-slate-400" />
               </button>
             </div>
-            {/* Column headers */}
-            <div className="grid grid-cols-5 gap-1 mb-1">
-              {DAY_ABBR.map(a => <div key={a} className="text-center text-[10px] font-medium text-slate-400 uppercase tracking-wide py-0.5">{a}</div>)}
+            {/* Column headers — centered */}
+            <div className="grid grid-cols-5 gap-1.5 mb-1">
+              {DAY_ABBR.map(a => <div key={a} className="text-center text-[10px] font-semibold text-slate-400 uppercase tracking-wide py-0.5">{a}</div>)}
             </div>
             {/* Day buttons */}
-            <div className="grid grid-cols-5 gap-1">
+            <div className="grid grid-cols-5 gap-1.5">
               {monthDays.map(renderMonthBtn)}
             </div>
             {/* Legend */}
@@ -560,14 +616,14 @@ export default function CallJournal({ username, onBack }: CallJournalProps) {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto px-6 py-4">
-        <div className="max-w-5xl mx-auto space-y-4">
+      <div className="flex-1 overflow-y-auto px-4 py-3">
+        <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-sm font-semibold text-slate-800">{selectedLabel}</h2>
-              <p className="text-xs text-slate-400 mt-0.5">Face-to-face and telephonic calls</p>
+              <h2 className="text-lg font-semibold text-slate-900">{selectedLabel}</h2>
+              <p className="text-sm text-slate-400 mt-0.5">Face-to-face and telephonic calls</p>
             </div>
-            {/* Add call button always visible */}
+            {/* Single Add Call button — top right only */}
             {!loadingPhysicians && (
               <button onClick={() => setShowPicker(v => !v)}
                 className="h-9 px-4 rounded-full flex items-center gap-2 text-sm font-medium border transition-all"
@@ -591,11 +647,6 @@ export default function CallJournal({ username, onBack }: CallJournalProps) {
             <div className="flex flex-col items-center justify-center py-16 text-slate-400 gap-3">
               <Users className="w-8 h-8 text-slate-300" />
               <p className="text-sm">No face-to-face or telephonic calls recorded for this date.</p>
-              <button onClick={() => setShowPicker(true)}
-                className="h-9 px-5 rounded-full flex items-center gap-2 text-sm font-medium text-white"
-                style={{ background: 'linear-gradient(135deg,#FF6B00,#00C8FF)' }}>
-                <PlusCircle className="w-4 h-4" /> Add a Call Entry
-              </button>
             </div>
           ) : allPhysicians.length > 0 ? (
             <PhysicianTable

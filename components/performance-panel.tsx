@@ -68,13 +68,15 @@ function ScoreRibbon({
   subtitle,
   summary,
   trendRows,
+  defaultExpanded = false,
 }: {
   title: string;
   subtitle?: string;
   summary: any;
   trendRows: any[];
+  defaultExpanded?: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(defaultExpanded);
   const trendData    = toChartRows(trendRows);
   const score        = summary?.OVERALL_SCORE != null ? Number(summary.OVERALL_SCORE) : null;
   const readiness    = summary?.FIELD_READINESS ?? null;
@@ -254,6 +256,7 @@ export default function PerformancePanel({ open, onClose }: PerformancePanelProp
               subtitle={`Across ${summary.SEGMENT_COUNT ?? 0} segment${(summary.SEGMENT_COUNT ?? 0) !== 1 ? 's' : ''} × 3 most recent sessions`}
               summary={summary}
               trendRows={trend}
+              defaultExpanded
             />
 
             {/* ── Per-segment ── */}

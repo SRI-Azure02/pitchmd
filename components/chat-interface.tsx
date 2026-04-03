@@ -74,7 +74,7 @@ function PhysicianFilterDropdown({
       {isOpen && <div className="fixed inset-0 z-40" onClick={onToggle} />}
       <button
         onClick={onToggle}
-        className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border text-base font-medium transition-colors ${
+        className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full border text-base font-medium transition-colors ${
           isActive
             ? 'border-blue-400 bg-blue-50 text-blue-700'
             : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
@@ -1103,9 +1103,9 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
               <p className="text-lg font-semibold text-slate-900">Select a Physician</p>
               <p className="text-sm text-slate-400">Choose who you'd like to practice with today</p>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => setPhysicianSelectionMode(false)} className="text-sm text-slate-400">
+            <button onClick={() => setPhysicianSelectionMode(false)} className="text-sm text-slate-400 hover:text-slate-700 px-3 py-1 rounded-full hover:bg-slate-100 transition-colors">
               Back
-            </Button>
+            </button>
           </div>
 
           {/* ── Filter ribbon ───────────────────────────────────────────── */}
@@ -1131,7 +1131,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
               {/* Physician ID column toggle */}
               <button
                 onClick={() => setShowPhysicianId(v => !v)}
-                className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-base font-medium transition-colors ${
+                className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full border text-base font-medium transition-colors ${
                   showPhysicianId
                     ? 'border-blue-300 bg-blue-50 text-blue-700'
                     : 'border-slate-200 bg-white text-slate-400 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-600'
@@ -1189,7 +1189,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                     setSortConfig(null);
                     setFilterValues({ segment: null, specialty: null, overallScore: null, fieldReadiness: null });
                   }}
-                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-sm text-slate-500 hover:text-red-500 hover:bg-red-50 border border-transparent hover:border-red-200 transition-colors"
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-sm text-slate-500 hover:text-red-500 hover:bg-red-50 border border-transparent hover:border-red-200 transition-colors"
                 >
                   <X className="w-3 h-3" />
                   Clear
@@ -1405,7 +1405,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
           style={hoveredSplashBtn === label ? { background: 'linear-gradient(135deg, #C47B42, #C49868, #45A8C8)' } : {}}
           onMouseEnter={() => { if (active) setHoveredSplashBtn(label); }}
           onMouseLeave={() => setHoveredSplashBtn(null)}
-          className={`relative flex items-center gap-5 rounded-2xl border px-6 py-5 text-left transition-all duration-200 ${
+          className={`relative flex items-center gap-5 rounded-2xl border px-6 py-12 text-left transition-all duration-200 ${
             active
               ? 'border-slate-200 bg-[#F1EFE9] shadow-sm hover:shadow-md hover:border-transparent cursor-pointer'
               : 'border-slate-100 bg-slate-50/60 cursor-not-allowed'
@@ -1419,13 +1419,13 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
           </div>
 
           {/* Text */}
-          <div className="flex flex-col min-w-0">
-            <span className={`text-xs font-semibold uppercase tracking-widest mb-1 transition-colors ${
+          <div className="flex flex-col justify-between min-w-0 gap-3">
+            <span className={`text-xs font-semibold uppercase tracking-widest transition-colors ${
               active ? (hoveredSplashBtn === label ? 'text-white/70' : 'text-slate-400') : 'text-slate-300'
             }`}>
               {badge}
             </span>
-            <p className={`font-semibold text-base leading-snug mb-0.5 transition-colors ${
+            <p className={`font-semibold text-base leading-snug transition-colors ${
               active ? (hoveredSplashBtn === label ? 'text-white' : 'text-slate-800') : 'text-slate-400'
             }`}>
               {label}
@@ -1564,7 +1564,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
         <div className="absolute top-3 right-3 z-10">
           <button
             onClick={handleBackToPhysicianList}
-            className="flex items-center gap-1.5 bg-white/70 backdrop-blur-sm hover:bg-white/90 text-gray-700 text-sm font-medium px-3 py-1.5 rounded-lg shadow transition-all"
+            className="flex items-center gap-1.5 bg-white/70 backdrop-blur-sm hover:bg-white/90 text-gray-700 text-sm font-medium px-3 py-1.5 rounded-full shadow transition-all"
           >
             Back
           </button>
