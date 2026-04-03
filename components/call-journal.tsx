@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   ChevronDown, ChevronUp, ChevronLeft, ChevronRight,
   Mic, MicOff, Send, Edit2, ArrowLeft, Phone, Users, PlusCircle,
@@ -303,8 +303,8 @@ function PhysicianTable({ physicians, notes, expandedRow, callDate, onToggleRow,
             const isTelephonic = channel.toLowerCase().includes('telephonic');
 
             return (
-              <>
-                <tr key={p.PHYSICIAN_ID}
+              <React.Fragment key={p.PHYSICIAN_ID}>
+                <tr
                   className={`group border-b border-slate-100 transition-colors ${isExpanded ? 'bg-slate-50' : 'hover:bg-slate-100/70'}`}>
                   <td className="px-4 py-3 font-semibold text-slate-900 whitespace-nowrap">Dr. {p.FIRST_NAME} {p.LAST_NAME}</td>
                   <td className="px-4 py-3 text-slate-600">{p.SPECIALTY ?? <span className="text-slate-300">—</span>}</td>
@@ -340,7 +340,7 @@ function PhysicianTable({ physicians, notes, expandedRow, callDate, onToggleRow,
                   </td>
                 </tr>
                 {isExpanded && (
-                  <tr key={`${p.PHYSICIAN_ID}-exp`} className="border-b border-slate-100">
+                  <tr className="border-b border-slate-100">
                     <td colSpan={8} className="p-0">
                       <NoteRow
                         physician={p}
@@ -352,7 +352,7 @@ function PhysicianTable({ physicians, notes, expandedRow, callDate, onToggleRow,
                     </td>
                   </tr>
                 )}
-              </>
+              </React.Fragment>
             );
           })}
         </tbody>
