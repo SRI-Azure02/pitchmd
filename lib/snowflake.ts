@@ -811,6 +811,25 @@ export class SnowflakeClient {
     });
   }
 
+  /**
+   * Returns distinct dates (YYYY-MM-DD) that have face-to-face or telephonic
+   * activity within a date range — used to highlight the calendar.
+   */
+  async queryActivityDates(from: string, to: string): Promise<string[]> {
+    const sql = `
+      SELECT DISTINCT TO_CHAR(TRANSACTION_DATE, 'YYYY-MM-DD') AS ACTIVITY_DATE
+      FROM CORTEX_TESTING.PUBLIC.SYNTHETIC_ACTIVITY
+      WHERE TRANSACTION_DATE >= :1 AND TRANSACTION_DATE <= :2
+        AND PROMOTION_CHANNEL IN ('Face to face', 'Telephonic')
+      ORDER BY ACTIVITY_DATE
+    `;
+    const rows = await this.executeQuery(sql, {
+      '1': { type: 'TEXT', value: from },
+      '2': { type: 'TEXT', value: to },
+    });
+    return rows.map((r: any) => r.ACTIVITY_DATE);
+  }
+
   /** Fetch existing call notes for a user on a given date. */
   async getCallNotes(appUserId: string, date: string): Promise<any[]> {
     const sql = `
