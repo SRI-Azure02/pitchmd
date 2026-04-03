@@ -933,10 +933,13 @@ export class SnowflakeClient {
     sourceNoteId: string | null,
     taskText: string,
   ): Promise<void> {
+    // Pass CREATED_AT from the Node.js server (UTC) to avoid TIMESTAMP_NTZ
+    // misinterpretation when Snowflake account runs in a non-UTC timezone.
+    const createdAt = new Date().toISOString().replace('T', ' ').replace('Z', '');
     const sql = `
       INSERT INTO CORTEX_TESTING.PUBLIC.SYNTHETIC_LOOPBACK
-        (TASK_ID, APP_USER_ID, PHYSICIAN_ID, SOURCE_NOTE_ID, TASK_TEXT)
-      VALUES (:1, :2, :3, :4, :5)
+        (TASK_ID, APP_USER_ID, PHYSICIAN_ID, SOURCE_NOTE_ID, TASK_TEXT, CREATED_AT)
+      VALUES (:1, :2, :3, :4, :5, :6::TIMESTAMP_NTZ)
     `;
     await this.executeQuery(sql, {
       '1': { type: 'TEXT', value: taskId },
@@ -944,6 +947,7 @@ export class SnowflakeClient {
       '3': { type: 'TEXT', value: physicianId },
       '4': { type: 'TEXT', value: sourceNoteId ?? '' },
       '5': { type: 'TEXT', value: taskText },
+      '6': { type: 'TEXT', value: createdAt },
     });
   }
 
