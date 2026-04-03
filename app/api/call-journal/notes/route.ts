@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { randomUUID } from 'crypto';
 import { getSessionFromRequest } from '@/lib/auth';
 import { getSnowflakeClient } from '@/lib/snowflake';
 
@@ -40,8 +41,9 @@ export async function POST(request: NextRequest) {
 
   try {
     const sf = getSnowflakeClient();
-    await sf.saveCallNote(session.userId, physicianId, callDate, callTimestamp, transcript, aiSummary ?? '');
-    return NextResponse.json({ ok: true });
+    const noteId = randomUUID();
+    await sf.saveCallNote(session.userId, physicianId, callDate, callTimestamp, transcript, aiSummary ?? '', noteId);
+    return NextResponse.json({ ok: true, noteId });
   } catch (err: any) {
     console.error('[call-journal/notes] POST error:', err.message);
     return NextResponse.json({ error: err.message }, { status: 500 });

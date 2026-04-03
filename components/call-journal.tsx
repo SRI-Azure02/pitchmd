@@ -161,13 +161,24 @@ function NoteRow({ physician, existingNote, callDate, onSaved, onClose }: NoteRo
       const { summary: aiSummary } = await sumRes.json();
       setSummary(aiSummary ?? '');
       const callTimestamp = new Date().toISOString();
+      let savedNoteId = noteId;
       if (noteId) {
         await fetch('/api/call-journal/notes', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ noteId, transcript: text, aiSummary: aiSummary ?? '' }) });
       } else {
-        await fetch('/api/call-journal/notes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ physicianId: physician.PHYSICIAN_ID, callDate, callTimestamp, transcript: text, aiSummary: aiSummary ?? '' }) });
+        const res = await fetch('/api/call-journal/notes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ physicianId: physician.PHYSICIAN_ID, callDate, callTimestamp, transcript: text, aiSummary: aiSummary ?? '' }) });
+        const data = await res.json();
+        savedNoteId = data.noteId ?? null;
       }
       setEditing(false);
-      onSaved({ NOTE_ID: noteId, TRANSCRIPT: text, AI_SUMMARY: aiSummary ?? '', CALL_TIMESTAMP: callTimestamp });
+      onSaved({ NOTE_ID: savedNoteId, TRANSCRIPT: text, AI_SUMMARY: aiSummary ?? '', CALL_TIMESTAMP: callTimestamp });
+      // Fire-and-forget: extract loop-back tasks from transcript
+      if (savedNoteId) {
+        fetch('/api/loopback/extract', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ noteId: savedNoteId, physicianId: physician.PHYSICIAN_ID, transcript: text }),
+        }).catch(err => console.warn('[note-row] loopback extract error:', err));
+      }
     } catch (err) { console.error('[note-row] save error:', err); }
     finally { setSaving(false); }
   };

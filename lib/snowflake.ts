@@ -71,11 +71,18 @@ export class SnowflakeClient {
     };
     if (bindings) body.bindings = bindings;
 
-    const response = await axios.post(
-      `${this.baseURL}/statements`,
-      body,
-      { headers: this.headers }
-    );
+    let response: any;
+    try {
+      response = await axios.post(
+        `${this.baseURL}/statements`,
+        body,
+        { headers: this.headers }
+      );
+    } catch (err: any) {
+      const sfMsg = err?.response?.data?.message ?? err?.response?.data ?? err.message;
+      console.error('[snowflake] executeQuery error:', JSON.stringify(sfMsg));
+      throw new Error(typeof sfMsg === 'string' ? sfMsg : JSON.stringify(sfMsg));
+    }
 
     if (response.data?.code === '090001' && response.data?.data) {
       return this.parseResponse(response.data);
@@ -834,7 +841,7 @@ export class SnowflakeClient {
   async getCallNotes(appUserId: string, date: string): Promise<any[]> {
     const sql = `
       SELECT NOTE_ID, PHYSICIAN_ID, CALL_DATE, CALL_TIMESTAMP,
-             TRANSCRIPT, AI_SUMMARY, CREATED_AT, UPDATED_AT
+             TRANSCRIPT, AI_SUMMARY
       FROM CORTEX_TESTING.PUBLIC.SYNTHETIC_CALL_JOURNAL
       WHERE APP_USER_ID = :1 AND CALL_DATE = :2
       ORDER BY CALL_TIMESTAMP DESC
@@ -845,7 +852,7 @@ export class SnowflakeClient {
     });
   }
 
-  /** Insert a new call note. */
+  /** Insert a new call note. Returns the generated NOTE_ID. */
   async saveCallNote(
     appUserId: string,
     physicianId: string,
@@ -853,19 +860,21 @@ export class SnowflakeClient {
     callTimestamp: string,
     transcript: string,
     aiSummary: string,
+    noteId: string,
   ): Promise<void> {
     const sql = `
       INSERT INTO CORTEX_TESTING.PUBLIC.SYNTHETIC_CALL_JOURNAL
         (NOTE_ID, APP_USER_ID, PHYSICIAN_ID, CALL_DATE, CALL_TIMESTAMP, TRANSCRIPT, AI_SUMMARY)
-      VALUES (UUID_STRING(), :1, :2, :3, :4, :5, :6)
+      VALUES (:1, :2, :3, :4, :5, :6, :7)
     `;
     await this.executeQuery(sql, {
-      '1': { type: 'TEXT', value: appUserId },
-      '2': { type: 'TEXT', value: physicianId },
-      '3': { type: 'TEXT', value: callDate },
-      '4': { type: 'TEXT', value: callTimestamp },
-      '5': { type: 'TEXT', value: transcript },
-      '6': { type: 'TEXT', value: aiSummary },
+      '1': { type: 'TEXT', value: noteId },
+      '2': { type: 'TEXT', value: appUserId },
+      '3': { type: 'TEXT', value: physicianId },
+      '4': { type: 'TEXT', value: callDate },
+      '5': { type: 'TEXT', value: callTimestamp },
+      '6': { type: 'TEXT', value: transcript },
+      '7': { type: 'TEXT', value: aiSummary },
     });
   }
 
@@ -877,7 +886,7 @@ export class SnowflakeClient {
   ): Promise<void> {
     const sql = `
       UPDATE CORTEX_TESTING.PUBLIC.SYNTHETIC_CALL_JOURNAL
-      SET TRANSCRIPT = :1, AI_SUMMARY = :2, UPDATED_AT = CURRENT_TIMESTAMP()
+      SET TRANSCRIPT = :1, AI_SUMMARY = :2
       WHERE NOTE_ID = :3
     `;
     await this.executeQuery(sql, {
@@ -885,6 +894,75 @@ export class SnowflakeClient {
       '2': { type: 'TEXT', value: aiSummary },
       '3': { type: 'TEXT', value: noteId },
     });
+  }
+
+  // ─── Loop Back Queries ──────────────────────────────────────────────
+
+  /** All non-deleted tasks for a user (across all physicians). */
+  async getLoopbackTasks(appUserId: string): Promise<any[]> {
+    const sql = `
+      SELECT TASK_ID, PHYSICIAN_ID, SOURCE_NOTE_ID, TASK_TEXT,
+             COMPLETED, CREATED_AT, COMPLETED_AT
+      FROM CORTEX_TESTING.PUBLIC.SYNTHETIC_LOOPBACK
+      WHERE APP_USER_ID = :1 AND DELETED = FALSE
+      ORDER BY CREATED_AT DESC
+    `;
+    return await this.executeQuery(sql, {
+      '1': { type: 'TEXT', value: appUserId },
+    });
+  }
+
+  /** All tasks (including completed/deleted) for a specific source note — used for dedup. */
+  async getLoopbackTasksBySourceNote(appUserId: string, sourceNoteId: string): Promise<any[]> {
+    const sql = `
+      SELECT TASK_ID, TASK_TEXT, COMPLETED, DELETED
+      FROM CORTEX_TESTING.PUBLIC.SYNTHETIC_LOOPBACK
+      WHERE APP_USER_ID = :1 AND SOURCE_NOTE_ID = :2
+    `;
+    return await this.executeQuery(sql, {
+      '1': { type: 'TEXT', value: appUserId },
+      '2': { type: 'TEXT', value: sourceNoteId },
+    });
+  }
+
+  /** Insert a single loop-back task. */
+  async insertLoopbackTask(
+    taskId: string,
+    appUserId: string,
+    physicianId: string,
+    sourceNoteId: string | null,
+    taskText: string,
+  ): Promise<void> {
+    const sql = `
+      INSERT INTO CORTEX_TESTING.PUBLIC.SYNTHETIC_LOOPBACK
+        (TASK_ID, APP_USER_ID, PHYSICIAN_ID, SOURCE_NOTE_ID, TASK_TEXT)
+      VALUES (:1, :2, :3, :4, :5)
+    `;
+    await this.executeQuery(sql, {
+      '1': { type: 'TEXT', value: taskId },
+      '2': { type: 'TEXT', value: appUserId },
+      '3': { type: 'TEXT', value: physicianId },
+      '4': { type: 'TEXT', value: sourceNoteId ?? '' },
+      '5': { type: 'TEXT', value: taskText },
+    });
+  }
+
+  /** Toggle completion state on a task. */
+  async setLoopbackTaskCompleted(taskId: string, completed: boolean): Promise<void> {
+    const sql = completed
+      ? `UPDATE CORTEX_TESTING.PUBLIC.SYNTHETIC_LOOPBACK SET COMPLETED = TRUE,  COMPLETED_AT = CURRENT_TIMESTAMP() WHERE TASK_ID = :1`
+      : `UPDATE CORTEX_TESTING.PUBLIC.SYNTHETIC_LOOPBACK SET COMPLETED = FALSE, COMPLETED_AT = NULL WHERE TASK_ID = :1`;
+    await this.executeQuery(sql, { '1': { type: 'TEXT', value: taskId } });
+  }
+
+  /** Soft-delete a task. */
+  async deleteLoopbackTask(taskId: string): Promise<void> {
+    const sql = `
+      UPDATE CORTEX_TESTING.PUBLIC.SYNTHETIC_LOOPBACK
+      SET DELETED = TRUE, DELETED_AT = CURRENT_TIMESTAMP()
+      WHERE TASK_ID = :1
+    `;
+    await this.executeQuery(sql, { '1': { type: 'TEXT', value: taskId } });
   }
 }
 

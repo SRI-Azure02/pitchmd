@@ -7,6 +7,7 @@ import AudioInput from './audio-input';
 import EvaluationPanel from './evaluation-panel';
 import PerformancePanel from './performance-panel';
 import CallJournal from './call-journal';
+import LoopBack from './loop-back';
 import { Send, RotateCcw, Square, Volume2, VolumeX, Video, VideoOff, MessageSquare, Search, ChevronDown, X, Check, BarChart2, ArrowUp, ArrowDown, ArrowUpDown, Hash, Mic, BookOpen, NotebookPen } from 'lucide-react';
 import { parseEmotion, speakText, stopCurrentAudio } from '@/lib/elevenlabs';
 
@@ -168,6 +169,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   const [evalPhysicianId, setEvalPhysicianId] = useState<string | null>(null);
   const [performanceOpen, setPerformanceOpen] = useState(false);
   const [callJournalMode, setCallJournalMode] = useState(false);
+  const [loopBackMode, setLoopBackMode]       = useState(false);
   const [userTyping, setUserTyping] = useState(false);
   const [sessionDuration, setSessionDuration] = useState<number | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
@@ -1086,6 +1088,11 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     return { background: '#f1f5f9', color: '#475569' };
   };
 
+  // ── Loop Back full-screen view ───────────────────────────────────────────
+  if (loopBackMode) {
+    return <LoopBack username={username ?? 'Rep'} onBack={() => setLoopBackMode(false)} />;
+  }
+
   // ── Call Journal full-screen view ────────────────────────────────────────
   if (callJournalMode) {
     return <CallJournal username={username ?? 'Rep'} onBack={() => setCallJournalMode(false)} />;
@@ -1499,7 +1506,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
               'Track commitments made during your calls and follow through on every promise.',
               <RotateCcw className="w-7 h-7" />,
               'Post-Field',
-              undefined,
+              () => setLoopBackMode(true),
               'flex-1',
             )}
           </div>
