@@ -8,6 +8,7 @@ import EvaluationPanel from './evaluation-panel';
 import PerformancePanel from './performance-panel';
 import CallJournal from './call-journal';
 import LoopBack from './loop-back';
+import EngagementPlaybook from './engagement-playbook';
 import { Send, RotateCcw, Square, Volume2, VolumeX, Video, VideoOff, MessageSquare, Search, ChevronDown, X, Check, BarChart2, ArrowUp, ArrowDown, ArrowUpDown, Hash, Mic, BookOpen, NotebookPen } from 'lucide-react';
 import { parseEmotion, speakText, stopCurrentAudio } from '@/lib/elevenlabs';
 
@@ -169,7 +170,8 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   const [evalPhysicianId, setEvalPhysicianId] = useState<string | null>(null);
   const [performanceOpen, setPerformanceOpen] = useState(false);
   const [callJournalMode, setCallJournalMode] = useState(false);
-  const [loopBackMode, setLoopBackMode]       = useState(false);
+  const [loopBackMode, setLoopBackMode]             = useState(false);
+  const [engagementPlaybookMode, setEngagementPlaybookMode] = useState(false);
   const [userTyping, setUserTyping] = useState(false);
   const [sessionDuration, setSessionDuration] = useState<number | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
@@ -1093,6 +1095,10 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     return <LoopBack username={username ?? 'Rep'} onBack={() => setLoopBackMode(false)} />;
   }
 
+  if (engagementPlaybookMode) {
+    return <EngagementPlaybook username={username ?? 'Rep'} onBack={() => setEngagementPlaybookMode(false)} />;
+  }
+
   // ── Call Journal full-screen view ────────────────────────────────────────
   if (callJournalMode) {
     return <CallJournal username={username ?? 'Rep'} onBack={() => setCallJournalMode(false)} />;
@@ -1486,7 +1492,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
               'Walk in with the right message every time — shaped by physician segment, Rx trends, and your last visit notes.',
               <BookOpen className="w-7 h-7" />,
               'In-Field',
-              undefined,
+              () => setEngagementPlaybookMode(true),
               'w-full',
             )}
           </div>

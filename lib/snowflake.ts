@@ -968,6 +968,47 @@ export class SnowflakeClient {
     `;
     await this.executeQuery(sql, { '1': { type: 'TEXT', value: taskId } });
   }
+
+  /** Last N call notes for a specific physician — AI summary only (no full transcript). */
+  async getRecentCallNotesByPhysician(
+    appUserId: string,
+    physicianId: string,
+    limit: number = 5,
+  ): Promise<any[]> {
+    // Limit is a server-controlled constant, safe to inline
+    const safeLimit = Math.max(1, Math.min(50, Math.floor(limit)));
+    const sql = `
+      SELECT NOTE_ID, CALL_DATE, AI_SUMMARY
+      FROM CORTEX_TESTING.PUBLIC.SYNTHETIC_CALL_JOURNAL
+      WHERE APP_USER_ID = :1 AND PHYSICIAN_ID = :2
+      ORDER BY CALL_DATE DESC, CALL_TIMESTAMP DESC
+      LIMIT ${safeLimit}
+    `;
+    return await this.executeQuery(sql, {
+      '1': { type: 'TEXT', value: appUserId },
+      '2': { type: 'TEXT', value: physicianId },
+    });
+  }
+
+  /** Open (non-completed, non-deleted) loop-back tasks for a specific physician. */
+  async getOpenTasksByPhysician(
+    appUserId: string,
+    physicianId: string,
+  ): Promise<any[]> {
+    const sql = `
+      SELECT TASK_ID, TASK_TEXT, CREATED_AT
+      FROM CORTEX_TESTING.PUBLIC.SYNTHETIC_LOOPBACK
+      WHERE APP_USER_ID = :1
+        AND PHYSICIAN_ID = :2
+        AND COMPLETED = FALSE
+        AND DELETED = FALSE
+      ORDER BY CREATED_AT ASC
+    `;
+    return await this.executeQuery(sql, {
+      '1': { type: 'TEXT', value: appUserId },
+      '2': { type: 'TEXT', value: physicianId },
+    });
+  }
 }
 
 // ─── Singleton ─────────────────────────────────────────────────────────
