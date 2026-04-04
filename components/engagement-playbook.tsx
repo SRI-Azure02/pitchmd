@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  ArrowDown, ArrowUp, ArrowUpDown, BookOpen, ChevronDown, ChevronUp,
+  ArrowDown, ArrowUp, ArrowUpDown, BookOpen, Check, ChevronDown, ChevronUp,
   Search, X, RefreshCw, AlertCircle,
 } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
@@ -18,55 +18,133 @@ interface Physician {
   STATE: string | null;
   OVERALL_SCORE: number | null;
   FIELD_READINESS: string | null;
-}
-
-interface Objection {
-  objection: string;
-  suggested_response: string;
+  LAST_CONTACT_DATE: string | null;
+  LAST_CONTACT_CHANNEL: string | null;
 }
 
 interface PlaybookJSON {
-  rep_brief: string;
-  opening_strategy: string;
+  physician_brief: string;
+  opening_points: string[];
   key_messages: string[];
-  anticipated_objections: Objection[];
+  anticipated_objections: { objection: string; responses: string[] }[];
   closing_ask: string;
-  follow_up_items: string[];
-  tone_guidance: string;
+}
+
+interface BrandShare {
+  brand: string;
+  current_share: number;
+  direction: 'up' | 'down' | 'flat';
+  change: number;
 }
 
 interface PhysicianPlaybookState {
   status: 'idle' | 'loading' | 'done' | 'error';
   playbook: PlaybookJSON | null;
+  marketShare: BrandShare[] | null;
+  openTasks: string[];
   error: string | null;
 }
 
-type SortField = 'name' | 'specialty' | 'segment' | 'state' | 'overallScore' | 'fieldReadiness';
+type SortField = 'name' | 'specialty' | 'segment' | 'state' | 'lastContact';
 type SortDir   = 'asc' | 'desc';
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
+// ── Filter dropdown ────────────────────────────────────────────────────────────
 
-function readinessBadge(val: string): React.CSSProperties {
-  if (val === 'Field Ready')             return { background: '#d1fae5', color: '#065f46' };
-  if (val === 'Not Ready')               return { background: '#fee2e2', color: '#991b1b' };
-  if (val === 'Field Ready with coaching') return { background: '#fef3c7', color: '#92400e' };
-  if (val === 'Needs Practice')          return { background: '#ffe4e6', color: '#9f1239' };
-  return { background: '#f1f5f9', color: '#475569' };
-}
-
-// ── Section component ──────────────────────────────────────────────────────────
-
-function PlaybookSection({ label, children, last = false }: {
+function FilterDropdown({ label, options, value, onChange, isOpen, onToggle }: {
   label: string;
-  children: React.ReactNode;
-  last?: boolean;
+  options: string[];
+  value: string | null;
+  onChange: (v: string | null) => void;
+  isOpen: boolean;
+  onToggle: () => void;
 }) {
+  const active = !!value;
   return (
-    <div className={`${last ? '' : 'pb-4 border-b border-slate-100 mb-4'}`}>
-      <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-2">{label}</p>
-      {children}
+    <div className="relative">
+      {isOpen && <div className="fixed inset-0 z-40" onClick={onToggle} />}
+      <button
+        onClick={onToggle}
+        className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full border text-sm font-medium transition-colors ${
+          active
+            ? 'border-orange-300 bg-orange-50 text-orange-700'
+            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+        }`}
+      >
+        {label}
+        {active && <span className="w-1.5 h-1.5 rounded-full bg-orange-500 ml-0.5" />}
+        <ChevronDown className={`w-3 h-3 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+      {isOpen && (
+        <div className="absolute top-full left-0 mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-lg min-w-max py-1 overflow-hidden">
+          <button
+            onClick={() => { onChange(null); onToggle(); }}
+            className={`w-full text-left px-4 py-2 text-sm flex items-center justify-between hover:bg-slate-50 ${!value ? 'text-orange-600 font-medium' : 'text-slate-600'}`}
+          >
+            <span className="whitespace-nowrap">All</span>
+            {!value && <Check className="w-3.5 h-3.5 ml-4" />}
+          </button>
+          {options.map(opt => (
+            <button
+              key={opt}
+              onClick={() => { onChange(opt); onToggle(); }}
+              className={`w-full text-left px-4 py-2 text-sm flex items-center justify-between hover:bg-slate-50 ${value === opt ? 'text-orange-600 font-medium bg-orange-50' : 'text-slate-600'}`}
+            >
+              <span className="whitespace-nowrap">{opt}</span>
+              {value === opt && <Check className="w-3.5 h-3.5 ml-4 shrink-0" />}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
+}
+
+// ── Playbook card ──────────────────────────────────────────────────────────────
+
+function PbCard({ label, children, className = '' }: { label: string; children: React.ReactNode; className?: string }) {
+  return (
+    <div className={`rounded-xl border border-slate-200 bg-white overflow-hidden flex flex-col ${className}`}>
+      <div className="px-4 py-2 border-b border-slate-100 bg-slate-50/60 shrink-0">
+        <span className="text-xs font-semibold uppercase tracking-widest text-slate-400">{label}</span>
+      </div>
+      <div className="px-4 py-3 flex-1">{children}</div>
+    </div>
+  );
+}
+
+function Bullets({ items, color = 'bg-orange-400' }: { items: string[]; color?: string }) {
+  return (
+    <ul className="space-y-1.5">
+      {items.map((item, i) => (
+        <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
+          <span className={`mt-[7px] w-1.5 h-1.5 rounded-full ${color} shrink-0`} />
+          {item}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+// ── Channel display helper ─────────────────────────────────────────────────────
+
+function channelLabel(raw: string | null): string {
+  if (!raw) return '—';
+  const r = raw.toLowerCase();
+  if (r.includes('face')) return 'Face to Face';
+  if (r.includes('teleph')) return 'Telephonic';
+  if (r.includes('email')) return 'Email';
+  return raw;
+}
+
+function formatDate(raw: string | null): string {
+  if (!raw) return '—';
+  // Handle epoch seconds
+  if (/^\d{9,11}(\.\d+)?$/.test(String(raw))) {
+    return new Date(parseFloat(String(raw)) * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return String(raw);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
@@ -80,12 +158,15 @@ export default function EngagementPlaybook({ username: _username, onBack }: Enga
   const [physicians, setPhysicians]         = useState<Physician[]>([]);
   const [physLoading, setPhysLoading]       = useState(true);
   const [expandedId, setExpandedId]         = useState<string | null>(null);
+  const [tasksExpandedId, setTasksExpandedId] = useState<string | null>(null);
   const [search, setSearch]                 = useState('');
   const [sortConfig, setSortConfig]         = useState<{ field: SortField; dir: SortDir } | null>(null);
   const [playbookStates, setPlaybookStates] = useState<Record<string, PhysicianPlaybookState>>({});
   const [hoveredBtnId, setHoveredBtnId]     = useState<string | null>(null);
+  const [filterSegment, setFilterSegment]   = useState<string | null>(null);
+  const [filterSpecialty, setFilterSpecialty] = useState<string | null>(null);
+  const [openDropdown, setOpenDropdown]     = useState<string | null>(null);
 
-  // Load physicians
   useEffect(() => {
     fetch('/api/physicians?scores=true')
       .then(r => r.json())
@@ -94,7 +175,9 @@ export default function EngagementPlaybook({ username: _username, onBack }: Enga
       .finally(() => setPhysLoading(false));
   }, []);
 
-  // Sort / filter
+  const uniqueSegments    = useMemo(() => [...new Set(physicians.map(p => p.SEGMENT_NAME).filter(Boolean))].sort() as string[], [physicians]);
+  const uniqueSpecialties = useMemo(() => [...new Set(physicians.map(p => p.SPECIALTY).filter(Boolean))].sort() as string[], [physicians]);
+
   const handleSort = (field: SortField) => {
     setSortConfig(prev =>
       prev?.field === field
@@ -103,32 +186,35 @@ export default function EngagementPlaybook({ username: _username, onBack }: Enga
     );
   };
 
-  const sortedPhysicians = [...physicians]
+  const sortedPhysicians = useMemo(() => [...physicians]
     .filter(p => {
-      if (!search.trim()) return true;
-      const q = search.toLowerCase();
-      return (
-        p.FIRST_NAME?.toLowerCase().includes(q) ||
-        p.LAST_NAME?.toLowerCase().includes(q) ||
-        p.SPECIALTY?.toLowerCase().includes(q) ||
-        p.SEGMENT_NAME?.toLowerCase().includes(q)
-      );
+      if (search.trim()) {
+        const q = search.toLowerCase();
+        const matches = (
+          p.FIRST_NAME?.toLowerCase().includes(q) ||
+          p.LAST_NAME?.toLowerCase().includes(q) ||
+          p.SPECIALTY?.toLowerCase().includes(q) ||
+          p.SEGMENT_NAME?.toLowerCase().includes(q)
+        );
+        if (!matches) return false;
+      }
+      if (filterSegment   && p.SEGMENT_NAME !== filterSegment)   return false;
+      if (filterSpecialty && p.SPECIALTY    !== filterSpecialty)  return false;
+      return true;
     })
     .sort((a, b) => {
       if (!sortConfig) return 0;
       const dir = sortConfig.dir === 'asc' ? 1 : -1;
       switch (sortConfig.field) {
-        case 'name':           return dir * `${a.LAST_NAME}${a.FIRST_NAME}`.localeCompare(`${b.LAST_NAME}${b.FIRST_NAME}`);
-        case 'specialty':      return dir * (a.SPECIALTY ?? '').localeCompare(b.SPECIALTY ?? '');
-        case 'segment':        return dir * (a.SEGMENT_NAME ?? '').localeCompare(b.SEGMENT_NAME ?? '');
-        case 'state':          return dir * (a.STATE ?? '').localeCompare(b.STATE ?? '');
-        case 'overallScore':   return dir * ((a.OVERALL_SCORE ?? 0) - (b.OVERALL_SCORE ?? 0));
-        case 'fieldReadiness': return dir * (a.FIELD_READINESS ?? '').localeCompare(b.FIELD_READINESS ?? '');
-        default:               return 0;
+        case 'name':        return dir * `${a.LAST_NAME}${a.FIRST_NAME}`.localeCompare(`${b.LAST_NAME}${b.FIRST_NAME}`);
+        case 'specialty':   return dir * (a.SPECIALTY    ?? '').localeCompare(b.SPECIALTY    ?? '');
+        case 'segment':     return dir * (a.SEGMENT_NAME ?? '').localeCompare(b.SEGMENT_NAME ?? '');
+        case 'state':       return dir * (a.STATE        ?? '').localeCompare(b.STATE        ?? '');
+        case 'lastContact': return dir * (a.LAST_CONTACT_DATE ?? '').localeCompare(b.LAST_CONTACT_DATE ?? '');
+        default:            return 0;
       }
-    });
+    }), [physicians, search, filterSegment, filterSpecialty, sortConfig]);
 
-  // Sort icon
   const SortIcon = ({ field }: { field: SortField }) => {
     if (sortConfig?.field !== field)
       return <ArrowUpDown className="w-3 h-3 opacity-0 group-hover/th:opacity-40 transition-opacity" />;
@@ -137,21 +223,17 @@ export default function EngagementPlaybook({ username: _username, onBack }: Enga
       : <ArrowDown className="w-3 h-3" />;
   };
 
-  // Fetch / cache playbook
   const handleViewPlaybook = async (physicianId: string) => {
     const current = playbookStates[physicianId];
-    // Toggle collapse if already loaded and expanded
     if (expandedId === physicianId && current?.status === 'done') {
       setExpandedId(null);
       return;
     }
     setExpandedId(physicianId);
-    // Use cache if available
     if (current?.status === 'done') return;
-    // Start loading
     setPlaybookStates(prev => ({
       ...prev,
-      [physicianId]: { status: 'loading', playbook: null, error: null },
+      [physicianId]: { status: 'loading', playbook: null, marketShare: null, openTasks: [], error: null },
     }));
     try {
       const res = await fetch('/api/playbook', {
@@ -163,12 +245,18 @@ export default function EngagementPlaybook({ username: _username, onBack }: Enga
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
       setPlaybookStates(prev => ({
         ...prev,
-        [physicianId]: { status: 'done', playbook: data.playbook, error: null },
+        [physicianId]: {
+          status: 'done',
+          playbook: data.playbook,
+          marketShare: data.marketShare ?? [],
+          openTasks: data.openTasks ?? [],
+          error: null,
+        },
       }));
     } catch (err: any) {
       setPlaybookStates(prev => ({
         ...prev,
-        [physicianId]: { status: 'error', playbook: null, error: err.message },
+        [physicianId]: { status: 'error', playbook: null, marketShare: null, openTasks: [], error: err.message },
       }));
     }
   };
@@ -176,12 +264,11 @@ export default function EngagementPlaybook({ username: _username, onBack }: Enga
   const handleRetry = (physicianId: string) => {
     setPlaybookStates(prev => ({
       ...prev,
-      [physicianId]: { status: 'idle', playbook: null, error: null },
+      [physicianId]: { status: 'idle', playbook: null, marketShare: null, openTasks: [], error: null },
     }));
     handleViewPlaybook(physicianId);
   };
 
-  // Render playbook content
   const renderPlaybookContent = (physicianId: string) => {
     const state = playbookStates[physicianId];
     if (!state || state.status === 'idle') return null;
@@ -213,82 +300,122 @@ export default function EngagementPlaybook({ username: _username, onBack }: Enga
     }
 
     const pb = state.playbook!;
+    const ms = state.marketShare ?? [];
+    const tasks = state.openTasks ?? [];
+    const physician = physicians.find(ph => ph.PHYSICIAN_ID === physicianId);
+    const tasksExpanded = tasksExpandedId === physicianId;
 
     return (
-      <div className="space-y-0">
-        {/* Rep Brief */}
-        <PlaybookSection label="Rep Brief">
-          <p className="text-sm text-slate-700 leading-relaxed">{pb.rep_brief}</p>
-        </PlaybookSection>
+      <div className="space-y-3">
 
-        {/* Opening Strategy */}
-        <PlaybookSection label="Opening Strategy">
-          <p className="text-sm text-slate-700 leading-relaxed">{pb.opening_strategy}</p>
-        </PlaybookSection>
-
-        {/* Key Messages */}
-        <PlaybookSection label="Key Messages">
-          <ul className="space-y-1.5">
-            {(pb.key_messages ?? []).map((msg, i) => (
-              <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
-                <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-orange-400 shrink-0" />
-                {msg}
-              </li>
-            ))}
-          </ul>
-        </PlaybookSection>
-
-        {/* Anticipated Objections */}
-        <PlaybookSection label="Anticipated Objections">
-          <div className="space-y-3">
-            {(pb.anticipated_objections ?? []).map((obj, i) => (
-              <div key={i} className="rounded-lg border border-slate-200 bg-white p-3 space-y-1.5">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Objection</p>
-                <p className="text-sm text-slate-700">{obj.objection}</p>
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-1">Suggested Response</p>
-                <p className="text-sm text-slate-600 italic">"{obj.suggested_response}"</p>
-              </div>
-            ))}
+        {/* ── Row 1: Summary — full width ─────────────────────────────────── */}
+        <div className="rounded-xl border border-slate-200 overflow-hidden">
+          <div className="px-4 pt-3 pb-2.5 bg-gradient-to-r from-orange-50 to-sky-50 border-b border-slate-100">
+            {physician?.SEGMENT_NAME && (
+              <span className="inline-block text-xs font-semibold px-2.5 py-0.5 rounded-full bg-orange-100 text-orange-700 mb-1.5">
+                {physician.SEGMENT_NAME}
+              </span>
+            )}
+            <p className="text-sm text-slate-700">{pb.physician_brief}</p>
           </div>
-        </PlaybookSection>
-
-        {/* Closing Ask */}
-        <PlaybookSection label="Closing Ask">
-          <p className="text-sm text-slate-700 leading-relaxed">{pb.closing_ask}</p>
-        </PlaybookSection>
-
-        {/* Follow-Up Items */}
-        <PlaybookSection label="Follow-Up Items">
-          {(pb.follow_up_items ?? []).length === 0 ? (
-            <p className="text-sm text-slate-400">No open follow-up items.</p>
-          ) : (
-            <ul className="space-y-1.5">
-              {pb.follow_up_items.map((item, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
-                  <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-sky-400 shrink-0" />
-                  {item}
-                </li>
+          {ms.length > 0 && (
+            <div className="px-4 py-3 bg-white space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-2">Market Share — last 4 weeks</p>
+              {ms.map(b => (
+                <div key={b.brand} className="flex items-center gap-2.5">
+                  <span className="text-xs font-medium text-slate-600 w-20 shrink-0 truncate">{b.brand}</span>
+                  <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-orange-400 to-sky-400"
+                      style={{ width: `${Math.min(b.current_share, 100)}%` }}
+                    />
+                  </div>
+                  <span className="text-xs font-semibold text-slate-700 w-10 text-right">{b.current_share}%</span>
+                  <span className={`text-xs font-medium w-14 text-right tabular-nums ${
+                    b.direction === 'up' ? 'text-emerald-600' :
+                    b.direction === 'down' ? 'text-red-500' : 'text-slate-400'
+                  }`}>
+                    {b.direction === 'up' ? '↑' : b.direction === 'down' ? '↓' : '→'}{' '}
+                    {b.direction === 'flat' ? 'flat' : `${b.change}pp`}
+                  </span>
+                </div>
               ))}
-            </ul>
+            </div>
           )}
-        </PlaybookSection>
+        </div>
 
-        {/* Tone Guidance */}
-        <PlaybookSection label="Tone & Approach" last>
-          <p className="text-sm text-slate-700 leading-relaxed">{pb.tone_guidance}</p>
-        </PlaybookSection>
+        {/* ── Row 2: Two-column grid — equal height ───────────────────────── */}
+        <div className="grid grid-cols-2 gap-3" style={{ alignItems: 'stretch' }}>
+          {/* Left column */}
+          <div className="flex flex-col gap-3">
+            <PbCard label="Opening" className="flex-1">
+              <Bullets items={pb.opening_points ?? []} color="bg-orange-400" />
+            </PbCard>
+            <PbCard label="Key Messages" className="flex-1">
+              <Bullets items={pb.key_messages ?? []} color="bg-sky-400" />
+            </PbCard>
+          </div>
+
+          {/* Right column — full height */}
+          <PbCard label="Objection Handling" className="h-full">
+            <div className="space-y-3">
+              {(pb.anticipated_objections ?? []).map((obj, i) => (
+                <div key={i} className={i > 0 ? 'pt-3 border-t border-slate-100' : ''}>
+                  <p className="text-sm font-semibold text-slate-700 mb-1.5">{obj.objection}</p>
+                  <Bullets items={obj.responses ?? []} color="bg-slate-300" />
+                </div>
+              ))}
+            </div>
+          </PbCard>
+        </div>
+
+        {/* ── Row 3: Closing — full width ─────────────────────────────────── */}
+        <PbCard label="Closing">
+          <p className="text-sm text-slate-700">{pb.closing_ask}</p>
+        </PbCard>
+
+        {/* ── Row 4: Open Tasks — collapsible, collapsed by default ────────── */}
+        <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+          <button
+            onClick={() => setTasksExpandedId(tasksExpanded ? null : physicianId)}
+            className="w-full flex items-center justify-between px-4 py-2.5 border-b border-slate-100 bg-slate-50/60 hover:bg-slate-100/60 transition-colors"
+          >
+            <span className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+              Pending Tasks
+              {tasks.length > 0 && (
+                <span className="ml-2 inline-flex items-center justify-center w-4 h-4 rounded-full bg-orange-100 text-orange-600 text-[10px] font-bold normal-case tracking-normal">
+                  {tasks.length}
+                </span>
+              )}
+            </span>
+            {tasksExpanded
+              ? <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
+              : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
+          </button>
+          {tasksExpanded && (
+            <div className="px-4 py-3">
+              {tasks.length === 0 ? (
+                <p className="text-sm text-slate-400">No open tasks for this physician.</p>
+              ) : (
+                <Bullets items={tasks} color="bg-orange-400" />
+              )}
+            </div>
+          )}
+        </div>
+
       </div>
     );
   };
 
-  const columns: { label: string; field: SortField; align: 'left' | 'center' }[] = [
-    { label: 'Physician',  field: 'name',           align: 'left'   },
-    { label: 'Specialty',  field: 'specialty',      align: 'left'   },
-    { label: 'Segment',    field: 'segment',        align: 'left'   },
-    { label: 'State',      field: 'state',          align: 'left'   },
-    { label: 'Score',      field: 'overallScore',   align: 'center' },
-    { label: 'Readiness',  field: 'fieldReadiness', align: 'left'   },
+  const columns: { label: string; field: SortField; align: 'left' }[] = [
+    { label: 'Physician',     field: 'name',        align: 'left' },
+    { label: 'Specialty',     field: 'specialty',   align: 'left' },
+    { label: 'Segment',       field: 'segment',     align: 'left' },
+    { label: 'State',         field: 'state',       align: 'left' },
+    { label: 'Last Contact',  field: 'lastContact', align: 'left' },
   ];
+
+  const hasActiveFilters = filterSegment || filterSpecialty;
 
   return (
     <div className="flex flex-col h-full min-h-0 bg-white">
@@ -307,10 +434,11 @@ export default function EngagementPlaybook({ username: _username, onBack }: Enga
         </button>
       </div>
 
-      {/* ── Search bar ─────────────────────────────────────────────────────── */}
+      {/* ── Search + filter bar ─────────────────────────────────────────────── */}
       <div className="shrink-0 px-4 py-2.5 border-b border-slate-100 bg-slate-50/60">
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1 max-w-xs">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Search input */}
+          <div className="relative w-56">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
             <input
               type="text"
@@ -328,7 +456,38 @@ export default function EngagementPlaybook({ username: _username, onBack }: Enga
               </button>
             )}
           </div>
-          <p className="text-xs text-slate-400">
+
+          {/* Segment filter */}
+          <FilterDropdown
+            label="Segment"
+            options={uniqueSegments}
+            value={filterSegment}
+            onChange={setFilterSegment}
+            isOpen={openDropdown === 'segment'}
+            onToggle={() => setOpenDropdown(prev => prev === 'segment' ? null : 'segment')}
+          />
+
+          {/* Specialty filter */}
+          <FilterDropdown
+            label="Specialty"
+            options={uniqueSpecialties}
+            value={filterSpecialty}
+            onChange={setFilterSpecialty}
+            isOpen={openDropdown === 'specialty'}
+            onToggle={() => setOpenDropdown(prev => prev === 'specialty' ? null : 'specialty')}
+          />
+
+          {/* Clear filters */}
+          {hasActiveFilters && (
+            <button
+              onClick={() => { setFilterSegment(null); setFilterSpecialty(null); }}
+              className="text-xs text-slate-400 hover:text-slate-600 px-2 py-1 rounded-full hover:bg-slate-100 transition-colors"
+            >
+              Clear filters
+            </button>
+          )}
+
+          <p className="text-xs text-slate-400 ml-auto">
             {sortedPhysicians.length} of {physicians.length} physician{physicians.length !== 1 ? 's' : ''}
           </p>
         </div>
@@ -342,18 +501,17 @@ export default function EngagementPlaybook({ username: _username, onBack }: Enga
             <span className="text-sm">Loading…</span>
           </div>
         ) : (
-          <table className="w-full text-base border-collapse min-w-[780px]">
+          <table className="w-full text-base border-collapse min-w-[860px]">
             <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_0_0_#e2e8f0]">
               <tr>
-                {columns.map(({ label, field, align }) => (
+                {columns.map(({ label, field }) => (
                   <th
                     key={field}
                     onClick={() => handleSort(field)}
-                    className="group/th px-4 py-2.5 text-sm font-semibold uppercase tracking-wide cursor-pointer select-none transition-colors"
-                    style={{ textAlign: align }}
+                    className="group/th px-4 py-2.5 text-left text-sm font-semibold uppercase tracking-wide cursor-pointer select-none transition-colors"
                   >
                     <span
-                      className={`inline-flex items-center gap-1 group-hover/th:text-slate-600 ${align === 'center' ? 'justify-center w-full' : ''}`}
+                      className="inline-flex items-center gap-1 group-hover/th:text-slate-600"
                       style={{ color: sortConfig?.field === field ? '#3b82f6' : '#94a3b8' }}
                     >
                       {label}
@@ -361,7 +519,6 @@ export default function EngagementPlaybook({ username: _username, onBack }: Enga
                     </span>
                   </th>
                 ))}
-                {/* Sticky actions column */}
                 <th className="sticky right-0 bg-white px-4 py-2.5 text-sm font-semibold uppercase tracking-wide shadow-[-1px_0_0_0_#e2e8f0] text-right">
                   <span className="text-slate-400"></span>
                 </th>
@@ -370,11 +527,11 @@ export default function EngagementPlaybook({ username: _username, onBack }: Enga
 
             <tbody>
               {sortedPhysicians.map(p => {
-                const expanded     = expandedId === p.PHYSICIAN_ID;
-                const pbState      = playbookStates[p.PHYSICIAN_ID];
-                const isLoading    = pbState?.status === 'loading';
-                const btnLabel     = isLoading ? 'Generating…' : (expanded && pbState?.status === 'done') ? 'Close' : 'View Playbook';
-                const isHovered    = hoveredBtnId === p.PHYSICIAN_ID;
+                const expanded  = expandedId === p.PHYSICIAN_ID;
+                const pbState   = playbookStates[p.PHYSICIAN_ID];
+                const isLoading = pbState?.status === 'loading';
+                const btnLabel  = isLoading ? 'Generating…' : (expanded && pbState?.status === 'done') ? 'Close' : 'View Playbook';
+                const isHovered = hoveredBtnId === p.PHYSICIAN_ID;
 
                 return (
                   <React.Fragment key={p.PHYSICIAN_ID}>
@@ -388,51 +545,37 @@ export default function EngagementPlaybook({ username: _username, onBack }: Enga
                           Dr. {p.FIRST_NAME} {p.LAST_NAME}
                         </span>
                       </td>
-
                       {/* Specialty */}
                       <td className="px-4 py-3 text-slate-600">
                         {p.SPECIALTY ?? <span className="text-slate-300">—</span>}
                       </td>
-
                       {/* Segment */}
                       <td className="px-4 py-3 text-slate-600">
                         {p.SEGMENT_NAME ?? <span className="text-slate-300">—</span>}
                       </td>
-
                       {/* State */}
                       <td className="px-4 py-3 text-slate-600">
                         {p.STATE ?? <span className="text-slate-300">—</span>}
                       </td>
-
-                      {/* Score */}
-                      <td className="px-4 py-3 text-center">
-                        {p.OVERALL_SCORE != null
-                          ? <span className="font-semibold text-slate-700">{Number(p.OVERALL_SCORE).toFixed(1)}</span>
-                          : <span className="text-slate-300">—</span>}
-                      </td>
-
-                      {/* Readiness */}
+                      {/* Last Contact */}
                       <td className="px-4 py-3">
-                        {p.FIELD_READINESS ? (
-                          <span
-                            className="inline-block text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap"
-                            style={readinessBadge(p.FIELD_READINESS)}
-                          >
-                            {p.FIELD_READINESS}
-                          </span>
+                        {p.LAST_CONTACT_DATE ? (
+                          <div>
+                            <p className="text-sm text-slate-700">{formatDate(p.LAST_CONTACT_DATE)}</p>
+                            <p className="text-xs text-slate-400">{channelLabel(p.LAST_CONTACT_CHANNEL)}</p>
+                          </div>
                         ) : (
                           <span className="text-slate-300">—</span>
                         )}
                       </td>
-
-                      {/* Sticky action column */}
+                      {/* Action */}
                       <td className="sticky right-0 bg-white group-hover:bg-slate-100/70 px-4 py-3 shadow-[-1px_0_0_0_#e2e8f0] transition-colors text-right">
                         <button
                           onClick={() => handleViewPlaybook(p.PHYSICIAN_ID)}
                           disabled={isLoading}
                           onMouseEnter={() => setHoveredBtnId(p.PHYSICIAN_ID)}
                           onMouseLeave={() => setHoveredBtnId(null)}
-                          className="h-9 px-4 rounded-full inline-flex items-center gap-2 border border-slate-200 bg-white text-slate-500 text-sm font-medium hover:text-white hover:border-transparent transition-all whitespace-nowrap disabled:opacity-60 disabled:cursor-not-allowed"
+                          className="h-9 w-[160px] justify-center rounded-full inline-flex items-center gap-2 border border-slate-200 bg-white text-slate-500 text-sm font-medium hover:text-white hover:border-transparent transition-all whitespace-nowrap disabled:opacity-60 disabled:cursor-not-allowed"
                           style={isHovered && !isLoading ? { background: 'linear-gradient(135deg,#FF6B00,#00C8FF)', color: '#fff', borderColor: 'transparent' } : {}}
                         >
                           {isLoading
@@ -443,11 +586,11 @@ export default function EngagementPlaybook({ username: _username, onBack }: Enga
                       </td>
                     </tr>
 
-                    {/* ── Accordion playbook panel ─────────────────────────── */}
+                    {/* Accordion playbook panel */}
                     {expanded && (
                       <tr className="border-b border-slate-200">
-                        <td colSpan={7} className="p-0">
-                          <div className="bg-slate-50 px-6 py-5">
+                        <td colSpan={6} className="p-0">
+                          <div className="px-6 py-5" style={{ backgroundColor: '#F1EFE9' }}>
                             {renderPlaybookContent(p.PHYSICIAN_ID)}
                           </div>
                         </td>
@@ -459,7 +602,7 @@ export default function EngagementPlaybook({ username: _username, onBack }: Enga
 
               {sortedPhysicians.length === 0 && !physLoading && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-sm text-slate-400">
+                  <td colSpan={6} className="px-4 py-12 text-center text-sm text-slate-400">
                     No physicians match your search.
                   </td>
                 </tr>
