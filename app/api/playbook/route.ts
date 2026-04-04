@@ -7,13 +7,18 @@ import Anthropic from '@anthropic-ai/sdk';
 export const maxDuration = 180;
 
 interface PlaybookJSON {
-  rep_brief: string;
-  opening_strategy: string;
+  physician_brief: string;
+  opening_points: string[];
   key_messages: string[];
-  anticipated_objections: { objection: string; suggested_response: string }[];
+  anticipated_objections: { objection: string; responses: string[] }[];
   closing_ask: string;
-  follow_up_items: string[];
-  tone_guidance: string;
+}
+
+interface BrandShare {
+  brand: string;
+  current_share: number;
+  direction: 'up' | 'down' | 'flat';
+  change: number;
 }
 
 export async function POST(request: NextRequest) {
@@ -74,17 +79,46 @@ export async function POST(request: NextRequest) {
       sf.getOpenTasksByPhysician(userId, physicianId),
     ]);
 
+    // ── 2a. Compute market share (most recent 4 weeks vs prior 4 weeks) ───
+    const allWeeks = [...new Set((rxRows as any[]).map(r => r.FRIDAY_WEEK_ENDING_DATE as string))].sort().reverse();
+    const currentWeekSet = new Set(allWeeks.slice(0, 4));
+    const priorWeekSet   = new Set(allWeeks.slice(4, 8));
+
+    const sumScripts = (rows: any[], weekSet: Set<string>) => {
+      const totals: Record<string, number> = {};
+      for (const r of rows) {
+        if (weekSet.has(r.FRIDAY_WEEK_ENDING_DATE)) {
+          totals[r.BRAND] = (totals[r.BRAND] ?? 0) + Number(r.PRESCRIPTIONS_WRITTEN);
+        }
+      }
+      return totals;
+    };
+
+    const currentScripts = sumScripts(rxRows as any[], currentWeekSet);
+    const priorScripts   = sumScripts(rxRows as any[], priorWeekSet);
+    const currentTotal   = Object.values(currentScripts).reduce((a, b) => a + b, 0) || 1;
+    const priorTotal     = Object.values(priorScripts).reduce((a, b) => a + b, 0) || 1;
+
+    const allBrands = [...new Set((rxRows as any[]).map(r => r.BRAND as string))];
+    const marketShare: BrandShare[] = allBrands.map(brand => {
+      const cur      = currentScripts[brand] ?? 0;
+      const prior    = priorScripts[brand]   ?? 0;
+      const curShare = (cur   / currentTotal) * 100;
+      const priShare = (prior / priorTotal)   * 100;
+      const delta    = curShare - priShare;
+      return {
+        brand,
+        current_share: Math.round(curShare * 10) / 10,
+        direction: Math.abs(delta) < 0.1 ? 'flat' : delta > 0 ? 'up' : 'down',
+        change: Math.round(Math.abs(delta) * 10) / 10,
+      };
+    }).sort((a, b) => b.current_share - a.current_share);
+
     // ── 2. Format context blocks ───────────────────────────────────────────
     const p = physicianRows[0] ?? {};
     const physicianName = p.PHYSICIAN_FIRST_NAME && p.PHYSICIAN_LAST_NAME
       ? `Dr. ${p.PHYSICIAN_FIRST_NAME} ${p.PHYSICIAN_LAST_NAME}`
       : 'the physician';
-
-    const rxTrendText = rxRows.length > 0
-      ? rxRows.map((r: any) =>
-          `  - Week ending ${r.FRIDAY_WEEK_ENDING_DATE}: ${r.BRAND} = ${r.PRESCRIPTIONS_WRITTEN} scripts`
-        ).join('\n')
-      : '  No Rx data available.';
 
     const activityText = activityRows.length > 0
       ? activityRows.map((a: any) =>
@@ -105,7 +139,13 @@ export async function POST(request: NextRequest) {
       : '  None.';
 
     // ── 3. Build prompt ────────────────────────────────────────────────────
-    const prompt = `You are a pharmaceutical sales strategy assistant. Generate a structured pre-call playbook for a sales rep preparing to visit the physician below.
+    const marketShareContext = marketShare.length > 0
+      ? marketShare.map(b =>
+          `  ${b.brand}: ${b.current_share}% share (${b.direction === 'up' ? '↑' : b.direction === 'down' ? '↓' : '→'} ${b.direction === 'flat' ? 'flat' : b.change + 'pp'} vs prior 4 weeks)`
+        ).join('\n')
+      : '  No Rx data available.';
+
+    const prompt = `You are a pharmaceutical sales strategy assistant. Generate a focused pre-call playbook for a sales rep visiting the physician below. Be specific and actionable — avoid generic language.
 
 PHYSICIAN PROFILE:
   Name: ${physicianName}
@@ -115,8 +155,8 @@ PHYSICIAN PROFILE:
   Treatment Preferences: ${p.TREATMENT_PREFERENCES ?? 'Not available'}
   Years in Practice: ${p.PHYSICIAN_YEARS_IN_PRACTICE ?? 'Unknown'}
 
-RX TREND (last 12 weeks):
-${rxTrendText}
+MARKET SHARE — most recent 4 weeks:
+${marketShareContext}
 
 RECENT PROMOTIONAL ACTIVITY (last 90 days):
 ${activityText}
@@ -127,25 +167,32 @@ ${callNotesText}
 OPEN FOLLOW-UP COMMITMENTS:
 ${tasksText}
 
-Return ONLY a valid JSON object with this exact structure. No markdown fences. No text before { or after }.
+Return ONLY a valid JSON object. No markdown fences. No text before { or after }.
+
+Keep all content terse — no filler words, no elaborate sentences. Plain, direct language only.
+
+Field rules:
+- physician_brief: One phrase, ≤12 words. Prescribing stance + relationship status.
+- opening_points: 2 bullets. Each ≤10 words. Verb first. Reference a specific data point (call note, task, activity, or share trend).
+- key_messages: 3 bullets. Each ≤12 words. Clinical/product point tailored to this physician's segment. No generic claims.
+- anticipated_objections: 2 objections from their attitudinal profile. Objection ≤8 words. 2 response bullets each, ≤12 words per bullet.
+- closing_ask: ≤12 words. Name the exact commitment (sample, trial, meeting, etc.).
 
 {
-  "rep_brief": "<2-3 sentences describing this physician and the current relationship state based on the data above>",
-  "opening_strategy": "<how to open the conversation given their segment, history, and recent activity>",
-  "key_messages": ["<message 1 tailored to this physician's segment and preferences>", "<message 2>", "<message 3>"],
+  "physician_brief": "<one phrase, ≤12 words>",
+  "opening_points": ["<≤10 words>", "<≤10 words>"],
+  "key_messages": ["<≤12 words>", "<≤12 words>", "<≤12 words>"],
   "anticipated_objections": [
-    {"objection": "<likely objection based on attitudinal profile>", "suggested_response": "<how to respond>"}
+    {"objection": "<≤8 words>", "responses": ["<≤12 words>", "<≤12 words>"]}
   ],
-  "closing_ask": "<the specific commitment or next step to aim for in this visit>",
-  "follow_up_items": ["<item 1 to address from open tasks or prior calls>"],
-  "tone_guidance": "<communication style and approach tailored to this physician's attitudinal profile and segment>"
+  "closing_ask": "<≤12 words>"
 }`;
 
     // ── 4. Claude call ─────────────────────────────────────────────────────
     const anthropic = new Anthropic({ apiKey });
     const msg = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1200,
+      max_tokens: 1400,
       messages: [{ role: 'user', content: prompt }],
     });
 
@@ -163,7 +210,8 @@ Return ONLY a valid JSON object with this exact structure. No markdown fences. N
       );
     }
 
-    return NextResponse.json({ playbook, physicianName });
+    const openTasks = (taskRows as any[]).map(t => t.TASK_TEXT as string);
+    return NextResponse.json({ playbook, physicianName, marketShare, openTasks });
 
   } catch (err: any) {
     console.error('[playbook] error:', err.message);

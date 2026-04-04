@@ -267,6 +267,19 @@ export class SnowflakeClient {
           FROM readiness_counts
         )
         WHERE mode_rn = 1
+      ),
+      last_contact AS (
+        SELECT PHYSICIAN_ID, TRANSACTION_DATE AS LAST_CONTACT_DATE, PROMOTION_CHANNEL AS LAST_CONTACT_CHANNEL
+        FROM (
+          SELECT
+            PHYSICIAN_ID,
+            TRANSACTION_DATE,
+            PROMOTION_CHANNEL,
+            ROW_NUMBER() OVER (PARTITION BY PHYSICIAN_ID ORDER BY TRANSACTION_DATE DESC) AS rn
+          FROM CORTEX_TESTING.PUBLIC.SYNTHETIC_ACTIVITY
+          WHERE PROMOTION_CHANNEL IN ('Face to face', 'Telephonic', 'Email')
+        )
+        WHERE rn = 1
       )
       SELECT
         pc.PHYSICIAN_ID,
@@ -280,12 +293,15 @@ export class SnowflakeClient {
         ps.SEGMENT_NAME,
         ps.ATTITUDINAL_DESCRIPTION,
         ms.OVERALL_SCORE,
-        mr.FIELD_READINESS
+        mr.FIELD_READINESS,
+        lc.LAST_CONTACT_DATE,
+        lc.LAST_CONTACT_CHANNEL
       FROM CORTEX_TESTING.PUBLIC.SYNTHETIC_PHYSICIAN_CHARS pc
       LEFT JOIN CORTEX_TESTING.PUBLIC.SYNTHETIC_PHYSICIAN_SEGMENT ps
         ON pc.PHYSICIAN_ID = ps.PHYSICIAN_ID
       LEFT JOIN median_scores ms   ON pc.PHYSICIAN_ID = ms.PHYSICIAN_ID
       LEFT JOIN mode_readiness mr  ON pc.PHYSICIAN_ID = mr.PHYSICIAN_ID
+      LEFT JOIN last_contact lc    ON pc.PHYSICIAN_ID = lc.PHYSICIAN_ID
       ORDER BY pc.PHYSICIAN_LAST_NAME, pc.PHYSICIAN_FIRST_NAME ASC
     `;
     return await this.executeQuery(sql, {
