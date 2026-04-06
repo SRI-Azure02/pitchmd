@@ -230,8 +230,83 @@ export class SnowflakeClient {
    * Like queryAllPhysicians but computes each physician's OVERALL_SCORE as the
    * median and FIELD_READINESS as the mode across the rep's most recent 3
    * evaluation sessions with that physician.
+   *
+   * Supports server-side pagination, search, filtering, and sorting.
+   * Returns `{ rows, totalCount }` where totalCount is the full match count
+   * (ignoring the page window) computed via COUNT(*) OVER ().
    */
-  async queryAllPhysiciansWithScores(appUserId: string): Promise<any[]> {
+  async queryAllPhysiciansWithScores(
+    appUserId: string,
+    opts: {
+      page?:      number;          // 1-indexed, default 1
+      pageSize?:  number;          // default 25, max 100
+      search?:    string;          // ILIKE across name / specialty / segment
+      sortBy?:    string;          // key from PHYSICIAN_SORT_COL whitelist
+      sortDir?:   'asc' | 'desc';
+      segment?:   string;          // exact SEGMENT_NAME filter
+      specialty?: string;          // exact PHYSICIAN_SPECIALTY filter
+    } = {}
+  ): Promise<{ rows: any[]; totalCount: number }> {
+    // ── Sanitise pagination params ───────────────────────────────────────────
+    const page     = Math.max(1, Math.floor(opts.page ?? 1));
+    const pageSize = Math.min(100, Math.max(1, Math.floor(opts.pageSize ?? 25)));
+    const offset   = (page - 1) * pageSize;
+
+    // ── Safe ORDER BY whitelist ──────────────────────────────────────────────
+    // Uses SELECT-clause aliases so Snowflake resolves them correctly.
+    // NULLS LAST keeps un-evaluated physicians at the bottom when sorting by score.
+    const SORT_COL: Record<string, string> = {
+      name:           'LAST_NAME, FIRST_NAME',
+      specialty:      'SPECIALTY',
+      segment:        'SEGMENT_NAME',
+      state:          'STATE',
+      overallScore:   'OVERALL_SCORE NULLS LAST',
+      fieldReadiness: 'FIELD_READINESS NULLS LAST',
+      lastContact:    'LAST_CONTACT_DATE NULLS LAST',
+    };
+    const safeSort = SORT_COL[opts.sortBy ?? 'name'] ?? SORT_COL.name;
+    const safeDir  = opts.sortDir === 'desc' ? 'DESC' : 'ASC';
+
+    // ── Bind variables (all user-supplied values) ────────────────────────────
+    const bindings: Record<string, { type: string; value: string }> = {
+      '1': { type: 'TEXT', value: appUserId },
+    };
+    const whereClauses: string[] = [];
+    let bi = 2; // next binding index
+
+    if (opts.search?.trim()) {
+      const term = `%${opts.search.trim()}%`;
+      // Use separate bindings per column to stay compatible with Snowflake's
+      // positional binding model (no guaranteed multi-reference support).
+      bindings[String(bi)]     = { type: 'TEXT', value: term };
+      bindings[String(bi + 1)] = { type: 'TEXT', value: term };
+      bindings[String(bi + 2)] = { type: 'TEXT', value: term };
+      bindings[String(bi + 3)] = { type: 'TEXT', value: term };
+      whereClauses.push(`(
+        pc.PHYSICIAN_FIRST_NAME ILIKE :${bi}
+        OR pc.PHYSICIAN_LAST_NAME  ILIKE :${bi + 1}
+        OR pc.PHYSICIAN_SPECIALTY  ILIKE :${bi + 2}
+        OR ps.SEGMENT_NAME         ILIKE :${bi + 3}
+      )`);
+      bi += 4;
+    }
+
+    if (opts.segment) {
+      bindings[String(bi)] = { type: 'TEXT', value: opts.segment };
+      whereClauses.push(`ps.SEGMENT_NAME = :${bi}`);
+      bi++;
+    }
+
+    if (opts.specialty) {
+      bindings[String(bi)] = { type: 'TEXT', value: opts.specialty };
+      whereClauses.push(`pc.PHYSICIAN_SPECIALTY = :${bi}`);
+      bi++;
+    }
+
+    const whereSQL = whereClauses.length > 0
+      ? `AND ${whereClauses.join('\n      AND ')}`
+      : '';
+
     const sql = `
       WITH last3 AS (
         SELECT
@@ -295,18 +370,61 @@ export class SnowflakeClient {
         ms.OVERALL_SCORE,
         mr.FIELD_READINESS,
         lc.LAST_CONTACT_DATE,
-        lc.LAST_CONTACT_CHANNEL
+        lc.LAST_CONTACT_CHANNEL,
+        COUNT(*) OVER ()            AS TOTAL_COUNT
       FROM CORTEX_TESTING.PUBLIC.SYNTHETIC_PHYSICIAN_CHARS pc
       LEFT JOIN CORTEX_TESTING.PUBLIC.SYNTHETIC_PHYSICIAN_SEGMENT ps
         ON pc.PHYSICIAN_ID = ps.PHYSICIAN_ID
       LEFT JOIN median_scores ms   ON pc.PHYSICIAN_ID = ms.PHYSICIAN_ID
       LEFT JOIN mode_readiness mr  ON pc.PHYSICIAN_ID = mr.PHYSICIAN_ID
       LEFT JOIN last_contact lc    ON pc.PHYSICIAN_ID = lc.PHYSICIAN_ID
-      ORDER BY pc.PHYSICIAN_LAST_NAME, pc.PHYSICIAN_FIRST_NAME ASC
+      WHERE 1=1
+      ${whereSQL}
+      ORDER BY ${safeSort} ${safeDir}
+      LIMIT ${pageSize} OFFSET ${offset}
     `;
-    return await this.executeQuery(sql, {
-      '1': { type: 'TEXT', value: appUserId },
-    });
+
+    const rows = await this.executeQuery(sql, bindings);
+    const totalCount = rows.length > 0 ? Number(rows[0].TOTAL_COUNT ?? 0) : 0;
+    return { rows, totalCount };
+  }
+
+  /**
+   * Returns the distinct filter options for physician list dropdowns.
+   * Runs two lightweight DISTINCT queries in parallel — suitable for use on
+   * every page load without hitting the heavy aggregation query.
+   */
+  async getPhysicianFilterOptions(appUserId: string): Promise<{
+    segments: string[];
+    specialties: string[];
+    readinessValues: string[];
+  }> {
+    const [segRows, specRows, readinessRows] = await Promise.all([
+      this.executeQuery(`
+        SELECT DISTINCT SEGMENT_NAME AS VALUE
+        FROM CORTEX_TESTING.PUBLIC.SYNTHETIC_PHYSICIAN_SEGMENT
+        WHERE SEGMENT_NAME IS NOT NULL
+        ORDER BY VALUE
+      `),
+      this.executeQuery(`
+        SELECT DISTINCT PHYSICIAN_SPECIALTY AS VALUE
+        FROM CORTEX_TESTING.PUBLIC.SYNTHETIC_PHYSICIAN_CHARS
+        WHERE PHYSICIAN_SPECIALTY IS NOT NULL
+        ORDER BY VALUE
+      `),
+      this.executeQuery(`
+        SELECT DISTINCT FIELD_READINESS AS VALUE
+        FROM CORTEX_TESTING.ML.REPEVAL_RESULTS
+        WHERE APP_USER_ID = :1
+          AND FIELD_READINESS IS NOT NULL
+        ORDER BY VALUE
+      `, { '1': { type: 'TEXT', value: appUserId } }),
+    ]);
+    return {
+      segments:       segRows.map((r: any) => r.VALUE as string),
+      specialties:    specRows.map((r: any) => r.VALUE as string),
+      readinessValues: readinessRows.map((r: any) => r.VALUE as string),
+    };
   }
 
   /**

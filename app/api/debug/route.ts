@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSnowflakeClient } from '@/lib/snowflake';
+import { getSessionFromRequest } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
+  const session = await getSessionFromRequest(request);
+  if (!session) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     const client = getSnowflakeClient();
     const results = await client.executeQuery(`

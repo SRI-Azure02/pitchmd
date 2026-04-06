@@ -148,9 +148,12 @@ function extractRoleplay(text: string): string | null {
  * Merges fragments after title abbreviations (Dr., Mr., Mrs., Ms., Prof.)
  * so "I'm Dr." + "Smith." stays as one sentence rather than being cut.
  *
- * FIX 2: This is still used for the `done` event's text field (TTS / fallback).
- * The client-side rendering now does its own 2-sentence truncation on streamed
- * chunks, so the server truncation is only a safety net.
+ * FIX 2: Authoritative truncation for the committed message text sent in the
+ * `done` event (used for TTS and final chat history).  The client independently
+ * truncates the live streaming bubble for visual feedback only — that content is
+ * discarded when the `done` event fires and replaced by this server-truncated
+ * text.  The two truncation sites operate on separate code paths and do NOT
+ * double-truncate the same content.
  */
 function shortenRoleplay(text: string): string {
   const emotion = text.match(EMOTION_TAG_REGEX)?.[0] ?? '[EMOTION:neutral]';

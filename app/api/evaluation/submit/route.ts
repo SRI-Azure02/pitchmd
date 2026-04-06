@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionFromRequest } from '@/lib/auth';
-import { SnowflakeClient } from '@/lib/snowflake';
+import { getSnowflakeClient } from '@/lib/snowflake';
+import { validateInput, EvalSubmitInputSchema } from '@/lib/validate';
+import { checkRateLimit, rateLimitResponse, AI_HEAVY_LIMIT } from '@/lib/rate-limit';
 
 // Allow up to 6 minutes — REPEVAL does Cortex LLM inference and can take 2–4 min.
 export const maxDuration = 360;
@@ -11,16 +13,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { physicianId, transcript } = await request.json();
+  // Rate limit: 20 evaluations per minute per user
+  const rl = checkRateLimit(`eval:${session.userId}`, AI_HEAVY_LIMIT);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs) as unknown as NextResponse;
 
-  if (!physicianId || !transcript) {
-    return NextResponse.json(
-      { error: 'Missing required fields: physicianId, transcript' },
-      { status: 400 },
-    );
-  }
+  const rawBody = await request.json();
+  const { data, errorResponse } = validateInput(EvalSubmitInputSchema, rawBody);
+  if (errorResponse) return errorResponse;
+  const { physicianId, transcript } = data;
 
-  const client = new SnowflakeClient();
+  const client = getSnowflakeClient();
   console.log(`[repeval] START — physician=${physicianId}, user=${session.username}, transcriptLen=${transcript.length}`);
 
   try {

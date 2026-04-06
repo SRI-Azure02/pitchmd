@@ -3,18 +3,31 @@ import { getSessionFromRequest } from '@/lib/auth';
 import { getSnowflakeClient } from '@/lib/snowflake';
 
 export async function GET(request: NextRequest) {
-  // FIX: was checking 'session_' prefix, but createSession() produces 'sess_' prefix,
-  // causing a permanent 401 redirect loop from the dashboard. Use the shared
-  // session helper so the prefix, KV lookup, and cookie fallback all stay in sync.
   const session = await getSessionFromRequest(request);
   if (!session) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const sp = request.nextUrl.searchParams;
+
+  // Pagination
+  const page     = Math.max(1, Number(sp.get('page')     ?? 1));
+  const pageSize = Math.min(100, Math.max(1, Number(sp.get('pageSize') ?? 25)));
+
+  // Search / filter / sort
+  const search    = sp.get('search')    ?? undefined;
+  const sortBy    = sp.get('sortBy')    ?? undefined;
+  const sortDir   = sp.get('sortDir') === 'desc' ? 'desc' : 'asc';
+  const segment   = sp.get('segment')   ?? undefined;
+  const specialty = sp.get('specialty') ?? undefined;
+
   try {
     const client = getSnowflakeClient();
-    const physicians = await client.queryAllPhysiciansWithScores(session.userId);
-    return NextResponse.json({ physicians });
+    const { rows, totalCount } = await client.queryAllPhysiciansWithScores(
+      session.userId,
+      { page, pageSize, search, sortBy, sortDir, segment, specialty },
+    );
+    return NextResponse.json({ physicians: rows, totalCount, page, pageSize });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('[physicians] Snowflake error:', message);

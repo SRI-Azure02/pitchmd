@@ -1,6 +1,9 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useState } from 'react';
+import { usePhysicianList } from '@/lib/hooks/use-physician-list';
+import { Paginator } from '@/components/ui/paginator';
+import { parseSnowflakeDate } from '@/lib/dates';
 import {
   ArrowDown, ArrowUp, ArrowUpDown, BookOpen, Check, ChevronDown, ChevronUp,
   Search, X, RefreshCw, AlertCircle,
@@ -138,12 +141,8 @@ function channelLabel(raw: string | null): string {
 
 function formatDate(raw: string | null): string {
   if (!raw) return '—';
-  // Handle epoch seconds
-  if (/^\d{9,11}(\.\d+)?$/.test(String(raw))) {
-    return new Date(parseFloat(String(raw)) * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  }
-  const d = new Date(raw);
-  if (isNaN(d.getTime())) return String(raw);
+  const d = parseSnowflakeDate(raw);
+  if (!d) return String(raw);
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
@@ -155,65 +154,28 @@ interface EngagementPlaybookProps {
 }
 
 export default function EngagementPlaybook({ username: _username, onBack }: EngagementPlaybookProps) {
-  const [physicians, setPhysicians]         = useState<Physician[]>([]);
-  const [physLoading, setPhysLoading]       = useState(true);
+  const hook = usePhysicianList();
   const [expandedId, setExpandedId]         = useState<string | null>(null);
   const [tasksExpandedId, setTasksExpandedId] = useState<string | null>(null);
-  const [search, setSearch]                 = useState('');
   const [sortConfig, setSortConfig]         = useState<{ field: SortField; dir: SortDir } | null>(null);
   const [playbookStates, setPlaybookStates] = useState<Record<string, PhysicianPlaybookState>>({});
   const [hoveredBtnId, setHoveredBtnId]     = useState<string | null>(null);
-  const [filterSegment, setFilterSegment]   = useState<string | null>(null);
-  const [filterSpecialty, setFilterSpecialty] = useState<string | null>(null);
   const [openDropdown, setOpenDropdown]     = useState<string | null>(null);
 
-  useEffect(() => {
-    fetch('/api/physicians?scores=true')
-      .then(r => r.json())
-      .then(d => setPhysicians(d.physicians ?? d ?? []))
-      .catch(console.error)
-      .finally(() => setPhysLoading(false));
-  }, []);
+  const uniqueSegments    = hook.filterOptions.segments;
+  const uniqueSpecialties = hook.filterOptions.specialties;
 
-  const uniqueSegments    = useMemo(() => [...new Set(physicians.map(p => p.SEGMENT_NAME).filter(Boolean))].sort() as string[], [physicians]);
-  const uniqueSpecialties = useMemo(() => [...new Set(physicians.map(p => p.SPECIALTY).filter(Boolean))].sort() as string[], [physicians]);
-
+  const SERVER_SORT_FIELDS = new Set<SortField>(['name', 'specialty', 'segment', 'state', 'lastContact']);
   const handleSort = (field: SortField) => {
-    setSortConfig(prev =>
-      prev?.field === field
-        ? { field, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
-        : { field, dir: 'asc' }
-    );
+    setSortConfig(prev => {
+      const newDir: SortDir = prev?.field === field && prev.dir === 'asc' ? 'desc' : 'asc';
+      if (SERVER_SORT_FIELDS.has(field)) hook.setSort(field, newDir);
+      return { field, dir: newDir };
+    });
   };
 
-  const sortedPhysicians = useMemo(() => [...physicians]
-    .filter(p => {
-      if (search.trim()) {
-        const q = search.toLowerCase();
-        const matches = (
-          p.FIRST_NAME?.toLowerCase().includes(q) ||
-          p.LAST_NAME?.toLowerCase().includes(q) ||
-          p.SPECIALTY?.toLowerCase().includes(q) ||
-          p.SEGMENT_NAME?.toLowerCase().includes(q)
-        );
-        if (!matches) return false;
-      }
-      if (filterSegment   && p.SEGMENT_NAME !== filterSegment)   return false;
-      if (filterSpecialty && p.SPECIALTY    !== filterSpecialty)  return false;
-      return true;
-    })
-    .sort((a, b) => {
-      if (!sortConfig) return 0;
-      const dir = sortConfig.dir === 'asc' ? 1 : -1;
-      switch (sortConfig.field) {
-        case 'name':        return dir * `${a.LAST_NAME}${a.FIRST_NAME}`.localeCompare(`${b.LAST_NAME}${b.FIRST_NAME}`);
-        case 'specialty':   return dir * (a.SPECIALTY    ?? '').localeCompare(b.SPECIALTY    ?? '');
-        case 'segment':     return dir * (a.SEGMENT_NAME ?? '').localeCompare(b.SEGMENT_NAME ?? '');
-        case 'state':       return dir * (a.STATE        ?? '').localeCompare(b.STATE        ?? '');
-        case 'lastContact': return dir * (a.LAST_CONTACT_DATE ?? '').localeCompare(b.LAST_CONTACT_DATE ?? '');
-        default:            return 0;
-      }
-    }), [physicians, search, filterSegment, filterSpecialty, sortConfig]);
+  // search / segment / specialty / sort are all handled server-side via hook
+  const sortedPhysicians = hook.physicians;
 
   const SortIcon = ({ field }: { field: SortField }) => {
     if (sortConfig?.field !== field)
@@ -241,7 +203,8 @@ export default function EngagementPlaybook({ username: _username, onBack }: Enga
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ physicianId }),
       });
-      const data = await res.json();
+      const text = await res.text();
+      const data = text ? JSON.parse(text) : {};
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
       setPlaybookStates(prev => ({
         ...prev,
@@ -302,7 +265,7 @@ export default function EngagementPlaybook({ username: _username, onBack }: Enga
     const pb = state.playbook!;
     const ms = state.marketShare ?? [];
     const tasks = state.openTasks ?? [];
-    const physician = physicians.find(ph => ph.PHYSICIAN_ID === physicianId);
+    const physician = hook.physicians.find(ph => ph.PHYSICIAN_ID === physicianId);
     const tasksExpanded = tasksExpandedId === physicianId;
 
     return (
@@ -415,7 +378,7 @@ export default function EngagementPlaybook({ username: _username, onBack }: Enga
     { label: 'Last Contact',  field: 'lastContact', align: 'left' },
   ];
 
-  const hasActiveFilters = filterSegment || filterSpecialty;
+  const hasActiveFilters = hook.search || hook.filterSegment || hook.filterSpecialty;
 
   return (
     <div className="flex flex-col h-full min-h-0 bg-white">
@@ -442,14 +405,14 @@ export default function EngagementPlaybook({ username: _username, onBack }: Enga
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
             <input
               type="text"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
+              value={hook.search}
+              onChange={e => hook.setSearch(e.target.value)}
               placeholder="Search physicians…"
               className="w-full pl-8 pr-3 py-1.5 rounded-full border border-slate-200 bg-white text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-300"
             />
-            {search && (
+            {hook.search && (
               <button
-                onClick={() => setSearch('')}
+                onClick={() => hook.setSearch('')}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
               >
                 <X className="w-3 h-3" />
@@ -461,8 +424,8 @@ export default function EngagementPlaybook({ username: _username, onBack }: Enga
           <FilterDropdown
             label="Segment"
             options={uniqueSegments}
-            value={filterSegment}
-            onChange={setFilterSegment}
+            value={hook.filterSegment}
+            onChange={hook.setFilterSegment}
             isOpen={openDropdown === 'segment'}
             onToggle={() => setOpenDropdown(prev => prev === 'segment' ? null : 'segment')}
           />
@@ -471,8 +434,8 @@ export default function EngagementPlaybook({ username: _username, onBack }: Enga
           <FilterDropdown
             label="Specialty"
             options={uniqueSpecialties}
-            value={filterSpecialty}
-            onChange={setFilterSpecialty}
+            value={hook.filterSpecialty}
+            onChange={hook.setFilterSpecialty}
             isOpen={openDropdown === 'specialty'}
             onToggle={() => setOpenDropdown(prev => prev === 'specialty' ? null : 'specialty')}
           />
@@ -480,7 +443,7 @@ export default function EngagementPlaybook({ username: _username, onBack }: Enga
           {/* Clear filters */}
           {hasActiveFilters && (
             <button
-              onClick={() => { setFilterSegment(null); setFilterSpecialty(null); }}
+              onClick={() => { hook.setSearch(''); hook.setFilterSegment(null); hook.setFilterSpecialty(null); }}
               className="text-xs text-slate-400 hover:text-slate-600 px-2 py-1 rounded-full hover:bg-slate-100 transition-colors"
             >
               Clear filters
@@ -488,14 +451,14 @@ export default function EngagementPlaybook({ username: _username, onBack }: Enga
           )}
 
           <p className="text-xs text-slate-400 ml-auto">
-            {sortedPhysicians.length} of {physicians.length} physician{physicians.length !== 1 ? 's' : ''}
+            {hook.totalCount} physician{hook.totalCount !== 1 ? 's' : ''}
           </p>
         </div>
       </div>
 
       {/* ── Table ──────────────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-auto">
-        {physLoading ? (
+        {hook.loading ? (
           <div className="flex items-center justify-center h-40 gap-2 text-slate-400">
             <Spinner className="w-4 h-4" />
             <span className="text-sm">Loading…</span>
@@ -600,7 +563,7 @@ export default function EngagementPlaybook({ username: _username, onBack }: Enga
                 );
               })}
 
-              {sortedPhysicians.length === 0 && !physLoading && (
+              {sortedPhysicians.length === 0 && !hook.loading && (
                 <tr>
                   <td colSpan={6} className="px-4 py-12 text-center text-sm text-slate-400">
                     No physicians match your search.
@@ -611,6 +574,13 @@ export default function EngagementPlaybook({ username: _username, onBack }: Enga
           </table>
         )}
       </div>
+
+      <Paginator
+        page={hook.page}
+        pageSize={hook.pageSize}
+        total={hook.totalCount}
+        onPageChange={hook.setPage}
+      />
     </div>
   );
 }

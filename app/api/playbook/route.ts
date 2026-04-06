@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSessionFromRequest } from '@/lib/auth';
 import { getSnowflakeClient } from '@/lib/snowflake';
 import Anthropic from '@anthropic-ai/sdk';
+import { checkRateLimit, rateLimitResponse, AI_HEAVY_LIMIT } from '@/lib/rate-limit';
 
 // Allow up to 3 minutes — 5 parallel Snowflake queries + Claude inference
 export const maxDuration = 180;
@@ -22,18 +23,22 @@ interface BrandShare {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await getSessionFromRequest(request);
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-  const { physicianId } = await request.json() as { physicianId: string };
-  if (!physicianId) {
-    return NextResponse.json({ error: 'physicianId is required' }, { status: 400 });
-  }
-
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return NextResponse.json({ error: 'Anthropic API key not configured' }, { status: 500 });
-
   try {
+    const session = await getSessionFromRequest(request);
+    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    // Rate limit: 20 playbook generations per minute per user
+    const rl = checkRateLimit(`playbook:${session.userId}`, AI_HEAVY_LIMIT);
+    if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs) as unknown as NextResponse;
+
+    const { physicianId } = await request.json() as { physicianId: string };
+    if (!physicianId) {
+      return NextResponse.json({ error: 'physicianId is required' }, { status: 400 });
+    }
+
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) return NextResponse.json({ error: 'Anthropic API key not configured' }, { status: 500 });
+
     const sf = getSnowflakeClient();
     const userId = session.userId;
 
@@ -109,7 +114,7 @@ export async function POST(request: NextRequest) {
       return {
         brand,
         current_share: Math.round(curShare * 10) / 10,
-        direction: Math.abs(delta) < 0.1 ? 'flat' : delta > 0 ? 'up' : 'down',
+        direction: (Math.abs(delta) < 0.1 ? 'flat' : delta > 0 ? 'up' : 'down') as 'flat' | 'up' | 'down',
         change: Math.round(Math.abs(delta) * 10) / 10,
       };
     }).sort((a, b) => b.current_share - a.current_share);
@@ -197,24 +202,18 @@ Field rules:
     });
 
     const raw = (msg.content[0] as any)?.text?.trim() ?? '';
-    let playbook: PlaybookJSON;
-    try {
-      const match = raw.match(/\{[\s\S]*\}/);
-      if (!match) throw new Error('No JSON object found in response');
-      playbook = JSON.parse(match[0]);
-    } catch (parseErr: any) {
-      console.error('[playbook] JSON parse failed. Raw:', raw.slice(0, 300));
-      return NextResponse.json(
-        { error: 'Failed to parse playbook from AI response' },
-        { status: 500 },
-      );
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) {
+      console.error('[playbook] No JSON found in AI response. Raw:', raw.slice(0, 300));
+      return NextResponse.json({ error: 'Failed to parse playbook from AI response' }, { status: 500 });
     }
+    const playbook: PlaybookJSON = JSON.parse(match[0]);
 
-    const openTasks = (taskRows as any[]).map(t => t.TASK_TEXT as string);
+    const openTasks = (taskRows as any[]).map((t: any) => t.TASK_TEXT as string);
     return NextResponse.json({ playbook, physicianName, marketShare, openTasks });
 
   } catch (err: any) {
-    console.error('[playbook] error:', err.message);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error('[playbook] error:', err?.message ?? String(err));
+    return NextResponse.json({ error: err?.message ?? 'Internal server error' }, { status: 500 });
   }
 }

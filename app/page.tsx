@@ -1,15 +1,18 @@
-"use client"
+import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+/**
+ * Root page — server-side auth gate.
+ * Checks for the session cookie and redirects accordingly, avoiding an extra
+ * round-trip through /dashboard for unauthenticated visitors.
+ */
+export default async function HomePage() {
+  const cookieStore = await cookies();
+  const sessionId = cookieStore.get('sessionId')?.value;
 
-export default function HomePage() {
-  const router = useRouter();
+  if (!sessionId) {
+    redirect('/login');
+  }
 
-  useEffect(() => {
-    // Redirect to dashboard (will be redirected to login if not authenticated)
-    router.push('/dashboard');
-  }, [router]);
-
-  return null;
+  redirect('/dashboard');
 }

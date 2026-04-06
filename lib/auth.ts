@@ -11,7 +11,23 @@ export interface AppSession {
 // ── In-memory session store ──────────────────────────────────────────────────
 // Survives for the lifetime of the server process. For production, swap this
 // for a Redis/Snowflake-backed store keyed on sessionId.
-const sessionStore = new Map<string, AppSession>();
+
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days — mirrors cookie maxAge
+
+interface SessionEntry {
+  session: AppSession;
+  expiresAt: number;
+}
+
+const sessionStore = new Map<string, SessionEntry>();
+
+/** Remove sessions that have passed their TTL. Called amortised on writes. */
+function pruneExpiredSessions() {
+  const now = Date.now();
+  for (const [id, entry] of sessionStore.entries()) {
+    if (entry.expiresAt < now) sessionStore.delete(id);
+  }
+}
 
 // ── Session management ───────────────────────────────────────────────────────
 
@@ -21,7 +37,12 @@ export async function createSession(
   _email: string
 ): Promise<string> {
   const sessionId = crypto.randomUUID();
-  sessionStore.set(sessionId, { userId, username, role: 'rep' });
+  // Prune expired sessions ~2% of the time to avoid unbounded Map growth
+  if (Math.random() < 0.02) pruneExpiredSessions();
+  sessionStore.set(sessionId, {
+    session: { userId, username, role: 'rep' },
+    expiresAt: Date.now() + SESSION_TTL_MS,
+  });
 
   const cookieStore = await cookies();
   cookieStore.set('sessionId', sessionId, {
@@ -71,7 +92,9 @@ export async function verifyPassword(
 export async function getSessionFromRequest(
   request: NextRequest
 ): Promise<AppSession | null> {
-  const mode = process.env.FEATURE_AUTH ?? 'stub';
+  // Default to 'real' auth in all environments.
+  // Set FEATURE_AUTH=stub explicitly in .env.local for local development only.
+  const mode = process.env.FEATURE_AUTH ?? 'real';
 
   if (mode === 'stub') {
     return { userId: 'Demo User', username: 'Demo User', role: 'rep' };
@@ -80,5 +103,11 @@ export async function getSessionFromRequest(
   const sessionId = request.cookies.get('sessionId')?.value;
   if (!sessionId) return null;
 
-  return sessionStore.get(sessionId) ?? null;
+  const entry = sessionStore.get(sessionId);
+  if (!entry) return null;
+  if (entry.expiresAt < Date.now()) {
+    sessionStore.delete(sessionId);
+    return null;
+  }
+  return entry.session;
 }

@@ -1,15 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionFromRequest } from '@/lib/auth';
 import Anthropic from '@anthropic-ai/sdk';
+import { validateInput, SummarizeInputSchema } from '@/lib/validate';
+import { checkRateLimit, rateLimitResponse, AI_LIGHT_LIMIT } from '@/lib/rate-limit';
 
 export async function POST(request: NextRequest) {
   const session = await getSessionFromRequest(request);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { transcript } = await request.json() as { transcript: string };
-  if (!transcript?.trim()) {
-    return NextResponse.json({ error: 'transcript is required' }, { status: 400 });
-  }
+  // Rate limit: 60 summaries per minute per user
+  const rl = checkRateLimit(`summarize:${session.userId}`, AI_LIGHT_LIMIT);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs) as unknown as NextResponse;
+
+  const rawBody = await request.json();
+  const { data, errorResponse } = validateInput(SummarizeInputSchema, rawBody);
+  if (errorResponse) return errorResponse;
+  const { transcript } = data;
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {

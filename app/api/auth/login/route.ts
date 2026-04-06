@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSession, hashPassword, verifyPassword } from '@/lib/auth';
 import { getSnowflakeClient } from '@/lib/snowflake';
+import { checkRateLimit, rateLimitResponse, LOGIN_LIMIT } from '@/lib/rate-limit';
 
 // Demo mode: ON by default — set DEMO_MODE=false to switch to Snowflake USERS
 // table auth (production). Default-on means v0.dev / local dev works without
@@ -8,6 +9,13 @@ import { getSnowflakeClient } from '@/lib/snowflake';
 const DEMO_MODE = process.env.DEMO_MODE !== 'false';
 
 export async function POST(request: NextRequest) {
+  // Rate limit by IP — 10 attempts per 15 minutes
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim()
+    ?? request.headers.get('x-real-ip')
+    ?? 'unknown';
+  const rl = checkRateLimit(`login:${ip}`, LOGIN_LIMIT);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs) as unknown as NextResponse;
+
   let body: { username?: string; password?: string };
   try {
     body = await request.json();

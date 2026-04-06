@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { usePhysicianList } from '@/lib/hooks/use-physician-list';
+import { Paginator } from '@/components/ui/paginator';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import AudioInput from './audio-input';
@@ -32,7 +34,7 @@ function randomSessionDuration(min = 60, max = 150): number {
 
 type SortDir = 'asc' | 'desc';
 type SortConfig = { field: string; dir: SortDir } | null;
-type FilterMap = { segment: string | null; specialty: string | null; overallScore: string | null; fieldReadiness: string | null };
+type FilterMap = { overallScore: string | null; fieldReadiness: string | null };
 
 function scoreBucket(score: number | null | undefined): string {
   if (score == null) return 'Not Evaluated';
@@ -168,7 +170,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   const [statusMessage, setStatusMessage] = useState('');
   const [evalOpen, setEvalOpen] = useState(false);
   const [evalPhysicianId, setEvalPhysicianId] = useState<string | null>(null);
-  const [performanceOpen, setPerformanceOpen] = useState(false);
+  const [performanceMode, setPerformanceMode] = useState(false);
   const [callJournalMode, setCallJournalMode] = useState(false);
   const [loopBackMode, setLoopBackMode]             = useState(false);
   const [engagementPlaybookMode, setEngagementPlaybookMode] = useState(false);
@@ -187,14 +189,14 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
 
   // ── Physician selection state ─────────────────────────────────────────────
   const [physicianSelectionMode, setPhysicianSelectionMode] = useState(false);
-  const [physicians, setPhysicians] = useState<any[]>([]);
-  const [physiciansLoading, setPhysiciansLoading] = useState(false);
   const [selectedPhysician, setSelectedPhysician] = useState<{ name: string; specialty: string | null; segment: string | null } | null>(null);
 
+  // ── Physician list hook (lazy — loads only when physician picker is opened) ─
+  const physicianHook = usePhysicianList({ lazy: true });
+
   // ── Physician list filter / sort state ────────────────────────────────────
-  const [physicianSearch, setPhysicianSearch] = useState('');
   const [sortConfig, setSortConfig] = useState<SortConfig>({ field: 'overallScore', dir: 'asc' });
-  const [filterValues, setFilterValues] = useState<FilterMap>({ segment: null, specialty: null, overallScore: null, fieldReadiness: null });
+  const [filterValues, setFilterValues] = useState<FilterMap>({ overallScore: null, fieldReadiness: null });
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [tableTooltip, setTableTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
   const [showPhysicianId, setShowPhysicianId] = useState(false);
@@ -709,19 +711,10 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   sendMessageRef.current = sendMessage;
 
   // ── Session controls ──────────────────────────────────────────────────────
-  const handleStartSession = async () => {
+  const handleStartSession = () => {
     if (hasStarted.current || physicianSelectionMode) return;
     setPhysicianSelectionMode(true);
-    setPhysiciansLoading(true);
-    try {
-      const res = await fetch('/api/physicians');
-      const data = await res.json();
-      setPhysicians(data.physicians ?? []);
-    } catch (err) {
-      console.error('[physicians] fetch failed:', err);
-    } finally {
-      setPhysiciansLoading(false);
-    }
+    physicianHook.load();
   };
 
   const handlePhysicianSelect = async (physician: any) => {
@@ -784,7 +777,6 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     evalStartedAtRef.current = null;
     targetDurationRef.current = randomSessionDuration();
     setPhysicianSelectionMode(false);
-    setPhysicians([]);
     setSelectedPhysician(null);
     setEvalPhysicianId(null);
     messagesRef.current = [];
@@ -999,44 +991,36 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   };
 
   // ── Column header sort ────────────────────────────────────────────────────
+  const SERVER_SORT_FIELDS = new Set(['name', 'specialty', 'segment', 'state', 'overallScore', 'fieldReadiness', 'lastContact']);
   const handleColumnSort = (field: string) => {
-    setSortConfig(prev =>
-      prev?.field === field
-        ? { field, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
-        : { field, dir: 'asc' },
-    );
+    setSortConfig(prev => {
+      const newDir: SortDir = prev?.field === field && prev.dir === 'asc' ? 'desc' : 'asc';
+      if (SERVER_SORT_FIELDS.has(field)) {
+        physicianHook.setSort(field, newDir);
+      }
+      return { field, dir: newDir };
+    });
   };
 
   // ── Derived options for dropdowns ─────────────────────────────────────────
-  const uniqueSegments    = useMemo(() => [...new Set(physicians.map(p => p.SEGMENT_NAME).filter(Boolean))].sort() as string[], [physicians]);
-  const uniqueSpecialties = useMemo(() => [...new Set(physicians.map(p => p.SPECIALTY).filter(Boolean))].sort() as string[], [physicians]);
+  // Segment / specialty options come from the server (all physicians, not just current page)
+  const uniqueSegments    = physicianHook.filterOptions.segments;
+  const uniqueSpecialties = physicianHook.filterOptions.specialties;
   const uniqueReadiness   = useMemo(() => {
-    const vals = [...new Set(physicians.map(p => p.FIELD_READINESS).filter(Boolean))].sort() as string[];
-    if (physicians.some(p => !p.FIELD_READINESS)) vals.unshift('Not Evaluated');
+    const vals = [...new Set(physicianHook.physicians.map(p => p.FIELD_READINESS).filter(Boolean))].sort() as string[];
+    if (physicianHook.physicians.some(p => !p.FIELD_READINESS)) vals.unshift('Not Evaluated');
     return vals;
-  }, [physicians]);
+  }, [physicianHook.physicians]);
   const scoreBucketOptions = useMemo(() => {
-    const buckets = new Set(physicians.map(p => scoreBucket(p.OVERALL_SCORE)));
+    const buckets = new Set(physicianHook.physicians.map(p => scoreBucket(p.OVERALL_SCORE)));
     const order = ['Not Evaluated', '< 6', '6–7.9', '8–8.9', '9+'];
     return order.filter(b => buckets.has(b));
-  }, [physicians]);
+  }, [physicianHook.physicians]);
 
-  // ── Filtered + sorted physician list ──────────────────────────────────────
+  // ── Client-side filter on current page (overallScore + fieldReadiness buckets) ──
   const filteredPhysicians = useMemo(() => {
-    let result = [...physicians];
+    let result = [...physicianHook.physicians];
 
-    // Text search across all visible attributes
-    const q = physicianSearch.trim().toLowerCase();
-    if (q) {
-      result = result.filter(p =>
-        [p.FIRST_NAME, p.LAST_NAME, p.SPECIALTY, p.CITY, p.STATE, p.SEGMENT_NAME, p.FIELD_READINESS]
-          .some(v => v?.toLowerCase().includes(q)),
-      );
-    }
-
-    // Field filters
-    if (filterValues.segment)      result = result.filter(p => p.SEGMENT_NAME    === filterValues.segment);
-    if (filterValues.specialty)    result = result.filter(p => p.SPECIALTY        === filterValues.specialty);
     if (filterValues.fieldReadiness) {
       if (filterValues.fieldReadiness === 'Not Evaluated')
         result = result.filter(p => !p.FIELD_READINESS);
@@ -1050,23 +1034,21 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
         result = result.filter(p => scoreBucket(p.OVERALL_SCORE) === filterValues.overallScore);
     }
 
-    // Sort
-    if (sortConfig) {
+    // physicianId is not server-sortable — sort client-side when selected
+    if (sortConfig?.field === 'physicianId') {
       result.sort((a, b) => {
-        const va = physicianSortValue(a, sortConfig.field);
-        const vb = physicianSortValue(b, sortConfig.field);
+        const va = physicianSortValue(a, 'physicianId');
+        const vb = physicianSortValue(b, 'physicianId');
         if (va === vb) return 0;
-        if (va === '' || va === -1) return 1;
-        if (vb === '' || vb === -1) return -1;
         const cmp = va < vb ? -1 : 1;
         return sortConfig.dir === 'asc' ? cmp : -cmp;
       });
     }
 
     return result;
-  }, [physicians, physicianSearch, filterValues, sortConfig]);
+  }, [physicianHook.physicians, filterValues, sortConfig]);
 
-  const anyFilterActive = physicianSearch.trim() || sortConfig || Object.values(filterValues).some(Boolean);
+  const anyFilterActive = physicianHook.search.trim() || sortConfig || Object.values(filterValues).some(Boolean) || physicianHook.filterSegment || physicianHook.filterSpecialty;
 
   const visibleMessages = messages.filter(
     (m, i) =>
@@ -1090,7 +1072,11 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     return { background: '#f1f5f9', color: '#475569' };
   };
 
-  // ── Loop Back full-screen view ───────────────────────────────────────────
+  // ── Full-screen section views ────────────────────────────────────────────
+  if (performanceMode) {
+    return <PerformancePanel onBack={() => setPerformanceMode(false)} />;
+  }
+
   if (loopBackMode) {
     return <LoopBack username={username ?? 'Rep'} onBack={() => setLoopBackMode(false)} />;
   }
@@ -1099,7 +1085,6 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     return <EngagementPlaybook username={username ?? 'Rep'} onBack={() => setEngagementPlaybookMode(false)} />;
   }
 
-  // ── Call Journal full-screen view ────────────────────────────────────────
   if (callJournalMode) {
     return <CallJournal username={username ?? 'Rep'} onBack={() => setCallJournalMode(false)} />;
   }
@@ -1129,13 +1114,13 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
                 <input
                   type="text"
-                  value={physicianSearch}
-                  onChange={e => setPhysicianSearch(e.target.value)}
+                  value={physicianHook.search}
+                  onChange={e => physicianHook.setSearch(e.target.value)}
                   placeholder="Search physicians…"
                   className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 bg-white text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400"
                 />
-                {physicianSearch && (
-                  <button onClick={() => setPhysicianSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                {physicianHook.search && (
+                  <button onClick={() => physicianHook.setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
                     <X className="w-3 h-3" />
                   </button>
                 )}
@@ -1158,8 +1143,8 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
               <PhysicianFilterDropdown
                 label="Segment"
                 options={uniqueSegments}
-                activeFilter={filterValues.segment}
-                onFilter={val => setFilterValues(prev => ({ ...prev, segment: val }))}
+                activeFilter={physicianHook.filterSegment}
+                onFilter={val => physicianHook.setFilterSegment(val)}
                 isOpen={openDropdown === 'segment'}
                 onToggle={() => setOpenDropdown(v => v === 'segment' ? null : 'segment')}
               />
@@ -1168,8 +1153,8 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
               <PhysicianFilterDropdown
                 label="Specialty"
                 options={uniqueSpecialties}
-                activeFilter={filterValues.specialty}
-                onFilter={val => setFilterValues(prev => ({ ...prev, specialty: val }))}
+                activeFilter={physicianHook.filterSpecialty}
+                onFilter={val => physicianHook.setFilterSpecialty(val)}
                 isOpen={openDropdown === 'specialty'}
                 onToggle={() => setOpenDropdown(v => v === 'specialty' ? null : 'specialty')}
               />
@@ -1198,9 +1183,11 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
               {anyFilterActive && (
                 <button
                   onClick={() => {
-                    setPhysicianSearch('');
+                    physicianHook.setSearch('');
+                    physicianHook.setFilterSegment(null);
+                    physicianHook.setFilterSpecialty(null);
                     setSortConfig(null);
-                    setFilterValues({ segment: null, specialty: null, overallScore: null, fieldReadiness: null });
+                    setFilterValues({ overallScore: null, fieldReadiness: null });
                   }}
                   className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-sm text-slate-500 hover:text-red-500 hover:bg-red-50 border border-transparent hover:border-red-200 transition-colors"
                 >
@@ -1213,14 +1200,14 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
 
             {/* Result count */}
             <p className="text-xs text-slate-400 mt-1.5">
-              {filteredPhysicians.length} of {physicians.length} physician{physicians.length !== 1 ? 's' : ''}
+              {filteredPhysicians.length} of {physicianHook.totalCount} physician{physicianHook.totalCount !== 1 ? 's' : ''}
               {anyFilterActive ? ' match your filters' : ''}
             </p>
           </div>
 
           {/* ── Physician table ──────────────────────────────────────────── */}
           <div className="flex-1 overflow-auto">
-            {physiciansLoading ? (
+            {physicianHook.loading ? (
               <div className="flex items-center justify-center h-40 gap-2 text-slate-400">
                 <Spinner className="w-4 h-4" />
                 <span className="text-sm">Loading physicians...</span>
@@ -1228,7 +1215,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
             ) : filteredPhysicians.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-40 gap-2 text-slate-400">
                 <p className="text-sm font-medium">No physicians match your filters.</p>
-                <button onClick={() => { setPhysicianSearch(''); setFilterValues({ segment: null, specialty: null, overallScore: null, fieldReadiness: null }); setSortConfig(null); }} className="text-xs text-blue-500 hover:underline">Clear filters</button>
+                <button onClick={() => { physicianHook.setSearch(''); physicianHook.setFilterSegment(null); physicianHook.setFilterSpecialty(null); setFilterValues({ overallScore: null, fieldReadiness: null }); setSortConfig(null); }} className="text-xs text-blue-500 hover:underline">Clear filters</button>
               </div>
             ) : (
               <table className="w-full text-base border-collapse min-w-[700px]">
@@ -1378,6 +1365,13 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
             )}
           </div>
 
+          <Paginator
+            page={physicianHook.page}
+            pageSize={physicianHook.pageSize}
+            total={physicianHook.totalCount}
+            onPageChange={physicianHook.setPage}
+          />
+
           <EvaluationPanel open={evalOpen} onClose={() => setEvalOpen(false)} content="" username={username} physicianId={evalPhysicianId} />
 
           {/* Fixed-position column header tooltip — renders outside overflow container */}
@@ -1480,7 +1474,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
               'See your scores and detailed feedback from recent sessions.',
               <BarChart2 className="w-7 h-7" />,
               'Pre-Field',
-              () => setPerformanceOpen(true),
+              () => setPerformanceMode(true),
               'flex-1',
             )}
           </div>
@@ -1525,10 +1519,6 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
           content=""
           username={username}
           physicianId={evalPhysicianId}
-        />
-        <PerformancePanel
-          open={performanceOpen}
-          onClose={() => setPerformanceOpen(false)}
         />
       </div>
     );
