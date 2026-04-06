@@ -6,6 +6,7 @@ import {
   BarChart, Bar, Cell, XAxis, Tooltip, ResponsiveContainer,
   ComposedChart, Area, Line, Legend,
 } from 'recharts';
+import { parseSnowflakeDate, formatDateTime } from '@/lib/dates';
 
 interface EvaluationPanelProps {
   open: boolean;
@@ -27,44 +28,6 @@ const DIMENSIONS = [
 
 const DIM_COLORS = ['#6b93c4', '#5fa882', '#c9a448', '#8b78c0', '#c97070'];
 
-// Snowflake ::DATE returns strings like "2026-03-22".
-// new Date("2026-03-22") parses as UTC midnight, which shifts to the previous day in US timezones.
-// We detect date-only strings and construct a local-midnight Date to avoid the UTC shift.
-function parseSnowflakeDate(val: any): Date | null {
-  if (val === null || val === undefined || val === '') return null;
-  const n = Number(val);
-  if (!isNaN(n)) {
-    // Large number (>1B) = Unix epoch in ms or seconds
-    if (n > 1000000000) return new Date(n > 9999999999 ? n : n * 1000);
-    // Small positive integer = Snowflake ::DATE returns days since 1970-01-01
-    // e.g. 20534 = 2026-03-22. new Date("20534") would wrongly give year 20534 AD.
-    if (n > 0 && Number.isInteger(n)) {
-      // n is days since 1970-01-01 (Snowflake epoch integer).
-      // new Date(n * 86400000) creates UTC midnight — in US timezones (UTC-5 to -8)
-      // that renders as the previous calendar day. Extract UTC components and
-      // construct a local-midnight Date instead to stay on the correct date.
-      const utc = new Date(n * 86400000);
-      return new Date(utc.getUTCFullYear(), utc.getUTCMonth(), utc.getUTCDate());
-    }
-  }
-  const str = String(val).trim();
-  // ISO date-only string "2026-03-22" — parse as local midnight to avoid UTC day shift
-  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
-    const [y, m, d] = str.split('-').map(Number);
-    return new Date(y, m - 1, d);
-  }
-  const d = new Date(str.replace(' ', 'T'));
-  return isNaN(d.getTime()) ? null : d;
-}
-
-function formatDateTime(val: any): string {
-  const d = parseSnowflakeDate(val);
-  if (!d) return '';
-  const h = d.getHours();
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  const h12 = h % 12 || 12;
-  return `${d.getMonth() + 1}/${d.getDate()}/${String(d.getFullYear()).slice(2)} ${h12}:${String(d.getMinutes()).padStart(2, '0')} ${ampm}`;
-}
 
 function Dot({ value }: { value: boolean | null }) {
   if (value === null || value === undefined) return <span className="inline-block w-3 h-3 rounded-full bg-slate-200" />;
@@ -250,8 +213,10 @@ export default function EvaluationPanel({ open, onClose, content, username, phys
       if (!physicianId) { setNoData(true); return; }
       const res = await fetch(`/api/evaluation?physicianId=${encodeURIComponent(physicianId)}`);
       if (res.status === 404) { setNoData(true); setEvaluation(null); return; }
-      if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Could not load evaluation'); }
-      const data = await res.json();
+      const text = await res.text();
+      const body = text ? JSON.parse(text) : {};
+      if (!res.ok) throw new Error(body.error || 'Could not load evaluation');
+      const data = body;
       setEvaluation(data.evaluation);
       const first = data.evaluation?.PHYSICIAN_FIRST_NAME;
       const last = data.evaluation?.PHYSICIAN_LAST_NAME;

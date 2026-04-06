@@ -31,7 +31,6 @@ export async function POST(request: NextRequest) {
   }
 
   const apiKey = process.env.ELEVENLABS_API_KEY;
-  console.log('[tts] key present:', !!apiKey, '| key prefix:', apiKey?.slice(0, 8));
   console.log('[tts] voiceId:', voiceId, '| text length:', text.length);
   if (!apiKey) {
     console.warn('[tts] ELEVENLABS_API_KEY not configured');

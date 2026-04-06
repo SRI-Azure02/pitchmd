@@ -1,15 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   ComposedChart, Area, Line, XAxis, YAxis, Tooltip, Legend,
   ResponsiveContainer,
 } from 'recharts';
+import { formatDate } from '@/lib/dates';
 
 interface PerformancePanelProps {
-  open: boolean;
-  onClose: () => void;
+  onBack: () => void;
 }
 
 const DIM_COLORS = ['#6b93c4', '#5fa882', '#c9a448', '#8b78c0', '#c97070'];
@@ -20,28 +19,6 @@ const DIMS = [
   { key: 'TONE_RAPPORT_SCORE',        label: 'Tone & Rapport',      short: 'TR' },
   { key: 'CLOSING_SCORE',             label: 'Closing',             short: 'CL' },
 ];
-
-function parseSnowflakeDate(val: any): Date | null {
-  if (val === null || val === undefined || val === '') return null;
-  const n = Number(val);
-  if (!isNaN(n) && Number.isInteger(n) && n > 0 && n < 99999) {
-    const utc = new Date(n * 86400000);
-    return new Date(utc.getUTCFullYear(), utc.getUTCMonth(), utc.getUTCDate());
-  }
-  const str = String(val).trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
-    const [y, m, d] = str.split('-').map(Number);
-    return new Date(y, m - 1, d);
-  }
-  const d = new Date(str.replace(' ', 'T'));
-  return isNaN(d.getTime()) ? null : d;
-}
-
-function formatDate(val: any): string {
-  const d = parseSnowflakeDate(val);
-  if (!d) return '';
-  return `${d.getMonth() + 1}/${d.getDate()}/${String(d.getFullYear()).slice(2)}`;
-}
 
 function readinessColor(r: string | null) {
   if (!r) return 'bg-slate-100 text-slate-600';
@@ -68,15 +45,16 @@ function ScoreRibbon({
   subtitle,
   summary,
   trendRows,
-  defaultExpanded = false,
+  expanded,
+  onToggle,
 }: {
   title: string;
   subtitle?: string;
   summary: any;
   trendRows: any[];
-  defaultExpanded?: boolean;
+  expanded: boolean;
+  onToggle: () => void;
 }) {
-  const [expanded, setExpanded] = useState(defaultExpanded);
   const trendData    = toChartRows(trendRows);
   const score        = summary?.OVERALL_SCORE != null ? Number(summary.OVERALL_SCORE) : null;
   const readiness    = summary?.FIELD_READINESS ?? null;
@@ -85,9 +63,8 @@ function ScoreRibbon({
 
   return (
     <div className={`border rounded-xl bg-white overflow-hidden ${isEmpty ? 'border-dashed border-slate-200 opacity-60' : 'border-slate-200'}`}>
-      {/* ── Collapsed header ── */}
       <button
-        onClick={() => !isEmpty && setExpanded(v => !v)}
+        onClick={() => !isEmpty && onToggle()}
         className={`w-full flex items-center justify-between px-6 py-5 transition-colors ${isEmpty ? 'cursor-default' : 'hover:bg-slate-50'}`}
       >
         <div className="text-left">
@@ -118,7 +95,6 @@ function ScoreRibbon({
         </div>
       </button>
 
-      {/* ── Expanded content ── */}
       {!isEmpty && expanded && (
         <div className="border-t border-slate-100 px-6 pb-6 space-y-5">
           <p className="text-xs text-slate-400 pt-4">
@@ -179,7 +155,7 @@ function ScoreRibbon({
 }
 
 // ── Main panel ───────────────────────────────────────────────────────────
-export default function PerformancePanel({ open, onClose }: PerformancePanelProps) {
+export default function PerformancePanel({ onBack }: PerformancePanelProps) {
   const [summary, setSummary]                   = useState<any>(null);
   const [trend, setTrend]                       = useState<any[]>([]);
   const [segmentSummaries, setSegmentSummaries] = useState<any[]>([]);
@@ -187,11 +163,14 @@ export default function PerformancePanel({ open, onClose }: PerformancePanelProp
   const [loading, setLoading]                   = useState(false);
   const [noData, setNoData]                     = useState(false);
   const [error, setError]                       = useState<string | null>(null);
+  const [expandedKey, setExpandedKey]           = useState<string>('__overall__');
+
+  const toggle = (key: string) =>
+    setExpandedKey(prev => (prev === key ? '' : key));
 
   useEffect(() => {
-    if (open) fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+    fetchData();
+  }, []);
 
   const fetchData = async () => {
     setLoading(true);
@@ -200,8 +179,10 @@ export default function PerformancePanel({ open, onClose }: PerformancePanelProp
     try {
       const res = await fetch('/api/evaluation/performance');
       if (res.status === 404) { setNoData(true); setSummary(null); return; }
-      if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Could not load performance data'); }
-      const data = await res.json();
+      const text = await res.text();
+      const body = text ? JSON.parse(text) : {};
+      if (!res.ok) throw new Error(body.error || 'Could not load performance data');
+      const data = body;
       setSummary(data.summary);
       setTrend(data.trend ?? []);
       setSegmentSummaries(data.segmentSummaries ?? []);
@@ -213,7 +194,6 @@ export default function PerformancePanel({ open, onClose }: PerformancePanelProp
     }
   };
 
-  // Group segment trend rows by SEGMENT_NAME
   const trendBySegment: Record<string, any[]> = {};
   for (const row of segmentTrends) {
     const seg = row.SEGMENT_NAME ?? 'Unknown';
@@ -222,17 +202,24 @@ export default function PerformancePanel({ open, onClose }: PerformancePanelProp
   }
 
   return (
-    <Dialog open={open} onOpenChange={o => !o && onClose()}>
-      <DialogContent
-        className="max-h-[90vh] overflow-y-auto"
-        style={{ maxWidth: '72rem', width: '90vw' }}
-      >
-        <DialogHeader>
-          <DialogTitle className="text-xl font-bold text-slate-900">
-            Performance Review
-          </DialogTitle>
-        </DialogHeader>
+    <div className="flex flex-col h-full min-h-0" style={{ backgroundColor: '#F1EFE9' }}>
 
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-slate-100 bg-white shrink-0">
+        <div>
+          <p className="text-lg font-semibold text-slate-900">Review Performance</p>
+          <p className="text-sm text-slate-400">Scores and feedback from your recent training sessions</p>
+        </div>
+        <button
+          onClick={onBack}
+          className="text-sm text-slate-400 hover:text-slate-700 px-3 py-1 rounded-full hover:bg-slate-100 transition-colors"
+        >
+          Back
+        </button>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
         {loading && (
           <div className="py-12 text-center text-sm text-slate-500">
             Loading performance data…
@@ -249,17 +236,16 @@ export default function PerformancePanel({ open, onClose }: PerformancePanelProp
         )}
 
         {!loading && summary && (
-          <div className="space-y-3">
-            {/* ── Overall ── */}
+          <>
             <ScoreRibbon
               title="Overall Score"
               subtitle={`Across ${summary.SEGMENT_COUNT ?? 0} segment${(summary.SEGMENT_COUNT ?? 0) !== 1 ? 's' : ''} × 3 most recent sessions`}
               summary={summary}
               trendRows={trend}
-              defaultExpanded
+              expanded={expandedKey === '__overall__'}
+              onToggle={() => toggle('__overall__')}
             />
 
-            {/* ── Per-segment ── */}
             {segmentSummaries.length > 0 && (
               <>
                 <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 px-1 pt-2">
@@ -272,13 +258,15 @@ export default function PerformancePanel({ open, onClose }: PerformancePanelProp
                     subtitle={`${seg.SESSION_COUNT ?? 0} most recent session${(seg.SESSION_COUNT ?? 0) !== 1 ? 's' : ''}`}
                     summary={seg}
                     trendRows={trendBySegment[seg.SEGMENT_NAME] ?? []}
+                    expanded={expandedKey === seg.SEGMENT_NAME}
+                    onToggle={() => toggle(seg.SEGMENT_NAME)}
                   />
                 ))}
               </>
             )}
-          </div>
+          </>
         )}
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   );
 }

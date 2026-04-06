@@ -13,8 +13,15 @@ function pickReplica(gender: string | null | undefined): string {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-// ── Persona cache ─────────────────────────────────────────────────────────────
-let cachedPersonaId: string | null = process.env.TAVUS_PERSONA_ID ?? null;
+// ── Persona management ────────────────────────────────────────────────────────
+//
+// The persona ID is read exclusively from the TAVUS_PERSONA_ID env var.
+// This is cluster-safe: env vars are available on every replica and every
+// serverless cold start without needing a shared in-memory cache.
+//
+// If TAVUS_PERSONA_ID is not set, we create a persona on the first request and
+// log the ID prominently — the operator must then set the env var so future
+// cold starts/replicas reuse the same persona.
 
 async function createPersona(apiKey: string): Promise<string> {
   const res = await fetch('https://tavusapi.com/v2/personas', {
@@ -27,14 +34,17 @@ async function createPersona(apiKey: string): Promise<string> {
   let persona: any;
   try { persona = JSON.parse(rawText); } catch { persona = {}; }
   if (!persona.persona_id) throw new Error(`Persona creation failed (${res.status}): ${rawText}`);
-
-  cachedPersonaId = persona.persona_id;
-  console.log(`[tavus] created persona ${cachedPersonaId} — update TAVUS_PERSONA_ID=${cachedPersonaId} in .env.local`);
-  return cachedPersonaId;
+  console.warn(
+    `[tavus] ⚠ TAVUS_PERSONA_ID not set — created new persona ${persona.persona_id}. ` +
+    `Set TAVUS_PERSONA_ID=${persona.persona_id} in your environment to avoid creating ` +
+    `a new persona on every cold start.`,
+  );
+  return persona.persona_id as string;
 }
 
 async function getOrCreatePersona(apiKey: string): Promise<string> {
-  if (cachedPersonaId) return cachedPersonaId;
+  const envPersonaId = process.env.TAVUS_PERSONA_ID;
+  if (envPersonaId) return envPersonaId;
   return createPersona(apiKey);
 }
 
@@ -111,8 +121,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Other failures may indicate a stale persona — invalidate and retry once.
-    cachedPersonaId = null;
+    // Other failures may indicate a stale persona — create a fresh one and retry once.
     try {
       personaId = await createPersona(apiKey);
     } catch (personaErr: any) {

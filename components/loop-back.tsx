@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { usePhysicianList } from '@/lib/hooks/use-physician-list';
+import { Paginator } from '@/components/ui/paginator';
 import {
   ArrowDown, ArrowUp, ArrowUpDown, CheckSquare, ChevronDown, ChevronUp,
   Circle, Clock, Plus, Search, Square, Trash2, X,
@@ -143,22 +145,11 @@ type SortField = 'name' | 'specialty' | 'segment' | 'state' | 'overallScore' | '
 type SortDir = 'asc' | 'desc';
 
 export default function LoopBack({ username: _username, onBack }: LoopBackProps) {
-  const [physicians, setPhysicians]     = useState<Physician[]>([]);
-  const [physLoading, setPhysLoading]   = useState(true);
+  const physicianHook = usePhysicianList();
   const [tasks, setTasks]               = useState<Task[]>([]);
   const [tasksLoading, setTasksLoading] = useState(true);
   const [expandedId, setExpandedId]     = useState<string | null>(null);
-  const [search, setSearch]             = useState('');
   const [sortConfig, setSortConfig]     = useState<{ field: SortField; dir: SortDir } | null>(null);
-
-  // Load physicians
-  useEffect(() => {
-    fetch('/api/physicians?scores=true')
-      .then(r => r.json())
-      .then(d => setPhysicians(d.physicians ?? d ?? []))
-      .catch(console.error)
-      .finally(() => setPhysLoading(false));
-  }, []);
 
   // Load tasks
   const loadTasks = useCallback(() => {
@@ -200,39 +191,22 @@ export default function LoopBack({ username: _username, onBack }: LoopBackProps)
 
   const taskCount = (pid: string) => (tasksByPhysician[pid] ?? []).filter(t => !t.COMPLETED).length;
 
-  // Sorting
+  // Sorting — server-side for all fields except taskCount (which is computed from a separate fetch)
+  const SERVER_SORT_FIELDS = new Set<SortField>(['name', 'specialty', 'segment', 'state', 'overallScore', 'fieldReadiness']);
   const handleSort = (field: SortField) => {
-    setSortConfig(prev =>
-      prev?.field === field
-        ? { field, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
-        : { field, dir: 'asc' }
-    );
+    setSortConfig(prev => {
+      const newDir: SortDir = prev?.field === field && prev.dir === 'asc' ? 'desc' : 'asc';
+      if (SERVER_SORT_FIELDS.has(field)) physicianHook.setSort(field, newDir);
+      return { field, dir: newDir };
+    });
   };
 
-  const sortedPhysicians = [...physicians]
-    .filter(p => {
-      if (!search.trim()) return true;
-      const q = search.toLowerCase();
-      return (
-        p.FIRST_NAME?.toLowerCase().includes(q) ||
-        p.LAST_NAME?.toLowerCase().includes(q) ||
-        p.SPECIALTY?.toLowerCase().includes(q) ||
-        p.SEGMENT_NAME?.toLowerCase().includes(q)
-      );
-    })
+  // taskCount is client-side only (computed from the tasks fetch, not part of physician query)
+  const sortedPhysicians = [...physicianHook.physicians]
     .sort((a, b) => {
-      if (!sortConfig) return 0;
+      if (sortConfig?.field !== 'taskCount') return 0;
       const dir = sortConfig.dir === 'asc' ? 1 : -1;
-      switch (sortConfig.field) {
-        case 'name':         return dir * (`${a.LAST_NAME}${a.FIRST_NAME}`).localeCompare(`${b.LAST_NAME}${b.FIRST_NAME}`);
-        case 'specialty':    return dir * (a.SPECIALTY ?? '').localeCompare(b.SPECIALTY ?? '');
-        case 'segment':      return dir * (a.SEGMENT_NAME ?? '').localeCompare(b.SEGMENT_NAME ?? '');
-        case 'state':        return dir * (a.STATE ?? '').localeCompare(b.STATE ?? '');
-        case 'overallScore': return dir * ((a.OVERALL_SCORE ?? 0) - (b.OVERALL_SCORE ?? 0));
-        case 'fieldReadiness': return dir * (a.FIELD_READINESS ?? '').localeCompare(b.FIELD_READINESS ?? '');
-        case 'taskCount':    return dir * (taskCount(a.PHYSICIAN_ID) - taskCount(b.PHYSICIAN_ID));
-        default:             return 0;
-      }
+      return dir * (taskCount(a.PHYSICIAN_ID) - taskCount(b.PHYSICIAN_ID));
     });
 
   // Task actions
@@ -265,7 +239,7 @@ export default function LoopBack({ username: _username, onBack }: LoopBackProps)
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ physicianId, taskText }),
     });
-    const data = await res.json();
+    const data = res.ok ? await res.json().catch(() => ({})) : {};
     if (data.taskId) {
       setTasks(prev => [
         ...prev,
@@ -287,7 +261,7 @@ export default function LoopBack({ username: _username, onBack }: LoopBackProps)
     return sortConfig.dir === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />;
   };
 
-  const loading = physLoading || tasksLoading;
+  const loading = physicianHook.loading || tasksLoading;
 
   return (
     <div className="flex flex-col h-full min-h-0 bg-white">
@@ -312,19 +286,19 @@ export default function LoopBack({ username: _username, onBack }: LoopBackProps)
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
             <input
               type="text"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
+              value={physicianHook.search}
+              onChange={e => physicianHook.setSearch(e.target.value)}
               placeholder="Search physicians…"
               className="w-full pl-8 pr-3 py-1.5 rounded-full border border-slate-200 bg-white text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-300"
             />
-            {search && (
-              <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+            {physicianHook.search && (
+              <button onClick={() => physicianHook.setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
                 <X className="w-3 h-3" />
               </button>
             )}
           </div>
           <p className="text-xs text-slate-400">
-            {sortedPhysicians.length} of {physicians.length} physician{physicians.length !== 1 ? 's' : ''}
+            {physicianHook.totalCount} physician{physicianHook.totalCount !== 1 ? 's' : ''}
           </p>
           {/* Legend */}
           <div className="ml-auto flex items-center gap-3 text-xs text-slate-400">
@@ -474,6 +448,13 @@ export default function LoopBack({ username: _username, onBack }: LoopBackProps)
           </table>
         )}
       </div>
+
+      <Paginator
+        page={physicianHook.page}
+        pageSize={physicianHook.pageSize}
+        total={physicianHook.totalCount}
+        onPageChange={physicianHook.setPage}
+      />
     </div>
   );
 }

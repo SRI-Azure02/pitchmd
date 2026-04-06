@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionFromRequest } from '@/lib/auth';
-import { SnowflakeClient } from '@/lib/snowflake';
+import { getSnowflakeClient } from '@/lib/snowflake';
 
 export async function GET(request: NextRequest) {
   const session = await getSessionFromRequest(request);
@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const client = new SnowflakeClient();
+    const client = getSnowflakeClient();
     const physicianId = await client.getPhysicianByVoiceModel(voiceModel);
     return NextResponse.json({ physicianId });
   } catch (err: any) {

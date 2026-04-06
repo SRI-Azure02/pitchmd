@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { getSessionFromRequest } from '@/lib/auth';
 import { getSnowflakeClient } from '@/lib/snowflake';
+import { validateInput, CreateTaskInputSchema, UpdateTaskInputSchema } from '@/lib/validate';
 
 export async function GET(request: NextRequest) {
   const session = await getSessionFromRequest(request);
@@ -21,10 +22,9 @@ export async function POST(request: NextRequest) {
   const session = await getSessionFromRequest(request);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { physicianId, taskText } = await request.json() as { physicianId: string; taskText: string };
-  if (!physicianId || !taskText?.trim()) {
-    return NextResponse.json({ error: 'physicianId and taskText are required' }, { status: 400 });
-  }
+  const { data: taskData, errorResponse: taskError } = validateInput(CreateTaskInputSchema, await request.json());
+  if (taskError) return taskError;
+  const { physicianId, taskText } = taskData;
 
   try {
     const sf = getSnowflakeClient();
@@ -41,9 +41,9 @@ export async function PATCH(request: NextRequest) {
   const session = await getSessionFromRequest(request);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const body = await request.json() as { taskId: string; completed?: boolean; deleted?: boolean };
+  const { data: body, errorResponse: bodyError } = validateInput(UpdateTaskInputSchema, await request.json());
+  if (bodyError) return bodyError;
   const { taskId } = body;
-  if (!taskId) return NextResponse.json({ error: 'taskId is required' }, { status: 400 });
 
   try {
     const sf = getSnowflakeClient();

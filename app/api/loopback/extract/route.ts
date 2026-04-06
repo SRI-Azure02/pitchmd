@@ -3,6 +3,8 @@ import { randomUUID } from 'crypto';
 import { getSessionFromRequest } from '@/lib/auth';
 import { getSnowflakeClient } from '@/lib/snowflake';
 import Anthropic from '@anthropic-ai/sdk';
+import { validateInput, ExtractInputSchema } from '@/lib/validate';
+import { checkRateLimit, rateLimitResponse, AI_LIGHT_LIMIT } from '@/lib/rate-limit';
 
 function normalizeText(t: string): string {
   return t.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
@@ -12,12 +14,14 @@ export async function POST(request: NextRequest) {
   const session = await getSessionFromRequest(request);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { noteId, physicianId, transcript } =
-    await request.json() as { noteId: string; physicianId: string; transcript: string };
+  // Rate limit: 60 extractions per minute per user
+  const rl = checkRateLimit(`extract:${session.userId}`, AI_LIGHT_LIMIT);
+  if (!rl.allowed) return rateLimitResponse(rl.retryAfterMs) as unknown as NextResponse;
 
-  if (!noteId || !physicianId || !transcript?.trim()) {
-    return NextResponse.json({ error: 'noteId, physicianId, and transcript are required' }, { status: 400 });
-  }
+  const rawBody = await request.json();
+  const { data, errorResponse } = validateInput(ExtractInputSchema, rawBody);
+  if (errorResponse) return errorResponse;
+  const { noteId, physicianId, transcript } = data;
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return NextResponse.json({ error: 'Anthropic API key not configured' }, { status: 500 });

@@ -30,8 +30,9 @@ export async function POST(request: NextRequest) {
     // warm Snowflake's routing layer.  We abort after 8 s regardless of
     // whether the agent has responded; the warm-up benefit is in the
     // connection establishment, not the response.
+    const timeoutMs = Number(process.env.CORTEX_PREWARM_TIMEOUT_MS ?? 8_000);
     const controller = new AbortController();
-    const warmupTimeout = setTimeout(() => controller.abort(), 8_000);
+    const warmupTimeout = setTimeout(() => controller.abort(), timeoutMs);
 
     const res = await fetch(agentUrl, {
       method: 'POST',
