@@ -11,5 +11,6 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     userId: session.userId,
     username: session.username,
+    email: session.email,
   });
 }
