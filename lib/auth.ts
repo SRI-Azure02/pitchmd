@@ -5,6 +5,7 @@ import { NextRequest } from 'next/server';
 export interface AppSession {
   userId: string;
   username: string;
+  email: string;
   role: 'rep' | 'admin';
 }
 
@@ -34,13 +35,13 @@ function pruneExpiredSessions() {
 export async function createSession(
   userId: string,
   username: string,
-  _email: string
+  email: string
 ): Promise<string> {
   const sessionId = crypto.randomUUID();
   // Prune expired sessions ~2% of the time to avoid unbounded Map growth
   if (Math.random() < 0.02) pruneExpiredSessions();
   sessionStore.set(sessionId, {
-    session: { userId, username, role: 'rep' },
+    session: { userId, username, email, role: 'rep' },
     expiresAt: Date.now() + SESSION_TTL_MS,
   });
 
@@ -97,7 +98,7 @@ export async function getSessionFromRequest(
   const mode = process.env.FEATURE_AUTH ?? 'real';
 
   if (mode === 'stub') {
-    return { userId: 'Demo User', username: 'Demo User', role: 'rep' };
+    return { userId: 'Demo User', username: 'Demo User', email: 'demo@demo.local', role: 'rep' };
   }
 
   const sessionId = request.cookies.get('sessionId')?.value;
