@@ -64,15 +64,16 @@ export default function DashboardPage() {
         {/* Header */}
         <div className="flex justify-between items-center px-6 pt-4 mb-3 shrink-0">
           <div>
-            <h1 className="text-3xl font-semibold text-slate-900">PitchMD™</h1>
-            <p style={{
+            <h1 style={{
+              fontSize: '28px',
               background: 'linear-gradient(90deg, #FF6B00, #00C8FF, #FF6B00)',
               backgroundSize: '300% 300%',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
               backgroundClip: 'text',
               animation: 'gradientShift 6s ease infinite',
-            }} className="mt-0.5">Welcome, {session?.username}</p>
+            }} className="font-semibold">PitchMD™</h1>
+            <p className="mt-0.5 font-medium tracking-widest text-slate-900 uppercase" style={{ fontSize: '11px' }}>Strategic Research Insights, Inc.</p>
           </div>
           <Button variant="destructive" size="sm" onClick={handleLogout} className="flex items-center gap-2">
             <LogOut className="w-4 h-4" />
