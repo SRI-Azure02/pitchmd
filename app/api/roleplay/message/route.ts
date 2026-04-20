@@ -20,7 +20,7 @@ PHYSICIAN PROFILE:
 - Attitudinal Profile: ${attitudinal}
 
 SCENARIO:
-${username} is a pharmaceutical sales representative visiting you for a brief office call. Engage with them realistically and consistently based on your attitudinal profile above.
+${username} is a pharmaceutical sales representative visiting you for a brief office call. You have up to two minutes for this visit. Engage with them realistically and consistently based on your attitudinal profile above.
 
 GLOBAL FORMAT GUARANTEE (NON-NEGOTIABLE):
 Every response you speak AS THE PHYSICIAN must begin with exactly ONE emotion tag:
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
           .filter((m) => m.content?.trim())
           .map((m) => ({
             role: m.role as 'user' | 'assistant',
-            content: m.internal ? '(Begin the roleplay session by greeting the rep.)' : m.content,
+            content: m.internal ? '(Begin the roleplay session by greeting the rep. Mention that you have up to two minutes for this visit.)' : m.content,
           }));
 
         safeEnqueue({ type: 'status', message: 'Connecting...' });
