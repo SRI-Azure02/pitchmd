@@ -118,13 +118,21 @@ function ChartTooltipContent({
   color,
   nameKey,
   labelKey,
-}: React.ComponentProps<typeof RechartsPrimitive.Tooltip> &
-  React.ComponentProps<'div'> & {
+}: React.ComponentProps<'div'> & {
+    // Recharts injects these into tooltip content renderers — not on the public
+    // Tooltip component props, so we declare them explicitly.
+    active?: boolean
+    payload?: any[]
+    label?: any
+    labelFormatter?: (label: any, payload: any[]) => React.ReactNode
+    formatter?: (...args: any[]) => React.ReactNode
+    color?: string
     hideLabel?: boolean
     hideIndicator?: boolean
     indicator?: 'line' | 'dot' | 'dashed'
     nameKey?: string
     labelKey?: string
+    labelClassName?: string
   }) {
   const { config } = useChart()
 
