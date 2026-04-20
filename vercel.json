@@ -2,7 +2,6 @@
   "framework": "nextjs",
   "buildCommand": "next build",
   "outputDirectory": ".next",
-  "nodeVersion": "20.x",
   "functions": {
     "app/api/**/*.ts": {
       "maxDuration": 60
