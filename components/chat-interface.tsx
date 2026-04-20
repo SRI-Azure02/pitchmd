@@ -884,6 +884,15 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
       });
       dailyCallRef.current = daily;
 
+      // Promise that resolves once the remote video track starts rendering.
+      // Falls back after 10 s so the session can still proceed on slow connections.
+      let resolveVideoReady!: () => void;
+      const videoReadyPromise = new Promise<void>(res => { resolveVideoReady = res; });
+      let videoReadyTimeout: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+        console.warn('[tavus] track-started timeout — proceeding without confirmed video');
+        resolveVideoReady();
+      }, 10_000);
+
       // Render avatar video + audio tracks
       daily.on('track-started', (event: any) => {
         const { track, participant } = event;
@@ -893,6 +902,9 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
           stream.addTrack(track);
           avatarVideoRef.current.srcObject = stream;
           avatarVideoRef.current.play().catch(() => {});
+          // Avatar is now visible — unblock the session start
+          if (videoReadyTimeout !== null) { clearTimeout(videoReadyTimeout); videoReadyTimeout = null; }
+          resolveVideoReady();
         }
         if (track.kind === 'audio') {
           if (avatarAudioRef.current) {
@@ -927,6 +939,13 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
 
       setTavusConvId(conversationId);
       tavusConvIdRef.current = conversationId;
+
+      // Wait until the remote video track is actually rendering (or 10 s timeout).
+      // This keeps "Connecting avatar…" visible and blocks sendMessage('__begin_roleplay__')
+      // from firing until the avatar is on screen — so the timer and first greeting
+      // are never lost to loading lag.
+      await videoReadyPromise;
+
       setAvatarConnecting(false);
       return true;
     } catch (err) {
