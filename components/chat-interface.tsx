@@ -24,10 +24,8 @@ interface Message {
 }
 
 
-function randomSessionDuration(min = 60, max = 150): number {
-  const r1 = Math.random();
-  const r2 = Math.random();
-  return Math.round(min + ((r1 + r2) / 2) * (max - min));
+function randomSessionDuration(): number {
+  return 120; // 2 minutes — matches the physician's stated "up to two minutes"
 }
 
 // ── Physician list helpers ─────────────────────────────────────────────────
