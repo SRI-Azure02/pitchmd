@@ -4,8 +4,6 @@ import { getSnowflakeClient } from '@/lib/snowflake';
 import Anthropic from '@anthropic-ai/sdk';
 import { checkRateLimit, rateLimitResponse, AI_HEAVY_LIMIT } from '@/lib/rate-limit';
 
-// Allow up to 3 minutes — 5 parallel Snowflake queries + Claude inference
-export const maxDuration = 180;
 
 interface PlaybookJSON {
   physician_brief: string;
