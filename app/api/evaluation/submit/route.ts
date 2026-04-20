@@ -4,8 +4,8 @@ import { getSnowflakeClient } from '@/lib/snowflake';
 import { validateInput, EvalSubmitInputSchema } from '@/lib/validate';
 import { checkRateLimit, rateLimitResponse, AI_HEAVY_LIMIT } from '@/lib/rate-limit';
 
-// Allow up to 6 minutes — REPEVAL does Cortex LLM inference and can take 2–4 min.
-export const maxDuration = 360;
+// Hobby plan cap is 300 s — REPEVAL typically completes in 2–4 min.
+export const maxDuration = 300;
 
 export async function POST(request: NextRequest) {
   const session = await getSessionFromRequest(request);
