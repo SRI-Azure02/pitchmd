@@ -167,7 +167,7 @@ function NoteRow({ physician, existingNote, callDate, onSaved, onClose }: NoteRo
   const [saving, setSaving] = useState(false);
   const [noteId] = useState(existingNote?.NOTE_ID ?? null);
 
-  const handleFinal = useCallback((t: string) => setEditText(prev => prev ? prev + ' ' + t : t), []);
+  const handleFinal = useCallback((t: string) => setEditText((prev: string) => prev ? prev + ' ' + t : t), []);
   const recorder = useVoiceRecorder(handleFinal);
 
   // Auto-start mic when note row opens for a new note
