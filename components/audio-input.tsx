@@ -12,7 +12,7 @@ interface AudioInputProps {
   userTyping?: boolean;
 }
 
-const SILENCE_TIMEOUT = 5000; // 5 s — gives users enough time to finish a sentence
+const SILENCE_TIMEOUT = 15000; // 15 s — enough time to pause mid-thought during roleplay
 const RING_R = 20;
 const CIRCUMFERENCE = 2 * Math.PI * RING_R;
 

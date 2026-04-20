@@ -57,6 +57,9 @@ function useVoiceRecorder(onFinalTranscript: (t: string) => void) {
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number | null>(null);
   const finalRef = useRef('');
+  // Tracks whether the user manually stopped so we don't auto-restart on browser timeout
+  const manualStopRef = useRef(false);
+  const restartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const stopWaveform = useCallback(() => {
     if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
@@ -82,10 +85,7 @@ function useVoiceRecorder(onFinalTranscript: (t: string) => void) {
     } catch { /* mic denied */ }
   }, []);
 
-  const start = useCallback(() => {
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) return;
-    finalRef.current = '';
+  const startRecognition = useCallback((SR: any) => {
     const r = new SR(); recRef.current = r;
     r.continuous = true; r.interimResults = true; r.lang = 'en-US';
     r.onresult = (e: any) => {
@@ -98,14 +98,41 @@ function useVoiceRecorder(onFinalTranscript: (t: string) => void) {
       finalRef.current = final;
       setState(s => ({ ...s, transcript: final, interim }));
     };
-    r.onerror = () => stop();
-    r.onend = () => { setState(s => ({ ...s, recording: false, interim: '' })); stopWaveform(); };
+    r.onerror = () => {
+      // On error, let onend handle the restart decision
+      recRef.current = null;
+    };
+    r.onend = () => {
+      recRef.current = null;
+      setState(s => ({ ...s, interim: '' }));
+      // Auto-restart unless the user explicitly clicked Stop — handles
+      // Chrome's ~60s natural SpeechRecognition timeout transparently.
+      if (!manualStopRef.current) {
+        restartTimerRef.current = setTimeout(() => {
+          const SR2 = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+          if (SR2 && !manualStopRef.current) startRecognition(SR2);
+        }, 300);
+      } else {
+        stopWaveform();
+        setState(s => ({ ...s, recording: false }));
+      }
+    };
     r.start();
+  }, [stopWaveform]);
+
+  const start = useCallback(() => {
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) return;
+    manualStopRef.current = false;
+    finalRef.current = '';
+    startRecognition(SR);
     setState(s => ({ ...s, recording: true, transcript: '', interim: '' }));
     startWaveform();
-  }, [startWaveform, stopWaveform]);
+  }, [startWaveform, startRecognition]);
 
   const stop = useCallback(() => {
+    manualStopRef.current = true;
+    if (restartTimerRef.current) { clearTimeout(restartTimerRef.current); restartTimerRef.current = null; }
     if (recRef.current) { try { recRef.current.stop(); } catch {} recRef.current = null; }
     stopWaveform();
     setState(s => ({ ...s, recording: false, interim: '' }));
