@@ -332,7 +332,7 @@ export default function EvaluationPanel({ open, onClose, content, username, phys
                   <p className="text-sm font-bold text-slate-800 mb-1">Overall Score</p>
                   <p className="text-xs text-slate-400 mb-4">Median across most recent {sessionCount} session{sessionCount !== 1 ? 's' : ''}</p>
                   <div className="flex-1 flex items-center justify-center">
-                    <p className="text-5xl font-bold text-slate-900">{e.OVERALL_SCORE ?? '—'}<span className="text-xl font-normal text-slate-400"> /10</span></p>
+                    <p className="text-5xl font-bold text-slate-900">{e.OVERALL_SCORE != null ? Number(e.OVERALL_SCORE).toFixed(1) : '—'}<span className="text-xl font-normal text-slate-400"> /10</span></p>
                   </div>
                 </div>
               </div>
