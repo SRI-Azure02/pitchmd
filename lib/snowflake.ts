@@ -1143,6 +1143,15 @@ export class SnowflakeClient {
       '2': { type: 'TEXT', value: physicianId },
     });
   }
+
+  /** All distinct brand names from SYNTHETIC_RX — used to seed the STT product-name corrector. */
+  async getAllBrands(): Promise<string[]> {
+    const rows = await this.executeQuery(
+      `SELECT DISTINCT BRAND FROM CORTEX_TESTING.PUBLIC.SYNTHETIC_RX WHERE BRAND IS NOT NULL ORDER BY BRAND`,
+      {},
+    );
+    return (rows as any[]).map((r) => r.BRAND as string).filter(Boolean);
+  }
 }
 
 // ─── Singleton ─────────────────────────────────────────────────────────

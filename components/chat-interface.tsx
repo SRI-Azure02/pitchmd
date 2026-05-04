@@ -13,6 +13,7 @@ import LoopBack from './loop-back';
 import EngagementPlaybook from './engagement-playbook';
 import { Send, RotateCcw, Square, Volume2, VolumeX, Video, VideoOff, MessageSquare, Search, ChevronDown, X, Check, BarChart2, ArrowUp, ArrowDown, ArrowUpDown, Hash, Mic, BookOpen, NotebookPen } from 'lucide-react';
 import { parseEmotion, speakText, stopCurrentAudio } from '@/lib/elevenlabs';
+import { buildCorrector, type Corrector } from '@/lib/product-name-corrector';
 
 interface Message {
   id: string;
@@ -256,6 +257,8 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   const utteranceDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Fallback timer for clearing avatarSpeaking if replica.stopped_speaking never fires
   const avatarSpeakFallbackRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // STT product-name corrector — built once from brand list fetched on mount
+  const correctorRef = useRef<Corrector>((t) => t);
   const loadingRef = useRef(false);
 
   // ── Sync state → refs ─────────────────────────────────────────────────────
@@ -266,6 +269,21 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   useEffect(() => { avatarEnabledRef.current = avatarEnabled; }, [avatarEnabled]);
   useEffect(() => { tavusConvIdRef.current = tavusConvId; }, [tavusConvId]);
   useEffect(() => { loadingRef.current = loading; }, [loading]);
+
+  // Fetch brand names once on mount and build the STT product-name corrector.
+  // The corrector is applied to every transcript (Web Speech API + Tavus STT)
+  // to fix common recognition errors on pharmaceutical brand names.
+  useEffect(() => {
+    fetch('/api/physicians/brands')
+      .then((r) => r.ok ? r.json() : Promise.reject(r.status))
+      .then(({ brands }: { brands: string[] }) => {
+        if (brands?.length) {
+          correctorRef.current = buildCorrector(brands);
+          console.log(`[corrector] loaded ${brands.length} brand(s):`, brands.join(', '));
+        }
+      })
+      .catch((err) => console.warn('[corrector] failed to load brands:', err));
+  }, []);
 
   // Cleanup Daily call on unmount
   useEffect(() => {
@@ -954,8 +972,10 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
 
         // ── User speech transcription from Tavus STT ──────────────────────
         if (msg?.event_type === 'conversation.utterance') {
-          const speech = (msg.properties?.speech as string | undefined)?.trim();
-          if (speech) {
+          const raw = (msg.properties?.speech as string | undefined)?.trim();
+          if (raw) {
+            const speech = correctorRef.current(raw);
+            if (speech !== raw) console.log(`[corrector] Tavus: "${raw}" → "${speech}"`);
             if (utteranceDebounceRef.current) clearTimeout(utteranceDebounceRef.current);
             utteranceDebounceRef.current = setTimeout(() => {
               if (!avatarSpeakingRef.current && !sessionEndedRef.current && !loadingRef.current) {
@@ -1817,7 +1837,10 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
             <MessageSquare className="w-4 h-4" />
           </Button>
           <AudioInput
-            onTranscript={(text) => setInputValue((prev) => prev + (prev ? ' ' : '') + text)}
+            onTranscript={(text) => {
+                const corrected = correctorRef.current(text);
+                setInputValue((prev) => prev + (prev ? ' ' : '') + corrected);
+              }}
             onAutoSubmit={handleAutoSubmit}
             onCountdown={(pct) => setTranscriptCountdownActive(pct !== null)}
             userTyping={userTyping}
