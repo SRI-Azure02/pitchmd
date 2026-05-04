@@ -254,6 +254,8 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   const avatarEnabledRef = useRef(false);
   const tavusConvIdRef = useRef<string | null>(null);
   const utteranceDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Fallback timer for clearing avatarSpeaking if replica.stopped_speaking never fires
+  const avatarSpeakFallbackRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadingRef = useRef(false);
 
   // ── Sync state → refs ─────────────────────────────────────────────────────
@@ -815,9 +817,26 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     }
     avatarSpeakingRef.current = false;
     setAvatarSpeaking(false);
+    if (avatarSpeakFallbackRef.current) {
+      clearTimeout(avatarSpeakFallbackRef.current);
+      avatarSpeakFallbackRef.current = null;
+    }
     setTavusConvId(null);
     tavusConvIdRef.current = null;
     setAvatarConnecting(false);
+  };
+
+  // Clears the avatar-speaking lock, opens the mic, and discards any phantom
+  // Web Speech API text captured while the avatar was talking.
+  const clearAvatarSpeakingLock = () => {
+    if (avatarSpeakFallbackRef.current) {
+      clearTimeout(avatarSpeakFallbackRef.current);
+      avatarSpeakFallbackRef.current = null;
+    }
+    avatarSpeakingRef.current = false;
+    setAvatarSpeaking(false); // re-enable AudioInput for user's turn
+    setInputValue('');        // discard any phantom text captured while avatar spoke
+    if (sessionEndedRef.current) cleanupTavus();
   };
 
   const speakViaTavus = (text: string) => {
@@ -842,17 +861,15 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
       },
       '*',
     );
-    // Clear speaking lock after estimated duration (~150 WPM).
-    // Re-enable AudioInput and wipe any avatar speech the Web Speech API may
-    // have buffered while it was muted.
-    // If the session has already ended this was the goodbye — stop the avatar stream.
+    // Primary unlock: conversation.replica.stopped_speaking event (see app-message handler).
+    // Fallback: word-count estimate + generous startup-latency buffer, in case the
+    // Tavus event never arrives (e.g. network drop, API version change).
+    // 500 ms/word ≈ 120 WPM; +3 000 ms covers TTS synthesis + network startup lag.
     const wordCount = text.split(/\s+/).length;
-    setTimeout(() => {
-      avatarSpeakingRef.current = false;
-      setAvatarSpeaking(false); // re-enable AudioInput for user's turn
-      setInputValue('');        // discard any phantom text from avatar audio
-      if (sessionEndedRef.current) cleanupTavus();
-    }, Math.max(2000, wordCount * 450));
+    avatarSpeakFallbackRef.current = setTimeout(
+      clearAvatarSpeakingLock,
+      Math.max(4000, wordCount * 500 + 3000),
+    );
   };
 
   const initTavusAvatar = async (physician: any): Promise<boolean> => {
@@ -919,9 +936,23 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
         }
       });
 
-      // Receive user speech transcriptions from Tavus STT
+      // Receive events from Tavus replica
       daily.on('app-message', (event: any) => {
         const msg = event?.data;
+
+        // ── Replica finished speaking → open mic immediately ──────────────
+        // This is the authoritative signal from Tavus that TTS playback has
+        // ended. Cancels the word-count fallback timer in speakViaTavus so
+        // the mic opens at the exact right moment, regardless of startup lag.
+        if (
+          msg?.event_type === 'conversation.replica.stopped_speaking' ||
+          msg?.event_type === 'replica.stopped_speaking'
+        ) {
+          console.log('[tavus] replica.stopped_speaking — unlocking mic');
+          clearAvatarSpeakingLock();
+        }
+
+        // ── User speech transcription from Tavus STT ──────────────────────
         if (msg?.event_type === 'conversation.utterance') {
           const speech = (msg.properties?.speech as string | undefined)?.trim();
           if (speech) {
