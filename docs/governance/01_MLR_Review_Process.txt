@@ -4,8 +4,10 @@ PHASE 0 GOVERNANCE — DOCUMENT 1 OF 7
 Medical, Legal, and Regulatory (MLR) Content Approval Workflow
 --------------------------------------------------------------------------------
 Prepared by : Strategic Research Insights, Inc.
-Version     : v0.1 — Proof of Concept
+Version     : v0.2 — Updated with product context
 Date        : June 2026
+Client Product: VENCLEXTA (venetoclax)
+Therapeutic Area: B-Cell Malignancies (CLL/SLL, AML)
 Status      : DRAFT — For Internal Review
 Classification: Internal / Confidential
 ================================================================================
@@ -16,7 +18,11 @@ PURPOSE
 No AI-generated claim, training scenario, or reference material enters the
 PitchMD(tm) platform without formal MLR sign-off. This document defines the
 end-to-end approval workflow, escalation paths, and emergency update procedures
-that govern all platform content.
+that govern all platform content for VENCLEXTA (venetoclax) training.
+
+Given VENCLEXTA's Boxed Warning for Tumor Lysis Syndrome (TLS), any content
+that relates to dosing, initiation, or TLS management requires particular
+scrutiny during the medical and regulatory review stages.
 
 
 STANDARD REVIEW WORKFLOW
@@ -25,84 +31,118 @@ All stages must be completed sequentially. No stage may be skipped without
 written approval from the Chief Compliance Officer.
 
   Stage  Owner                SLA        Activity
-  -----  -------------------  ---------  ----------------------------------------
+  -----  -------------------  ---------  -----------------------------------------
   1      Medical Affairs      Day 0      Content Submission: MA submits proposed
-                                         claims, product descriptions, indications,
-                                         and training scenarios for review.
+                                          claims, product descriptions, indications,
+                                          and training scenarios. For VENCLEXTA, all
+                                          TLS-related content flagged for enhanced
+                                          medical review in Stage 2.
 
   2      Medical Affairs      Days 1-3   Medical Review: Reviewer verifies clinical
-                                         accuracy, label alignment, and appropriate
-                                         citation of supporting evidence.
+                                          accuracy against current VENCLEXTA PI,
+                                          MURANO/CLL14/AMPLIFY/VIALE-A publications.
+                                          Confirms label alignment for CLL/SLL and
+                                          AML indications. Special attention to TLS
+                                          Boxed Warning accuracy and ramp-up dosing.
 
-  3      Legal                Days 3-5   Legal Review: Counsel reviews for liability
-                                         exposure, IP considerations, and
-                                         promotional compliance.
+  3      Legal                Days 3-5   Legal Review: Reviews for liability,
+                                          IP, and promotional compliance. Confirms
+                                          competitive claims (vs. Imbruvica, Brukinsa,
+                                          Calquence, etc.) cite only approved labeling
+                                          data. Validates differentiation claims.
 
   4      Regulatory Affairs   Days 5-7   Regulatory Review: Validates all claims
-                                         against current FDA-approved Prescribing
-                                         Information (PI).
+                                          against the current FDA-approved VENCLEXTA
+                                          Prescribing Information (PI) and companion
+                                          product PIs (Gazyva, Rituxan, Calquence).
+                                          Confirms fair balance requirements are met.
+                                          Checks AML indication population restriction
+                                          (adults >=75 or comorbid) is accurately
+                                          represented.
 
   5      Compliance           Days 7-8   Compliance Sign-Off: Compliance officer
-                                         provides final approval. Content is assigned
-                                         a unique MLR reference number.
+                                          provides final approval. Content assigned
+                                          a unique MLR reference number and entered
+                                          into the Approved Claims Library (Doc 2).
 
   6      IT / Platform Team   Days 8-9   Platform Upload: Approved content uploaded
-                                         to the RAG document repository with MLR
-                                         reference number, effective date, and
-                                         expiry date.
+                                          to the RAG document repository with MLR
+                                          reference number, effective date, and
+                                          expiry date. TLS/safety content tagged
+                                          with FAIR_BALANCE_REQUIRED flag.
 
   7      Medical Affairs      Ongoing    Periodic Re-Review: All content reviewed
-                                         upon label update or annually, whichever
-                                         comes first.
+                                          upon VENCLEXTA PI update or annually,
+                                          whichever comes first.
+
+
+PRODUCT-SPECIFIC EXPEDITED REVIEW TRIGGERS
+-------------------------------------------
+The following events require IMMEDIATE content review and potential removal,
+outside the standard SLA:
+
+  Event                                  Required Action            Timeline
+  ------------------------------------   ------------------------   ---------
+  FDA updates VENCLEXTA PI (any         Review all affected        24 hours
+  section, including Boxed Warning)      content; remove until
+                                         re-approved
+
+  FDA issues a Drug Safety              Remove ALL affected        24 hours
+  Communication for venetoclax           training content
+
+  New TLS-related adverse events        Medical Affairs reviews    48 hours
+  added to VENCLEXTA labeling           all TLS-related claims
+
+  New indication approved               New claims may be added;   7 days
+  (or new approval for combination       review existing content
+  partner — Gazyva, Rituxan, Calquence) for consistency
+
+  Competitor product (Imbruvica,        Notify Medical Affairs     5 days
+  Brukinsa, Calquence, Gazyva,         to assess if competitive
+  Jaypirca, Rituxan, Copiktra,         claim content in platform
+  Zydelig) PI update or label change    requires update
 
 
 ESCALATION PATH
 ---------------
-- Any MLR reviewer may escalate a dispute or borderline content decision to
-  the Chief Medical Officer (CMO).
-- Escalation must be documented in writing with: the specific concern, proposed
-  resolution, and final CMO decision.
-- Escalation does not pause the SLA clock. CMO decision must be received within
-  48 hours of escalation being raised.
+- Any MLR reviewer may escalate a dispute or borderline content decision
+  to the Chief Medical Officer (CMO).
+- For TLS-related content disputes: automatic escalation to Chief Medical
+  Officer (given the Boxed Warning's significance for patient safety).
+- Escalation must be documented in writing. CMO decision within 48 hours.
 
 
 EMERGENCY CONTENT REMOVAL
 --------------------------
-If the FDA issues a Drug Safety Communication, MedWatch alert, or any safety
-labeling update affecting a product represented in PitchMD(tm):
+If the FDA issues a Drug Safety Communication or updates the VENCLEXTA
+Boxed Warning for TLS (or any other safety matter):
 
-  1. The Platform Team must remove all affected content within 24 hours of
-     the FDA communication.
-  2. Sessions that used affected content must be flagged in the Compliance
-     Audit Log.
-  3. Affected content may NOT be re-uploaded until a full MLR re-review is
-     completed per the standard workflow above.
-  4. The Compliance Officer must notify all active PitchMD(tm) users of the
-     content removal within 24 hours.
+  1. Platform Team removes ALL affected content within 24 hours.
+  2. Sessions using affected content are flagged in SYNTHETIC_COMPLIANCE_LOG.
+  3. Affected content may NOT be re-uploaded until full MLR re-review completes.
+  4. Compliance Officer notifies all active PitchMD(tm) users within 24 hours.
+  5. If TLS Boxed Warning language is updated: all training scripts, the
+     Fair Balance Trigger List (Document 5), and the Approved Claims Library
+     (Document 2) must be reviewed before re-activation.
 
 
 DOCUMENT RETENTION
 ------------------
-All MLR review records — including submission packages, reviewer comments,
-approval certificates, and re-review documentation — must be retained for a
-minimum of SEVEN (7) YEARS, consistent with FDA record retention requirements
-under 21 CFR Part 202.1(j).
-
-Records must be stored in a tamper-evident, auditable document management system.
+All MLR review records retained for a minimum of SEVEN (7) YEARS per
+21 CFR Part 202.1(j). Records stored in a tamper-evident, auditable system.
 
 
 ITEMS TO BE COMPLETED BY CLIENT
 ---------------------------------
-[ ] Identify the named individuals for each reviewer role (Medical, Legal,
-    Regulatory, Compliance, CMO).
-[ ] Define the document management system where MLR records will be stored.
-[ ] Confirm whether existing MLR workflow tools (e.g., Veeva Vault PromoMats,
-    Zinc, or similar) will be integrated with PitchMD(tm).
-[ ] Define the MLR reference number format for content items.
+[ ] Identify named individuals for each reviewer role.
+[ ] Define document management system for MLR records.
+[ ] Confirm whether existing MLR workflow tools (e.g., Veeva Vault PromoMats)
+    will be integrated with PitchMD(tm).
 [ ] Confirm the emergency contact list for FDA safety communications.
+[ ] Designate a single Medical Affairs point of contact responsible for
+    monitoring FDA labeling updates for VENCLEXTA and all 8 competitive products.
 
 
 ================================================================================
 END OF DOCUMENT 1 — MLR Review Process
-Next: 02_Approved_Claims_Library_Template.txt
 ================================================================================

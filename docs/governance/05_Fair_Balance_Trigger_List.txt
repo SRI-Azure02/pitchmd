@@ -4,120 +4,251 @@ PHASE 0 GOVERNANCE — DOCUMENT 5 OF 7
 Fair Balance Requirements — Efficacy-to-Safety Pairing
 --------------------------------------------------------------------------------
 Prepared by : Strategic Research Insights, Inc.
-Version     : v0.1 — Proof of Concept
+Version     : v0.2 — Updated with VENCLEXTA-specific data
 Date        : June 2026
-Status      : DRAFT — Illustrative examples only. Full list to be completed
-              by Medical Affairs for each approved product/indication.
+Client Product: VENCLEXTA (venetoclax)
+Therapeutic Area: B-Cell Malignancies (CLL/SLL, AML)
+Status      : DRAFT — Requires Medical Affairs and Legal sign-off
 Classification: Internal / Confidential
 ================================================================================
 
 
 PURPOSE
 -------
-Under FDA promotional regulations (21 CFR Part 202 and OPDP guidance), every
-efficacy or benefit claim must be accompanied by fair balance — a truthful and
-non-misleading presentation of risk information with prominence and readability
-reasonably comparable to the efficacy claim.
+Under FDA promotional regulations (21 CFR Part 202 and FDA OPDP guidance),
+every efficacy or benefit claim must be balanced with fair balance — a truthful
+and non-misleading presentation of risk information with prominence reasonably
+comparable to the efficacy claim.
 
-PitchMD(tm) enforces these pairings automatically in the Phase 2 Output
-Compliance Filter: when the AI persona makes an efficacy claim matching a
-trigger phrase below, the corresponding safety balance statement MUST appear
-in the same response turn. If it does not, the response is re-generated before
-delivery.
+CRITICAL FOR VENCLEXTA: The Tumor Lysis Syndrome BOXED WARNING is a mandatory
+balance requirement for ALL efficacy claims. TLS is a potentially fatal risk
+that is prominently labeled and cannot be omitted from any discussion of
+VENCLEXTA efficacy.
+
+PitchMD(tm) Phase 2 Output Compliance Filter will enforce these pairings
+automatically: when the AI persona makes an efficacy claim matching a trigger
+phrase, the corresponding safety balance statement MUST appear in the same
+response turn. If absent, the response is re-generated before delivery.
 
 
-HOW THIS WORKS IN THE PLATFORM
---------------------------------
+SECTION 5.1 — HOW FAIR BALANCE ENFORCEMENT WORKS IN PITCHMD
+-------------------------------------------------------------
   Step 1: AI generates a response containing an efficacy claim.
-  Step 2: Output Compliance Filter scans the response for trigger phrases.
-  Step 3: If a trigger is matched WITHOUT the required safety balance:
-            - Response is flagged as "unbalanced"
-            - Re-generation is triggered with the safety balance appended
-            - The compliance flag is logged with rule code FAIR_BALANCE
-  Step 4: Re-generated response is delivered to the user.
-
-If re-generation fails to include the balance after 2 attempts:
-  - The response is replaced with a safe fallback:
-    "I'd refer you to the full Prescribing Information for the benefit-risk
-     profile of [product]."
-  - Compliance Officer is notified.
+  Step 2: Output Compliance Filter scans for trigger phrases (see tables below).
+  Step 3: If trigger found WITHOUT required safety balance:
+            - Response flagged as FAIR_BALANCE violation
+            - Re-generation triggered with safety balance appended
+            - Compliance flag logged in SYNTHETIC_COMPLIANCE_LOG
+  Step 4: If re-generation (2 attempts) fails to include balance:
+            - Safe fallback delivered:
+              "I'd refer you to the full VENCLEXTA Prescribing Information
+               for the complete benefit-risk profile."
+            - Compliance Officer notified.
 
 
-FAIR BALANCE TRIGGER TABLE
-----------------------------
-NOTE: The entries below use fictional product names for POC purposes.
-[TO BE COMPLETED BY CLIENT] — Full table to be populated by Medical Affairs
-for each approved product and indication before Phase 2 go-live.
+================================================================================
+SECTION 5.2 — VENCLEXTA (venetoclax) FAIR BALANCE TRIGGER TABLE
+================================================================================
 
-  PRODUCT    TRIGGER PHRASES                  MANDATORY SAFETY BALANCE
-  ---------  -------------------------------  ----------------------------------
-  Velorin    Any claim about HbA1c            "Velorin is contraindicated in
-             reduction, glycemic control, or   patients with eGFR <30 mL/min/
-             blood sugar improvement           1.73m2. Most common adverse
-                                               events: nausea (12%), headache
-                                               (8%), upper respiratory infection
-                                               (6%)."
-             SEVERITY: Required
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TRIGGER GROUP A — CLL/SLL EFFICACY (Any indication, any regimen)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  Velorin    Any reference to cardiovascular  "VELORIN-CVOT: No significant
-             outcomes, MACE data, or CV        difference in MACE vs placebo.
-             risk reduction                    BOXED WARNING: Risk of acute
-                                               pancreatitis. Discontinue
-                                               immediately if pancreatitis
-                                               is suspected."
-             SEVERITY: Required — Boxed Warning
+TRIGGER PHRASES (any of the following):
+  - "progression-free survival" / "PFS" / "HR 0.23" / "HR 0.33"
+  - "MURANO" / "CLL14" / "AMPLIFY" / "relapsed CLL" / "treatment-naive CLL"
+  - "median PFS" / "5-year PFS" / "4-year PFS" / "fixed-duration"
+  - "overall survival" / "OS" / "HR 0.53" / "not reached"
+  - "overall response rate" / "ORR" / "85%" / "complete remission"
+  - "MRD-negative" / "undetectable MRD" / "uMRD"
+  - "BCL-2 inhibitor" / "venetoclax" / "venetoclax plus" / "Venclexta"
+  - Any claim referencing venetoclax efficacy data
 
-  Cardantix  Any claim about blood pressure   "Cardantix is contraindicated
-             reduction, antihypertensive       in bilateral renal artery
-             efficacy, or systolic/diastolic   stenosis and in all trimesters
-             improvement                       of pregnancy. Monitor serum
-                                               potassium in patients receiving
-                                               ACE inhibitors or potassium-
-                                               sparing diuretics."
-             SEVERITY: Required
+REQUIRED SAFETY BALANCE (MUST appear in the same response turn):
 
-  Imvexin    Any reference to PFS, OS,        "BOXED WARNING: Interstitial
-             objective response rate, or       Lung Disease (ILD) reported in
-             tumor shrinkage                   3.4% of patients including
-                                               fatal cases. Withhold for
-                                               Grade 2 ILD; permanently
-                                               discontinue for Grade 3-4 ILD.
-                                               Hepatotoxicity: monitor LFTs
-                                               every 3 weeks."
-             SEVERITY: Required — Black Box Warning
+  MANDATORY BALANCE STATEMENT — CLL/SLL:
+  "VENCLEXTA carries a BOXED WARNING for Tumor Lysis Syndrome (TLS),
+   including fatal events and renal failure requiring dialysis. All CLL/SLL
+   patients must undergo a 5-week dose ramp-up (20 mg → 50 mg → 100 mg →
+   200 mg → 400 mg) with TLS prophylaxis and monitoring. The most common
+   Grade 3/4 adverse reaction is neutropenia (63-64%). Other common adverse
+   events include diarrhea (43%), nausea (42%), and upper respiratory tract
+   infection (36%)."
 
-  Imvexin    Any reference to EGFR mutation   "EGFR mutation testing using an
-             response rates or mutation-       FDA-approved companion diagnostic
-             specific efficacy                 is required prior to initiation.
-                                               Imvexin is NOT indicated for
-                                               EGFR wild-type NSCLC."
-             SEVERITY: Required — Companion Diagnostic Requirement
+SEVERITY: REQUIRED — BOXED WARNING (highest priority)
+RULE CODE: FAIR_BALANCE_CLL_EFFICACY
+RE-GENERATION REQUIRED: Yes, if TLS Boxed Warning is absent
 
 
-SEVERITY LEVELS
-----------------
-  Required              Standard balance. Must be present in the same turn.
-  Required — BBW        Boxed Warning must be prominent. Re-gen if absent.
-  Required — REMS       REMS-required safety messaging. Highest priority.
-  Required — CD         Companion diagnostic requirement must be stated.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TRIGGER GROUP B — TLS RAMP-UP DISCUSSION (CLL/SLL)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+TRIGGER PHRASES:
+  - "dose ramp-up" / "ramp up" / "titration" / "20 mg" / "400 mg"
+  - "weekly dose increase" / "starting dose" / "initiation"
+
+REQUIRED SAFETY BALANCE:
+  "VENCLEXTA CYP3A inhibitor interaction: Concomitant use with strong CYP3A
+   inhibitors at initiation and during the dose ramp-up phase in CLL/SLL
+   patients is CONTRAINDICATED due to markedly increased venetoclax exposure
+   and TLS risk. Blood chemistry monitoring and prophylactic measures are
+   required at each dose step."
+
+SEVERITY: REQUIRED — CONTRAINDICATION
+RULE CODE: FAIR_BALANCE_TLS_RAMPUP
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TRIGGER GROUP C — FIXED DURATION CLAIMS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+TRIGGER PHRASES:
+  - "fixed-duration" / "time-limited" / "treatment-free" / "stop therapy"
+  - "12 months" / "2 years" / "not indefinite" / "vs. continuous"
+  - "can stop treatment" / "finite therapy"
+
+REQUIRED SAFETY BALANCE:
+  "While VENCLEXTA-based regimens are fixed-duration, close monitoring is
+   required throughout treatment, particularly during the ramp-up phase for
+   TLS. Grade 3/4 neutropenia (63-64%) requires regular blood count monitoring.
+   Patients should be assessed for response and toxicity at each cycle."
+
+SEVERITY: REQUIRED
+RULE CODE: FAIR_BALANCE_FIXED_DURATION
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TRIGGER GROUP D — COMBINATION REGIMEN CLAIMS (VEN+G / VEN+R / VEN+ACA)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+TRIGGER PHRASES:
+  - "venetoclax plus obinutuzumab" / "VEN+G" / "CLL14" / "Gazyva"
+  - "venetoclax plus rituximab" / "VEN+R" / "MURANO" / "Rituxan"
+  - "venetoclax plus acalabrutinib" / "VEN+ACA" / "AMPLIFY" / "Calquence"
+  - "combination regimen" / "doublet" / "all-oral"
+
+REQUIRED SAFETY BALANCE — COMBINATION PARTNER CONSIDERATIONS:
+  For VEN+G: "In addition to the VENCLEXTA TLS Boxed Warning, GAZYVA
+  (obinutuzumab) carries Boxed Warnings for HBV Reactivation and Progressive
+  Multifocal Leukoencephalopathy (PML). Obinutuzumab infusion-related
+  reactions occur in approximately 69% of patients (mostly Cycle 1, Day 1).
+  Screen all patients for HBV prior to initiating therapy."
+
+  For VEN+R: "In addition to the VENCLEXTA TLS Boxed Warning, RITUXAN
+  (rituximab) carries Boxed Warnings for fatal infusion-related reactions,
+  severe mucocutaneous reactions, PML, and HBV reactivation."
+
+  For VEN+ACA (AMPLIFY): "The most common adverse events (>=20%) in AMPLIFY
+  included neutropenia, headache, diarrhea, musculoskeletal pain, and COVID-19
+  infection. The VENCLEXTA TLS Boxed Warning applies."
+
+SEVERITY: REQUIRED — COMBINATION-SPECIFIC SAFETY
+RULE CODE: FAIR_BALANCE_COMBINATION
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TRIGGER GROUP E — AML EFFICACY CLAIMS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+TRIGGER PHRASES:
+  - "VIALE-A" / "VIALE-C" / "azacitidine" / "AML" / "acute myeloid"
+  - "newly diagnosed AML" / "unfit" / "ineligible for intensive chemotherapy"
+  - "overall survival" in AML / "OS 14.7 months" / "HR 0.66"
+  - "CR+CRi" / "66.4%" / "complete remission in AML"
+  - "venetoclax plus azacitidine" / "venetoclax plus decitabine"
+
+REQUIRED SAFETY BALANCE — AML:
+  "VENCLEXTA + azacitidine is indicated for adults 75 years or older or those
+   with comorbidities that preclude intensive induction chemotherapy. In
+   VIALE-A, the most frequent Grade 3/4 adverse reactions were thrombocytopenia,
+   neutropenia, and febrile neutropenia. Grade 3/4 infections including
+   pneumonia were reported in approximately 33% of patients. The VENCLEXTA TLS
+   Boxed Warning applies; assess TLS risk prior to initiating therapy.
+   NOTE: VIALE-C (LDAC) did not meet its primary endpoint of statistically
+   significant OS improvement (HR 0.75; P=0.11)."
+
+SEVERITY: REQUIRED — POPULATION RESTRICTION + SAFETY
+RULE CODE: FAIR_BALANCE_AML_EFFICACY
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TRIGGER GROUP F — CARDIOVASCULAR DIFFERENTIATION vs. IBRUTINIB
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+TRIGGER PHRASES:
+  - "cardiovascular" / "atrial fibrillation" / "cardiac" in comparison to
+    ibrutinib or BTK inhibitors
+  - "no cardiac boxed warning" / "cardiac risk profile"
+  - "Imbruvica boxed warning" / "ibrutinib cardiac"
+  - "BTK inhibitor vs venetoclax safety"
+
+REQUIRED BALANCE:
+  "While VENCLEXTA does not carry a Boxed Warning for cardiac arrhythmias,
+   it does carry a Boxed Warning for Tumor Lysis Syndrome (TLS), which is
+   a different but serious safety consideration requiring distinct monitoring
+   and prophylaxis measures. The overall safety profiles differ between
+   BCL-2 inhibitors and BTK inhibitors — physicians should review the full
+   Prescribing Information for each product."
+
+SEVERITY: REQUIRED (prevents one-sided safety comparison)
+RULE CODE: FAIR_BALANCE_CV_COMPARISON
+
+
+================================================================================
+SECTION 5.3 — FALLBACK MESSAGES BY INDICATION
+================================================================================
+
+If the Phase 2 re-generation fails to produce a balanced response after
+2 attempts, the following safe fallbacks will be delivered:
+
+  CLL/SLL:
+  "I would recommend reviewing the full VENCLEXTA Prescribing Information for
+   the complete benefit and risk profile, including the important Boxed Warning
+   for Tumor Lysis Syndrome and the monitoring requirements during dose
+   ramp-up."
+
+  AML:
+  "I would recommend reviewing the VENCLEXTA Prescribing Information for the
+   full benefit and risk data from the VIALE-A trial and the approved AML
+   indication, including the TLS Boxed Warning and the approved patient
+   population."
+
+
+================================================================================
+SECTION 5.4 — SEVERITY LEVELS AND ENFORCEMENT ACTIONS
+================================================================================
+
+  SEVERITY LEVEL           ENFORCEMENT ACTION
+  ----------------------   --------------------------------------------------
+  REQUIRED — BBW           Boxed Warning MUST appear. Immediate re-generation
+                           if absent. 2 attempts, then fallback message.
+
+  REQUIRED — CONTRAIND.    Contraindication statement MUST appear. Same
+                           enforcement as BBW.
+
+  REQUIRED                 Balance statement must appear. Re-generation
+                           triggered. 2 attempts, then fallback.
+
+  ADVISORY                 Flag and log for compliance review. Deliver the
+                           original response but note in audit log.
 
 
 ITEMS TO BE COMPLETED BY CLIENT
 ---------------------------------
-[ ] Populate the full trigger table for all approved products and indications.
-[ ] Obtain MLR sign-off on each safety balance statement (it is itself a
-    regulated claim).
-[ ] Identify all products with Boxed Warnings — these require enhanced
-    treatment in the output filter.
-[ ] Identify all products with REMS programs — REMS messaging requirements
-    must be incorporated as mandatory safety blocks.
-[ ] Define the fallback message for each product (used when re-generation
-    fails to produce a balanced response).
-[ ] Connect this list to the Snowflake COMPLIANCE_RULES table so it can be
-    maintained and updated without code changes (Phase 2 build).
+[ ] Medical Affairs sign-off: Review and approve each mandatory safety
+    balance statement (the balance text is itself a regulated claim).
+[ ] Legal sign-off: Confirm the cardiovascular comparison (Group F) language
+    is appropriate for the competitive context.
+[ ] Confirm the VIALE-C disclosure in Group E (failed primary endpoint) —
+    this is factually accurate and should be disclosed to reps, but confirm
+    the exact language with Medical/Legal.
+[ ] Define trigger phrases for any additional approved claims not covered
+    above (e.g., del(17p) subgroup data, IGHV mutational status claims).
+[ ] Connect this trigger list to the Snowflake SYNTHETIC_COMPLIANCE_RULES
+    table before Phase 2 build begins (each trigger becomes a rule entry).
 
 
 ================================================================================
 END OF DOCUMENT 5 — Fair Balance Trigger List
-Next: 06_Regulatory_Jurisdiction_Map.txt
 ================================================================================

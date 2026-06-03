@@ -1,134 +1,423 @@
 ================================================================================
 PITCHMD(tm) AI SALES TRAINING PLATFORM
 PHASE 0 GOVERNANCE — DOCUMENT 2 OF 7
-Approved Claims Library — Template and Example Entries
+Approved Claims Library — VENCLEXTA (venetoclax) and Competitive Landscape
 --------------------------------------------------------------------------------
 Prepared by : Strategic Research Insights, Inc.
-Version     : v0.1 — Proof of Concept
+Version     : v0.2 — Updated with real product data
 Date        : June 2026
-Status      : DRAFT — Illustrative examples only. Full library to be populated
-              by Medical Affairs prior to platform go-live.
+Status      : DRAFT — Requires MLR sign-off before platform go-live
 Classification: Internal / Confidential
+Therapeutic Area: B-Cell Malignancies (CLL/SLL, AML)
 ================================================================================
 
 
 PURPOSE
 -------
-The Approved Claims Library is the single authoritative source of truth for all
-factual claims that the PitchMD(tm) AI physician persona may make, reference, or
-respond to during training sessions.
+The Approved Claims Library is the single authoritative source of truth for
+all factual claims that the PitchMD(tm) AI physician persona may make,
+reference, or respond to during training sessions.
 
-The AI system may ONLY assert claims that are:
-  (a) explicitly present in this library, AND
-  (b) have current MLR APPROVED status with a valid effective date.
+CLIENT PRODUCT: VENCLEXTA (venetoclax) — AbbVie/Genentech
+COMPETITIVE SET: Imbruvica, Brukinsa, Calquence, Gazyva, Jaypirca, Rituxan,
+                 Copiktra, Zydelig
 
-Any claim not in this library is treated as off-label or unapproved and will be
-blocked by the Phase 2 output compliance filter.
+The AI system may ONLY assert claims for Venclexta that are explicitly present
+in this library with current MLR APPROVED status. Competitor claims are
+included as training context only — reps must be trained on what physicians
+may raise, not on promoting competitor products.
 
 
 LIBRARY ENTRY STRUCTURE
 ------------------------
-Each entry must contain all fields below. Incomplete entries will be rejected
-during the MLR review process.
-
-  Field               Description
-  ------------------  ---------------------------------------------------------
-  CLAIM_ID            Unique identifier (e.g., VEL-EFF-001)
-  PRODUCT             Brand name of the drug
-  INDICATION          Exact approved indication as written in the PI
-  APPROVED_CLAIM      Verbatim claim text as approved by MLR
+  CLAIM_ID            Unique identifier
+  PRODUCT             Brand name
+  INDICATION          Exact approved indication
+  APPROVED_CLAIM      Verbatim claim text (cite source for each)
   CLAIM_TYPE          EFFICACY | SAFETY | MECHANISM | COMPARATIVE | ACCESS
-  SUPPORTING_SOURCE   Study name or PI section number
-  MLR_REF_NUMBER      MLR reference number assigned at approval (Stage 5)
-  EFFECTIVE_DATE      Date from which this claim is active on the platform
-  EXPIRY_DATE         Date on which this claim must be re-reviewed
+  SUPPORTING_SOURCE   Study name, PI section, or publication
+  MLR_REF_NUMBER      [TO BE ASSIGNED AT MLR APPROVAL]
   CURRENT_STATUS      APPROVED | PENDING | EXPIRED | WITHDRAWN
-  APPROVED_BY         Name of Compliance Officer who approved
-  NOTES               Any additional context or usage restrictions
 
 
-EXAMPLE ENTRIES (Illustrative — Using Fictional Products)
----------------------------------------------------------
-NOTE: Velorin, Cardantix, and Imvexin are fictional product names used for
-proof-of-concept purposes only. Replace with actual product names before
-go-live.
-
-  CLAIM_ID    : VEL-EFF-001
-  PRODUCT     : Velorin
-  INDICATION  : Type 2 Diabetes Mellitus — HbA1c Reduction
-  CLAIM       : "Velorin demonstrated a mean HbA1c reduction of 1.4% vs. 0.7%
-                 for placebo at 26 weeks (p<0.001, 95% CI: 0.5-0.9%)"
-  CLAIM_TYPE  : EFFICACY
-  SOURCE      : VELORIN-301 Phase 3 Trial, N=847
-  STATUS      : [TO BE COMPLETED]
-  EXPIRY DATE : [TO BE COMPLETED]
-
-  CLAIM_ID    : VEL-SAF-001
-  PRODUCT     : Velorin
-  INDICATION  : Type 2 Diabetes Mellitus — Safety Profile
-  CLAIM       : "Most common adverse events (>=5%): nausea (12%), headache (8%),
-                 upper respiratory infection (6%), diarrhea (5%)"
-  CLAIM_TYPE  : SAFETY
-  SOURCE      : VELORIN-301 Prescribing Information, Section 6.1
-  STATUS      : [TO BE COMPLETED]
-  EXPIRY DATE : [TO BE COMPLETED]
-
-  CLAIM_ID    : CAR-EFF-001
-  PRODUCT     : Cardantix
-  INDICATION  : Hypertension — First-Line Therapy in Adults
-  CLAIM       : "Cardantix reduced mean systolic blood pressure by 18.3 mmHg
-                 vs. 9.1 mmHg for placebo at 12 weeks (p<0.0001)"
-  CLAIM_TYPE  : EFFICACY
-  SOURCE      : CARDANTIX-201 Phase 3 Trial, N=1,204
-  STATUS      : [TO BE COMPLETED]
-  EXPIRY DATE : [TO BE COMPLETED]
-
-  CLAIM_ID    : IMV-EFF-001
-  PRODUCT     : Imvexin
-  INDICATION  : Non-Small Cell Lung Cancer — EGFR-mutated, 1st Line
-  CLAIM       : "Imvexin demonstrated median PFS of 11.1 months vs. 4.7 months
-                 for platinum-based chemotherapy (HR 0.35; 95% CI: 0.26-0.46;
-                 p<0.0001)"
-  CLAIM_TYPE  : EFFICACY
-  SOURCE      : IMVEXIN-101 Phase 3 Trial, N=364
-  STATUS      : [TO BE COMPLETED]
-  EXPIRY DATE : [TO BE COMPLETED]
-
-  CLAIM_ID    : IMV-SAF-001
-  PRODUCT     : Imvexin
-  INDICATION  : Non-Small Cell Lung Cancer — BOXED WARNING
-  CLAIM       : "WARNING: Interstitial Lung Disease (ILD) reported in 3.4% of
-                 patients including fatal cases. Withhold Imvexin for Grade 2
-                 ILD; permanently discontinue for Grade 3 or 4 ILD."
-  CLAIM_TYPE  : SAFETY
-  SOURCE      : IMVEXIN PI, Boxed Warning
-  STATUS      : [TO BE COMPLETED]
-  EXPIRY DATE : [TO BE COMPLETED]
+================================================================================
+VENCLEXTA (venetoclax) — PRIMARY CLIENT PRODUCT
+BCL-2 Inhibitor | AbbVie/Genentech | FDA Initial Approval: April 2016
+================================================================================
 
 
+--- APPROVED INDICATIONS ---
+
+VEN-IND-001: CLL/SLL
+  "For the treatment of adult patients with chronic lymphocytic leukemia
+   (CLL) or small lymphocytic lymphoma (SLL)."
+  Sub-categories:
+    - Frontline CLL/SLL in combination with obinutuzumab (CLL14)
+    - Frontline CLL/SLL in combination with acalabrutinib (AMPLIFY, Feb 2026)
+    - Relapsed/refractory CLL/SLL in combination with rituximab (MURANO)
+    - Relapsed/refractory CLL/SLL monotherapy
+
+VEN-IND-002: AML
+  "In combination with azacitidine, or decitabine, or low-dose cytarabine
+   for the treatment of newly diagnosed acute myeloid leukemia (AML) in
+   adults 75 years or older, or who have comorbidities that preclude use
+   of intensive induction chemotherapy."
+  Source: VIALE-A (azacitidine), VIALE-C (LDAC), decitabine data
+
+
+--- MECHANISM OF ACTION ---
+
+VEN-MOA-001: BCL-2 Inhibition
+  "VENCLEXTA is a selective, potent small-molecule inhibitor of BCL-2
+   (B-cell lymphoma 2 protein), the first and only approved BCL-2 inhibitor.
+   BCL-2 overexpression allows CLL and AML cells to evade programmed cell
+   death. VENCLEXTA binds directly to BCL-2 and displaces pro-apoptotic
+   proteins (such as BIM), triggering cancer cell death."
+  Source: VENCLEXTA PI, Section 12.1 (Mechanism of Action)
+  MLR Status: [TO BE COMPLETED]
+
+
+--- CLL/SLL EFFICACY CLAIMS ---
+
+VEN-EFF-001: MURANO — Primary PFS Endpoint (R/R CLL)
+  "In the MURANO trial (relapsed/refractory CLL), VENCLEXTA + rituximab
+   demonstrated a median PFS of 57.4 months vs. 17.0 months for
+   bendamustine + rituximab (HR 0.23; 95% CI 0.18-0.29) at final analysis."
+  Source: MURANO Phase 3 Trial, Final Analysis
+  MLR Status: [TO BE COMPLETED]
+
+VEN-EFF-002: MURANO — 5-Year PFS Rate
+  "In the MURANO trial, the 5-year PFS rate was 57.3% with VENCLEXTA +
+   rituximab versus 4.6% with bendamustine + rituximab."
+  Source: MURANO Phase 3 Trial, Final Analysis
+  MLR Status: [TO BE COMPLETED]
+
+VEN-EFF-003: MURANO — Overall Survival
+  "In the MURANO trial, median OS was not reached with VENCLEXTA + rituximab
+   vs. 87.8 months with bendamustine + rituximab (HR 0.53; 95% CI 0.37-0.74).
+   7-year OS rates: 69.6% vs. 51%."
+  Source: MURANO Phase 3 Trial, Blood (ASH 2025)
+  MLR Status: [TO BE COMPLETED]
+
+VEN-EFF-004: MURANO — Fixed Duration
+  "VENCLEXTA + rituximab is a fixed-duration, 2-year regimen (not continuous
+   daily therapy). Patients complete treatment and may stop therapy."
+  Source: MURANO Phase 3 Trial Protocol; VENCLEXTA PI
+  MLR Status: [TO BE COMPLETED]
+
+VEN-EFF-005: CLL14 — Primary PFS Endpoint (Treatment-Naive CLL)
+  "In the CLL14 trial (treatment-naive CLL with comorbidities), VENCLEXTA +
+   obinutuzumab demonstrated a median PFS not reached vs. 36.4 months for
+   chlorambucil + obinutuzumab (HR 0.33; 95% CI 0.25-0.45; P<0.0001) at
+   52.4-month follow-up."
+  Source: CLL14 Phase 3 Trial
+  MLR Status: [TO BE COMPLETED]
+
+VEN-EFF-006: CLL14 — 4-Year PFS Rate
+  "In the CLL14 trial, the 4-year PFS rate was 74.0% with VENCLEXTA +
+   obinutuzumab versus 35.4% with chlorambucil + obinutuzumab."
+  Source: CLL14 Phase 3 Trial
+  MLR Status: [TO BE COMPLETED]
+
+VEN-EFF-007: CLL14 — ORR
+  "In the CLL14 trial, overall response rate was 85% with VENCLEXTA +
+   obinutuzumab vs. 71% with chlorambucil + obinutuzumab (P=0.0007)."
+  Source: CLL14 Phase 3 Trial
+  MLR Status: [TO BE COMPLETED]
+
+VEN-EFF-008: CLL14 — Fixed Duration
+  "The VENCLEXTA + obinutuzumab regimen in CLL14 is a fixed 12-month
+   treatment duration (not continuous). Treatment concludes after
+   approximately 12 months of therapy."
+  Source: CLL14 Phase 3 Trial Protocol; VENCLEXTA PI
+  MLR Status: [TO BE COMPLETED]
+
+VEN-EFF-009: AMPLIFY — All-Oral Fixed-Duration Frontline CLL (Feb 2026)
+  "In the AMPLIFY trial (treatment-naive CLL/SLL), the all-oral fixed-duration
+   regimen of VENCLEXTA + acalabrutinib demonstrated a 3-year PFS rate of
+   76.5% (without obinutuzumab) and 83.1% (with obinutuzumab), vs. 66.5%
+   for standard chemoimmunotherapy (HR 0.65; P=0.0038) — the first all-oral,
+   fixed-duration frontline CLL regimen approved."
+  Source: AMPLIFY Phase 3 Trial; FDA Approval February 19, 2026
+  MLR Status: [TO BE COMPLETED]
+
+VEN-EFF-010: del(17p) Activity
+  "VENCLEXTA demonstrated activity in CLL patients with del(17p), a
+   high-risk genetic feature associated with poor outcomes with
+   chemoimmunotherapy."
+  Source: VENCLEXTA PI; CLL14 subgroup analysis; MURANO subgroup analysis
+  MLR Status: [TO BE COMPLETED]
+
+
+--- AML EFFICACY CLAIMS ---
+
+VEN-EFF-AML-001: VIALE-A — Overall Survival (Primary Endpoint)
+  "In the VIALE-A trial (newly diagnosed AML, ineligible for intensive
+   chemotherapy), VENCLEXTA + azacitidine demonstrated median OS of
+   14.7 months vs. 9.6 months for placebo + azacitidine (HR 0.66; 95% CI
+   0.52-0.85; P<0.001) — a 34% reduction in risk of death."
+  Source: VIALE-A Phase 3 Trial; NEJM August 2020
+  MLR Status: [TO BE COMPLETED]
+
+VEN-EFF-AML-002: VIALE-A — Complete Remission Rate
+  "In the VIALE-A trial, the CR+CRi rate was 66.4% with VENCLEXTA +
+   azacitidine vs. 28.3% with placebo + azacitidine (P<0.001)."
+  Source: VIALE-A Phase 3 Trial; NEJM August 2020
+  MLR Status: [TO BE COMPLETED]
+
+
+--- SAFETY CLAIMS (Required for Fair Balance) ---
+
+VEN-SAF-001: BOXED WARNING — Tumor Lysis Syndrome (CLL/SLL)
+  "BOXED WARNING: Tumor lysis syndrome (TLS), including fatal events and
+   renal failure requiring dialysis, has occurred in patients treated with
+   VENCLEXTA. Assess all patients for TLS risk prior to initiation. Provide
+   appropriate prophylaxis including hydration and anti-hyperuricemics.
+   Employ more intensive measures for higher-risk patients. Use the 5-week
+   dose ramp-up schedule in CLL/SLL patients."
+  Source: VENCLEXTA PI, Boxed Warning
+  MLR Status: [TO BE COMPLETED]
+  NOTE: This claim MUST be paired with any CLL/SLL efficacy claim.
+
+VEN-SAF-002: TLS — Ramp-Up Dosing Schedule
+  "VENCLEXTA requires a 5-week dose ramp-up in CLL/SLL patients (20 mg ->
+   50 mg -> 100 mg -> 200 mg -> 400 mg) to reduce the risk of TLS. With
+   current ramp-up and prophylaxis protocols, TLS occurred in 2% of patients
+   in CLL/SLL monotherapy trials (vs. 12% with earlier protocols)."
+  Source: VENCLEXTA PI, Sections 2 and 5.1
+  MLR Status: [TO BE COMPLETED]
+
+VEN-SAF-003: Neutropenia (CLL/SLL)
+  "The most common Grade 3 or 4 adverse reaction in patients with CLL/SLL
+   treated with VENCLEXTA was neutropenia (63-64%). Monitor blood counts
+   regularly. Grade 3-4 neutropenia may require dose interruptions."
+  Source: VENCLEXTA PI, Section 6.1
+  MLR Status: [TO BE COMPLETED]
+
+VEN-SAF-004: Most Common Adverse Events — CLL Monotherapy
+  "The most common adverse events (any grade, >=20%) in patients with
+   CLL/SLL treated with VENCLEXTA monotherapy include: neutropenia (50%),
+   diarrhea (43%), nausea (42%), upper respiratory tract infection (36%),
+   anemia (33%), fatigue (32%), thrombocytopenia (29%), musculoskeletal pain
+   (29%), edema (22%), and cough (22%)."
+  Source: VENCLEXTA PI, Section 6.1
+  MLR Status: [TO BE COMPLETED]
+
+VEN-SAF-005: CYP3A Inhibitors Contraindication (CLL/SLL)
+  "Concomitant use of VENCLEXTA with strong CYP3A inhibitors at initiation
+   and during the ramp-up phase in patients with CLL/SLL is CONTRAINDICATED
+   due to increased exposure and risk of TLS."
+  Source: VENCLEXTA PI, Sections 4 and 7.1
+  MLR Status: [TO BE COMPLETED]
+
+VEN-SAF-006: No REMS Program
+  "VENCLEXTA does not have a REMS program. TLS risk is managed through the
+   dose ramp-up schedule, required prophylaxis measures, and monitoring as
+   outlined in the Prescribing Information."
+  Source: VENCLEXTA PI; FDA approval history
+  MLR Status: [TO BE COMPLETED]
+
+VEN-SAF-007: Most Common Adverse Events — AML (VIALE-A)
+  "In VIALE-A, the most frequent Grade 3 or 4 adverse reactions in patients
+   treated with VENCLEXTA + azacitidine were thrombocytopenia, neutropenia,
+   and febrile neutropenia. Grade 3-4 infections including pneumonia were
+   reported in approximately 33% of patients."
+  Source: VENCLEXTA PI, Section 6.1 (AML); VIALE-A publication
+  MLR Status: [TO BE COMPLETED]
+
+
+--- DIFFERENTIATION CLAIMS vs. BTK INHIBITORS ---
+NOTE: These claims may only be used if supported by data cited in the
+approved labeling. Obtain MLR approval for each before use in training.
+
+VEN-DIFF-001: Fixed Duration vs. Continuous Therapy
+  "All VENCLEXTA-based regimens approved for CLL/SLL (VEN+G, VEN+R, VEN+ACA)
+   are fixed-duration (12 months to 2 years), providing patients with
+   treatment-free intervals. BTK inhibitors (ibrutinib, zanubrutinib,
+   acalabrutinib) require continuous indefinite daily dosing."
+  Source: MURANO PI; CLL14 PI; AMPLIFY PI
+  MLR Status: [TO BE COMPLETED]
+
+VEN-DIFF-002: Cardiovascular Profile vs. Ibrutinib
+  "VENCLEXTA-based regimens have not demonstrated the cardiovascular
+   toxicity profile (atrial fibrillation, hypertension) associated with
+   ibrutinib (IMBRUVICA), which carries a Boxed Warning for serious cardiac
+   arrhythmias and cardiac failure."
+  Source: VENCLEXTA PI; IMBRUVICA PI (Boxed Warning)
+  NOTE: This claim cites competitor PI. Confirm MLR approval required.
+  MLR Status: [TO BE COMPLETED]
+
+VEN-DIFF-003: Unique Mechanism — Complementary to BTK Inhibitors
+  "VENCLEXTA acts on BCL-2 (anti-apoptotic pathway), a distinct and
+   complementary mechanism to BTK inhibitors which target the BCR signaling
+   pathway. This mechanistic difference provides the rationale for
+   venetoclax-based combination regimens with BTK inhibitors."
+  Source: VENCLEXTA PI; AMPLIFY trial rationale
+  MLR Status: [TO BE COMPLETED]
+
+VEN-DIFF-004: Only BCL-2 Inhibitor AND Only Agent Approved for Both CLL and AML
+  "VENCLEXTA is the only FDA-approved BCL-2 inhibitor. Among all products
+   in the CLL competitive landscape (Imbruvica, Brukinsa, Calquence, Gazyva,
+   Jaypirca, Rituxan, Copiktra, Zydelig), VENCLEXTA is the only agent also
+   approved for AML."
+  Source: FDA product labeling for all listed products
+  MLR Status: [TO BE COMPLETED]
+
+
+================================================================================
+COMPETITIVE PRODUCT REFERENCE (Training Context Only — Not for Promotion)
+These entries are provided to train reps on what physicians may ask. Reps must
+never actively promote competitor products or disparage them without
+head-to-head data in the approved labeling.
+================================================================================
+
+
+--- IMBRUVICA (ibrutinib) — Covalent BTK Inhibitor, 1st Generation ---
+
+COMP-IBR-001: Approved Indications
+  CLL/SLL (frontline and R/R); Waldenström's Macroglobulinemia;
+  cGVHD (adults and pediatric ≥1 year)
+  NOTE: MCL and MZL indications VOLUNTARILY WITHDRAWN May 2023.
+
+COMP-IBR-002: Boxed Warnings (4 warnings)
+  (1) Serious hemorrhage including fatal hemorrhage
+  (2) Serious infections including fatal infections
+  (3) Cardiac arrhythmias and cardiac failure
+  (4) Hypertension
+
+COMP-IBR-003: Atrial Fibrillation Risk
+  Atrial fibrillation/flutter reported in approximately 9-17% of patients;
+  Grade >=3 AF in 3.7%; increases with duration of therapy.
+  Source: IMBRUVICA PI
+
+
+--- BRUKINSA (zanubrutinib) — Covalent BTK Inhibitor, 2nd Generation ---
+
+COMP-ZAN-001: ALPINE Head-to-Head vs. Ibrutinib (R/R CLL)
+  Zanubrutinib demonstrated superior PFS vs. ibrutinib (HR 0.68; 95% CI
+  0.54-0.84) and significantly lower atrial fibrillation rates (7.1% vs.
+  17.0%) in the ALPINE Phase 3 trial. Source: ALPINE Phase 3 Trial, Blood
+
+COMP-ZAN-002: Approved Indications
+  CLL/SLL (frontline and R/R); MCL (≥1 prior therapy); WM; MZL (R/R);
+  FL (R/R, in combination with obinutuzumab, ≥2 prior lines)
+
+
+--- CALQUENCE (acalabrutinib) — Covalent BTK Inhibitor, 2nd Generation ---
+
+COMP-ACA-001: Approved Indications
+  CLL/SLL (frontline and R/R); previously untreated MCL (with BR, Jan 2025);
+  CLL/SLL (frontline, in combination with venetoclax, Feb 2026 — AMPLIFY)
+
+COMP-ACA-002: Headache as Distinctive AE
+  Headache reported in 37-43% of patients treated with acalabrutinib —
+  the most distinctive adverse event profile vs. other BTK inhibitors.
+  Source: CALQUENCE PI
+
+
+--- GAZYVA (obinutuzumab) — Type II Anti-CD20 Antibody ---
+
+COMP-GAZ-001: Role as Venetoclax Partner
+  Gazyva (obinutuzumab) is the anti-CD20 antibody partner in the CLL14
+  fixed-duration regimen (VEN+G). It is also FDA-approved for previously
+  untreated and relapsed/refractory follicular lymphoma.
+  Source: CLL14 PI; GAZYVA PI
+
+COMP-GAZ-002: Boxed Warnings
+  (1) HBV Reactivation (screen all patients before treatment)
+  (2) Progressive Multifocal Leukoencephalopathy (PML)
+  Infusion-related reactions (IRRs) in approximately 69% of patients
+  (mostly Cycle 1, Day 1). Source: GAZYVA PI
+
+
+--- JAYPIRCA (pirtobrutinib) — Non-Covalent BTK Inhibitor ---
+
+COMP-JAY-001: Unique Positioning — Post-BTK AND Post-Venetoclax
+  Jaypirca is FDA-approved for adult patients with CLL/SLL who have received
+  at least two prior lines including a BTK inhibitor AND a BCL-2 inhibitor
+  (venetoclax) — the only approved option in this late-line post-both-classes
+  setting (full approval December 2025).
+  Source: JAYPIRCA PI
+
+COMP-JAY-002: Non-Covalent Mechanism — Overcomes C481S Mutation
+  Unlike covalent BTK inhibitors (ibrutinib, zanubrutinib, acalabrutinib),
+  pirtobrutinib does not form a covalent bond with BTK, allowing it to retain
+  activity against the C481S resistance mutation that drives resistance to
+  covalent BTK inhibitors. Source: JAYPIRCA PI
+
+
+--- RITUXAN (rituximab) — Type I Anti-CD20 Antibody ---
+
+COMP-RIT-001: Role as Venetoclax Partner
+  Rituximab is the anti-CD20 partner in the MURANO regimen (VEN+R) for
+  relapsed/refractory CLL/SLL. Also approved for DLBCL, FL, and other NHL
+  indications. Source: RITUXAN PI; MURANO Phase 3 Trial
+
+COMP-RIT-002: Boxed Warnings (4 warnings)
+  (1) Fatal infusion-related reactions
+  (2) Severe mucocutaneous reactions
+  (3) Progressive Multifocal Leukoencephalopathy (PML)
+  (4) Hepatitis B Virus (HBV) Reactivation
+  Source: RITUXAN PI
+
+
+--- COPIKTRA (duvelisib) — PI3K-delta/gamma Inhibitor ---
+
+COMP-DUV-001: Approved Indication and Limitations
+  Approved for R/R CLL/SLL after >=2 prior therapies. IMPORTANT: 2022 updated
+  Boxed Warning added for possible increased risk of death vs. ofatumumab at
+  5-year follow-up (HR 1.09). Source: FDA Safety Communication June 2022
+
+COMP-DUV-002: Boxed Warnings (5 warnings — heavily burdened)
+  (1) Fatal/serious infections  (2) Fatal/serious diarrhea or colitis
+  (3) Fatal/serious cutaneous reactions  (4) Fatal/serious pneumonitis
+  (5) Increased risk of death vs. ofatumumab (2022 addition)
+  Source: COPIKTRA PI (2022 update)
+
+
+--- ZYDELIG (idelalisib) — PI3K-delta Inhibitor ---
+
+COMP-ZYD-001: Approved Indication and Context
+  Approved for relapsed CLL in combination with rituximab (for patients where
+  rituximab alone would be appropriate due to comorbidities, ≥1 prior therapy);
+  relapsed FL monotherapy (≥2 prior lines); relapsed SLL monotherapy (≥2 lines).
+  Source: ZYDELIG PI
+
+COMP-ZYD-002: Boxed Warnings and Clinical Context
+  Boxed Warnings: (1) Fatal/serious hepatotoxicity  (2) Severe diarrhea/colitis
+  (3) Fatal/serious pneumonitis  (4) Fatal/serious intestinal perforation.
+  NOTE: In 2016, FDA halted 6 idelalisib combination studies due to increased
+  adverse events and deaths. Use is limited to narrow approved indications
+  with intensive monitoring. Source: ZYDELIG PI; FDA safety communications
+
+
+================================================================================
 LIBRARY GOVERNANCE RULES
---------------------------
+================================================================================
 1. Only Medical Affairs may submit new entries for MLR review.
 2. No claim may be active on the platform without a valid MLR_REF_NUMBER.
-3. Entries with EXPIRED status are automatically removed from the active
-   library. The AI will not use them even if they remain in the database.
-4. When a Prescribing Information is updated by the FDA, ALL entries for that
-   product must be reviewed and re-approved within 30 days.
-5. Withdrawn entries (e.g., due to safety signals) must be removed from the
-   platform within 24 hours of withdrawal decision.
-
+3. Entries with EXPIRED status are automatically excluded from the AI context.
+4. When a Prescribing Information is updated, ALL entries for that product
+   must be reviewed and re-approved within 30 days.
+5. Any change to VENCLEXTA labeling (including safety updates) requires
+   immediate review of ALL VEN-SAF entries and re-assessment of all
+   fair balance pairings in Document 5.
+6. Competitor entries in the "Training Context" section do not require full
+   MLR approval but must be reviewed by at least one Medical Affairs reviewer
+   to confirm factual accuracy before platform ingestion.
 
 ITEMS TO BE COMPLETED BY CLIENT
 ---------------------------------
-[ ] Populate full library for each approved product and indication.
-[ ] Obtain MLR sign-off for each entry before platform go-live.
-[ ] Define the expiry date policy (e.g., 12 months standard unless label
-    changes).
-[ ] Connect this library to the Snowflake RAG repository (Phase 4 build).
-[ ] Define process for Medical Affairs submissions into the claims database.
+[ ] Assign MLR reference numbers to all VENCLEXTA claims upon approval.
+[ ] Confirm which AMPLIFY claims (Feb 2026 approval) are ready for training.
+[ ] Review and confirm competitor entries for accuracy with Medical Affairs.
+[ ] Add any additional claims not covered above (patient support programs,
+    companion diagnostics, specific subgroup data, real-world evidence).
+[ ] Set effective dates and expiry dates for all entries.
+[ ] Confirm whether VIALE-C (LDAC combination) claims should be included
+    given the primary endpoint was not met (statistical significance).
 
 
 ================================================================================
 END OF DOCUMENT 2 — Approved Claims Library
-Next: 03_Prohibited_Language_List.txt
 ================================================================================

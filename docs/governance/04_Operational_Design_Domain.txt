@@ -4,8 +4,10 @@ PHASE 0 GOVERNANCE — DOCUMENT 4 OF 7
 Operational Design Domain (ODD) — Permitted Topic Boundaries
 --------------------------------------------------------------------------------
 Prepared by : Strategic Research Insights, Inc.
-Version     : v0.1 — Proof of Concept
+Version     : v0.2 — Updated with product-specific ODD
 Date        : June 2026
+Client Product: VENCLEXTA (venetoclax)
+Therapeutic Area: B-Cell Malignancies — CLL/SLL and AML
 Status      : DRAFT — For Internal Review
 Classification: Internal / Confidential
 ================================================================================
@@ -14,133 +16,193 @@ Classification: Internal / Confidential
 PURPOSE
 -------
 The Operational Design Domain (ODD) defines the universe of topics that
-PitchMD(tm) is permitted to address during training sessions. It functions as
-the "topic guardrail" — enforced by the Phase 3 Input Firewall — that keeps
-all training interactions focused on compliant pharmaceutical promotion.
+PitchMD(tm) is permitted to address during training sessions for VENCLEXTA
+(venetoclax) sales representatives.
 
-Any user input or AI-generated output that falls outside this domain will be
-blocked, redirected, or flagged according to the action specified below.
+Physician personas in PitchMD(tm) will be trained as hematology/oncology
+specialists (hematologists, medical oncologists) who manage patients with
+CLL/SLL and/or AML. The ODD reflects what is appropriate for a Venclexta
+rep to discuss during a physician office call or hospital visit.
 
 
 SECTION 6.1 — IN-SCOPE TOPICS (PERMITTED)
 ------------------------------------------
-The following topics are within the permitted operational domain of PitchMD(tm).
-The AI physician persona may discuss any of these topics, and sales
-representative inputs on these topics will be processed normally.
 
-  TOPIC AREA                    SCOPE BOUNDARY
-  ----------------------------  -----------------------------------------------
-  Approved Product Indications  As listed in the Approved Claims Library only
-                                 (Document 2). No extrapolation permitted.
+  CLINICAL TOPICS (VENCLEXTA-SPECIFIC)
 
-  Mechanism of Action           As described in the current FDA-approved PI.
-                                 No speculative MoA discussion permitted.
+  - CLL/SLL approved indications:
+      Frontline CLL/SLL + obinutuzumab (CLL14)
+      Frontline CLL/SLL + acalabrutinib (AMPLIFY, Feb 2026)
+      Relapsed/refractory CLL/SLL + rituximab (MURANO)
+      Relapsed/refractory CLL/SLL monotherapy
 
-  Clinical Trial Data           Only trials explicitly cited in approved labeling.
-                                 Trial data from peer-reviewed publications not
-                                 in the PI requires MLR review before use.
+  - AML approved indication:
+      Newly diagnosed AML (adults >=75 or unfit for intensive chemo) with
+      azacitidine, decitabine, or LDAC (VIALE-A, VIALE-C)
 
-  Dosing and Administration     Per PI only. No alternative dosing regimens.
+  - BCL-2 mechanism of action (as described in PI)
 
-  Patient Support Programs      Factual descriptions of co-pay assistance, hub
-                                 services, and patient access programs.
+  - Pivotal trial data explicitly cited in approved labeling:
+      MURANO, CLL14, AMPLIFY, VIALE-A, VIALE-C, M14-032
 
-  Formulary and Payer Access    Factual, non-speculative. Current formulary
-                                 status only; no future coverage promises.
+  - TLS Boxed Warning and management (5-week dose ramp-up, prophylaxis)
 
-  Objection Handling            Using approved clinical data and communication
-                                 techniques only. No prohibited language (Doc 3).
+  - Full safety profile from the PI:
+      Neutropenia, infections, tumor lysis syndrome, thrombocytopenia
 
-  Adverse Event Profiles        Approved safety data from PI and REMS materials
-                                 only. Must be accompanied by fair balance
-                                 (see Document 5).
+  - Dosing and administration as specified in the PI:
+      5-week ramp-up for CLL/SLL
+      Standard daily dosing for AML combinations
 
-  Comparative Claims            ONLY if head-to-head data is in the approved
-                                 labeling AND listed in the Claims Library.
+  - Drug interactions per PI (CYP3A inhibitors, P-gp inhibitors)
+
+  - Patient support programs (VENCLEXTA Access Solutions hub services,
+    co-pay assistance for eligible patients)
+
+  - Formulary and payer access (factual status; no coverage guarantees)
+
+  - Handling of common objections using data from the Approved Claims Library:
+      Fixed-duration vs. continuous therapy discussion
+      TLS management and prophylaxis protocols
+      del(17p) and high-risk CLL patient data
+      Sequencing after BTK inhibitor failure
+
+  - Competitor product safety/efficacy discussion ONLY using data
+    from the Approved Claims Library and competitor PIs (factual only):
+      Ibrutinib Boxed Warnings for cardiac/bleeding risk
+      ALPINE trial data on zanubrutinib vs. ibrutinib
+      Pirtobrutinib positioning as post-BTK AND post-venetoclax option
+
+
+  PHYSICIAN CONTEXT TOPICS
+
+  - Standard of care for CLL/SLL (frontline and relapsed/refractory)
+  - Standard of care for unfit/elderly AML patients
+  - CLL staging (Rai/Binet), risk stratification (del(17p), TP53, IGHV)
+  - MRD (minimal residual disease) as an emerging endpoint
+  - Treatment sequencing and therapy selection discussions
+  - AML comorbidity assessment (excluding intensive chemotherapy)
+  - Physician prescribing patterns and formulary access in their institution
 
 
 SECTION 6.2 — OUT-OF-SCOPE TOPICS (BLOCKED OR REDIRECTED)
 ----------------------------------------------------------
-The following topics are outside the permitted ODD. The Action column describes
-the system response. All blocks and flags are recorded in the Compliance Audit
-Log.
 
-  TOPIC                           ACTION              REDIRECT MESSAGE
-  ------------------------------  ------------------  -------------------------------
-  Off-label indications or        Block + Flag        "I can connect you with our
-  unapproved patient populations                       Medical Affairs team for
-                                                       information on that use."
+  TOPIC                          ACTION       REDIRECT MESSAGE
+  ---------------------------    -----------  --------------------------------
+  Multiple myeloma (venetoclax   Block+Flag   "VENCLEXTA is not approved for
+  is NOT approved for MM;                      multiple myeloma. I can connect
+  increased mortality signal)                  you with Medical Affairs for
+                                               information on that indication."
 
-  Pipeline products not yet       Block + Flag        "I'm only able to discuss
-  FDA-approved                                         products with current FDA
-                                                       approval. Please contact
-                                                       Medical Affairs."
+  MCL, FL, or other lymphoma     Block+Flag   "VENCLEXTA is not approved for
+  indications for venetoclax                   that indication. The approved
+                                               indications are CLL/SLL and AML."
 
-  Pricing negotiations,           Block + Redirect    "Pricing and contract
-  contract discounts, or                               discussions are handled by
-  rebate structures                                    your account manager."
+  Fit/younger AML patients       Block+Flag   "The AML indication is for adults
+  outside the approved AML                     75 years or older, or those with
+  population                                   comorbidities that preclude
+                                               intensive induction chemotherapy."
 
-  Personal medical advice or      Block + Flag        "I'm not able to provide
-  patient-specific treatment                           personal medical advice.
-  recommendations                                      Please direct patients to
-                                                       their treating physician."
+  Pipeline venetoclax uses       Block+Flag   "I'm only able to discuss
+  not yet FDA-approved                         FDA-approved indications. For
+                                               investigational data, please
+                                               contact Medical Affairs."
 
-  Politics, religion, social      Redirect            "Let's keep our focus on
-  commentary, or personal topics                       today's product discussion."
+  Dosing outside the PI          Block+Flag   "The VENCLEXTA Prescribing
+  (e.g., skipping ramp-up;                     Information specifies the 5-week
+  starting at 400 mg in CLL)                   dose ramp-up for CLL/SLL patients.
+                                               Please refer to the PI for dosing."
 
-  Competitor safety               Block + Flag        "I can share the head-to-head
-  disparagement without                                comparative data from our
-  comparative data                                     approved trial."
+  Competitor product promotion   Block+Flag   "I can share what the VENCLEXTA
+  (asking rep to explain why                   data shows. For competitor product
+  competitor is better)                        questions, let me focus on our
+                                               approved comparative data."
 
-  Patient-identifiable            Immediate           "Please do not include
-  information (PHI)               Block + Urgent       patient-identifying information
-                                  Flag                 in training sessions. This
-                                                       interaction has been flagged
-                                                       for compliance review."
+  Competitor disparagement       Block+Flag   "I can share the specific trial
+  (inflammatory/unsupported)                   data. Let me focus on the factual
+                                               clinical evidence."
 
-  Financial performance,          Block + Redirect    "For investor or financial
-  pipeline, or M&A discussion                          information, please contact
-                                                       Investor Relations."
+  Pricing negotiations,          Block+       "Pricing and contract discussions
+  rebate structures, or          Redirect     are handled by your account manager."
+  specific discount terms
 
-  Requests to override AI         Block + Flag        "I'm designed to provide
-  compliance constraints or                             compliant training only.
-  "act as" different persona                            Please stay within the
-                                                       training scenario."
+  Personal medical advice        Block+Flag   "I'm not able to provide personal
+  for individual patients                      medical advice. Please direct patient-
+                                               specific questions to the treating
+                                               physician or pharmacist."
+
+  Off-label combination          Block+Flag   "That combination is not in the
+  regimens not in the PI                       current approved labeling. Please
+  (e.g., VEN+ibrutinib as                      contact Medical Affairs for data
+  a single product label)                      on investigational combinations."
+
+  Requests to minimize           Block+Flag   "The TLS Boxed Warning is an
+  or dismiss the TLS                           important safety requirement of
+  Boxed Warning                               VENCLEXTA's labeling. I need to
+                                               discuss it as part of any
+                                               efficacy discussion."
+
+  Politics, religion, or         Redirect     "Let's keep our focus on the
+  personal topics                             clinical discussion today."
+
+  Patient-identifiable           Immediate    "Please do not include patient-
+  information (PHI)              Block+       identifying information in training
+                                 Urgent Flag  sessions. This has been flagged
+                                               for compliance review."
 
 
-SECTION 6.3 — REPEATED VIOLATION ESCALATION
+SECTION 6.3 — PHYSICIAN PERSONA CONFIGURATION
+----------------------------------------------
+Physician personas in PitchMD(tm) will be configured as:
+
+  Primary specialty: Hematology / Hematologic Oncology
+  Secondary specialty: Medical Oncology (may prescribe venetoclax for AML)
+
+  Typical patient volume (simulation context):
+    - CLL/SLL patients: High (hematology-focused)
+    - AML patients: Moderate to High (depending on practice setting)
+    - Prescribed BTK inhibitors: Yes (will have context on ibrutinib,
+      zanubrutinib, acalabrutinib)
+    - Venetoclax experience: Varies by persona (treatment-naive to experienced)
+
+  Personas will NOT be configured as:
+    - Primary care physicians (outside scope)
+    - Oncologists managing only solid tumors
+    - Pharmacists or nurses (training is for physician interaction)
+
+
+SECTION 6.4 — REPEATED VIOLATION ESCALATION
 --------------------------------------------
-Single violation:
-  - Generates a compliance flag in SYNTHETIC_COMPLIANCE_LOG.
-  - User sees the redirect message.
-  - No immediate user notification beyond the redirect.
+Single ODD violation:
+  - Compliance flag in SYNTHETIC_COMPLIANCE_LOG
+  - User sees redirect message
+  - No immediate account action
 
-Repeated violations (3+ of same category within rolling 30 days):
-  - System generates an escalation notification to:
-      (a) The user's direct manager
-      (b) The Compliance Officer
-  - User receives an in-app notice that their account is under review.
+Three or more violations of the same category within rolling 30 days:
+  - Escalation notification to rep's direct manager
+  - Escalation notification to Compliance Officer
+  - In-app notice to user
 
-Severe violations (PHI disclosure, jailbreak attempts):
-  - Immediate flag to Compliance Officer regardless of frequency.
-  - Session may be suspended pending compliance review at Compliance
-    Officer's discretion.
+Multiple Myeloma off-label discussion (any frequency):
+  - Immediate flag regardless of frequency
+  - Requires manager review before session continuation
+  (Rationale: VEN + bortezomib/dex increased mortality signal makes this
+   a high-severity off-label risk)
 
 
 ITEMS TO BE COMPLETED BY CLIENT
 ---------------------------------
-[ ] Review and approve the full in-scope topic list with Legal and Medical
-    Affairs.
-[ ] Confirm the escalation chain: who receives escalation notifications?
-    (Manager name/role, Compliance Officer contact).
-[ ] Define the redirect message tone and voice for your brand guidelines.
-[ ] Confirm whether "pipeline product" discussions are permitted in any
-    context (e.g., scientific exchange outside a promotional call).
-[ ] Define the suspension process: who can suspend an account, what
-    review is required before reinstatement?
+[ ] Confirm the AML indication is in scope for this training cohort (some
+    reps may be CLL-focused only).
+[ ] Define whether hospital-based hematologists vs. community oncologists
+    are the target persona for initial POC testing.
+[ ] Confirm the position on venetoclax + ibrutinib combination discussion
+    (investigational; CAPTIVATE data; not a single approved label as of
+    June 2026) — in-scope or out-of-scope?
+[ ] Define escalation chain for PHI detection: who receives the urgent flag?
 
 
 ================================================================================
 END OF DOCUMENT 4 — Operational Design Domain
-Next: 05_Fair_Balance_Trigger_List.txt
 ================================================================================

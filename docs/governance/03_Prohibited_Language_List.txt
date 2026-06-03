@@ -4,8 +4,10 @@ PHASE 0 GOVERNANCE — DOCUMENT 3 OF 7
 Prohibited Language and Claim Restrictions
 --------------------------------------------------------------------------------
 Prepared by : Strategic Research Insights, Inc.
-Version     : v0.1 — Proof of Concept
+Version     : v0.2 — Updated with product-specific language
 Date        : June 2026
+Client Product: VENCLEXTA (venetoclax)
+Therapeutic Area: B-Cell Malignancies (CLL/SLL, AML)
 Status      : DRAFT — For Internal Review
 Classification: Internal / Confidential
 ================================================================================
@@ -14,12 +16,10 @@ Classification: Internal / Confidential
 PURPOSE
 -------
 This document defines all language, phrases, and claim types that are prohibited
-on the PitchMD(tm) platform. These restrictions will be enforced by:
+on the PitchMD(tm) platform. These restrictions are enforced by:
 
-  - Phase 2 (Output Compliance Filter): Scans AI persona responses before
-    delivery to the user.
-  - Phase 3 (Input Firewall): Scans sales representative inputs before they
-    reach the AI model.
+  - Phase 2 (Output Compliance Filter): Scans AI persona responses
+  - Phase 3 (Input Firewall): Scans sales representative inputs
 
 Any interaction containing prohibited language is automatically flagged in the
 Compliance Audit Log. Blocked content is not delivered to the user.
@@ -27,131 +27,166 @@ Compliance Audit Log. Blocked content is not delivered to the user.
 
 SECTION 4.1 — ABSOLUTE SUPERLATIVES AND UNSUPPORTED CLAIMS
 ------------------------------------------------------------
-The following terms are prohibited in all platform interactions regardless
-of context. Each creates liability for false or misleading promotion.
+Prohibited regardless of context. These generate automatic compliance flags.
 
-  PROHIBITED TERM           WHY PROHIBITED
-  ------------------------  --------------------------------------------------
-  "the best"                Unsupported comparative claim — requires published
-                            head-to-head data in approved labeling.
+  PROHIBITED TERM/PHRASE        WHY PROHIBITED           COMPLIANT ALTERNATIVE
+  ----------------------------  -----------------------  ---------------------------
+  "best BTK inhibitor"          Unsupported comparative  "VENCLEXTA is a BCL-2
+  "best treatment for CLL"      claim — no universal     inhibitor, not a BTK
+  "#1 in CLL"                   trial supports this      inhibitor. In CLL14,
+                                                          VEN+G demonstrated..."
 
-  "the #1 drug"             Unsupported market leadership claim — requires
-                            cited, current, in-label comparative data.
+  "most effective"              No universal comparator  "In [trial], VENCLEXTA
+  "more effective than          trial in the approved    demonstrated [specific
+   all other options"           labeling supports this   endpoint with statistics]"
 
-  "the most effective"      Unsupported superlative — no universal comparator
-                            trial supports an absolute statement.
+  "completely safe"             No drug is without risk  "In [trial], the safety
+  "no serious side effects"     for venetoclax. TLS      profile included...
+  "well-tolerated"              Boxed Warning applies.   [cite AE rates from PI]"
+  (without citing AE data)
 
-  "the safest"              No drug is without risk. Absolute safety claims
-  "completely safe"         are categorically prohibited by FDA OPDP.
-  "zero side effects"
+  "proven to cure CLL"          No cure claim permitted  "In MURANO, 5-year PFS
+  "will cure"                   by FDA for any drug      rate was 57.3% with
+  "eliminates cancer"           currently                VEN+R"
 
-  "proven to cure"          Unapproved cure claim. FDA does not recognize
-  "will cure"               "cure" claims except in narrow, specific contexts
-                            with supporting clinical evidence.
+  "guaranteed response"         No treatment outcome     "In VIALE-A, 66.4% of
+  "will work"                   is guaranteed for any    patients achieved CR+CRi"
+                                individual patient
 
-  "guaranteed"              No therapeutic outcome is guaranteed. Prohibited
-  "guaranteed to work"      regardless of what follow-up data is cited.
+  "100% MRD-negative"           Not supported in any     "Significantly higher
+  "all patients achieve MRD"    VENCLEXTA trial          uMRD rates were observed
+                                                          in MURANO and CLL14"
 
-  "100% effective"          Absolute efficacy claim — unsupported by any
-                            clinical trial evidence for any medicine.
-
-  COMPLIANT ALTERNATIVES:
-  Use specific, cited language from the Approved Claims Library, e.g.:
-    "In the VELORIN-301 trial, Velorin demonstrated a mean HbA1c reduction
-     of 1.4% versus 0.7% for placebo (p<0.001)."
+  "fixed-duration means         Not supported — TLS      "Fixed-duration therapy
+   no monitoring needed"        monitoring is required   requires close monitoring,
+                                throughout ramp-up       particularly during the
+                                                          5-week dose ramp-up"
 
 
-SECTION 4.2 — OFF-LABEL INDICATION TRIGGERS
---------------------------------------------
-Any mention of the following patterns for products not listed under the
-corresponding indication in the Approved Claims Library triggers an automatic
-compliance flag and content block:
+SECTION 4.2 — VENCLEXTA-SPECIFIC OFF-LABEL TRIGGERS
+------------------------------------------------------
+Any mention of the following indications NOT in the Approved Claims Library
+triggers an automatic compliance flag and content block:
 
-  - Pediatric or neonatal use for products approved for adults only
-  - Combination regimens not described in the approved Prescribing Information
-  - Dosing frequencies, routes, or durations outside the PI-specified regimen
-  - Disease states, biomarker subpopulations, or lines of therapy not in the
-    approved indication statement
-  - Use in patient populations explicitly excluded from the approved label
-    (e.g., severe renal impairment if contraindicated, pregnancy if Category X)
-  - Mentions of investigational or pipeline uses before FDA approval
-  - Any phrasing suggesting the product "might work" for an unapproved use
+  OFF-LABEL USES TO BLOCK FOR VENCLEXTA:
+  - Multiple Myeloma: VENCLEXTA is NOT approved for multiple myeloma. A
+    combination study with bortezomib/dexamethasone showed increased mortality
+    in the non-t(11;14) population. Any mention of myeloma use is BLOCKED.
+  - Mantle Cell Lymphoma (MCL): VENCLEXTA is not approved for MCL.
+  - Follicular Lymphoma (FL): VENCLEXTA is not approved for FL.
+  - Pediatric use: VENCLEXTA is approved for adults only; no pediatric
+    indication exists.
+  - AML as frontline for fit patients: Approved only for adults >=75 years
+    old OR with comorbidities that preclude intensive chemotherapy. Use as
+    first-line in fit, younger AML patients is off-label.
+  - Combination regimens not in the PI: e.g., venetoclax + ibrutinib (CAPTIVATE
+    data exists but combination is not FDA-approved as of June 2026 in a single
+    label). Confirm current approval status before discussing.
+  - Dose modifications outside the PI (e.g., "you can start at 400 mg"
+    without the ramp-up in CLL/SLL): BLOCKED — violates Boxed Warning guidance.
 
-  REDIRECT MESSAGE (displayed to user):
-  "I'm only able to discuss FDA-approved indications. For information on
-   investigational uses, please contact Medical Affairs."
+  TRIGGER MESSAGE: "I can connect you with our Medical Affairs team for
+  information on uses outside the approved indications."
 
 
 SECTION 4.3 — COMPETITOR DISPARAGEMENT
-----------------------------------------
-The following are prohibited in all platform interactions:
-
-  - Direct negative comparisons to competitor products WITHOUT published,
-    FDA-recognized head-to-head trial data cited in the approved labeling.
-  - Statements implying competitor products are unsafe, ineffective, or
-    inferior without specific supporting evidence from approved comparative
-    labeling.
-  - Language such as:
-      "[Competitor] failed"
-      "[Competitor] doesn't work"
-      "[Competitor] is dangerous"
-      "[Competitor] caused [adverse event]" (without cited PI data)
-  - Misrepresentation of competitor product labeling or trial methodology.
-  - Any disparaging language about competitor company, personnel, or practices.
-
-  NOTE: Comparative claims ARE permitted if and only if:
-  (a) the head-to-head data is in the product's approved labeling, AND
-  (b) the claim appears in the Approved Claims Library with a valid
-      MLR reference number.
-
-
-SECTION 4.4 — PATIENT IDENTIFICATION AND HIPAA RISK
------------------------------------------------------
-To protect patient privacy and comply with HIPAA (45 CFR Parts 160 and 164),
-the following are strictly prohibited in training sessions:
-
-  - Real patient names, dates of birth, medical record numbers, or Social
-    Security numbers.
-  - Identifiable case descriptions from actual clinical practice, such as:
-      "My patient at [Hospital Name] last Tuesday..."
-      "I had a 64-year-old woman with [diagnosis] who..."
-  - Hospital, clinic, or practice names combined with patient-specific
-    clinical details.
-  - Any Protected Health Information (PHI) as defined under 45 CFR Section
-    164.514.
-  - Insurance member IDs, claim numbers, or payer-specific patient identifiers.
-
-  ACTION: Immediate block + Urgent Compliance Flag + user notification.
-  Any session containing PHI will be escalated to the Compliance Officer
-  regardless of whether the session was completed.
-
-
-SECTION 4.5 — FINANCIAL AND LEGAL TOPICS
 -----------------------------------------
-The following topics are outside the promotional domain and must be redirected:
+The following are prohibited. The competitive set includes:
+  Imbruvica (ibrutinib), Brukinsa (zanubrutinib), Calquence (acalabrutinib),
+  Gazyva (obinutuzumab), Jaypirca (pirtobrutinib), Rituxan (rituximab),
+  Copiktra (duvelisib), Zydelig (idelalisib)
 
-  - Drug pricing, net price, or list price discussions
-  - Rebate structures, contract terms, or discount negotiations
-  - Insurance coverage guarantees or payer access promises
-  - Legal advice or regulatory interpretation
-  - Investment, pipeline, or financial performance information
+  PROHIBITED (Block + Flag):
+  - "Imbruvica causes heart attacks" — Disparagement without specific cited
+    data. The Boxed Warning for cardiac arrhythmias may be cited factually
+    IF quoting directly from the approved labeling.
+  - "Brukinsa is just a copy of Calquence" — Unsupported claim;
+    different development programs and clinical data.
+  - "Copiktra will kill patients" — Inflammatory; the increased mortality
+    Boxed Warning must be cited factually from the COPIKTRA PI, not editorialized.
+  - "Zydelig was a failure" — Disparaging; the clinical development history
+    can be discussed factually.
+  - "[Competitor] doesn't work" — Any absolute efficacy dismissal without
+    citing specific trial data showing inferiority.
+  - "Patients on [competitor] always switch to Venclexta" — Unsupported
+    population claim.
+  - "You should stop prescribing Ibrutinib immediately" — Direct interference
+    with prescriber judgment; not permitted.
 
-  REDIRECT MESSAGE:
-  "Pricing and contract discussions are handled by your account manager.
-   Let's refocus on the clinical profile."
+  PERMITTED (when citing approved comparative data):
+  - Citing ALPINE trial data (zanubrutinib vs. ibrutinib — head-to-head):
+    "The ALPINE trial showed zanubrutinib demonstrated superior PFS vs.
+    ibrutinib (HR 0.68)" — This is factual data from published labeling.
+  - Citing ibrutinib Boxed Warning content directly:
+    "IMBRUVICA carries a Boxed Warning for serious cardiac arrhythmias" —
+    Permitted factual citation of a competitor's own PI language.
+  - Citing CLL14 vs. GClb arm (chlorambucil + obinutuzumab) — Permitted
+    as this is VENCLEXTA's own trial with an approved comparator.
+
+  NOTE: Comparative claims vs. competitors other than the approved trial
+  comparators require additional Medical Affairs review before use in training.
+
+
+SECTION 4.4 — TLS SAFETY MINIMIZATION (VENCLEXTA-SPECIFIC)
+-------------------------------------------------------------
+The following language minimizes the Tumor Lysis Syndrome Boxed Warning
+and is PROHIBITED:
+
+  "TLS isn't really a big deal"
+  "TLS risk is very rare with proper monitoring"
+  "You don't need to worry about TLS for most patients"
+  "Just start at the full dose, TLS is manageable"
+  "Skip the ramp-up if the patient is low risk"
+
+  COMPLIANT ALTERNATIVE:
+  "VENCLEXTA carries a Boxed Warning for TLS, including fatal events. The
+   5-week dose ramp-up schedule and prophylaxis measures are required for
+   all CLL/SLL patients. With the current ramp-up and prophylaxis protocols,
+   the TLS rate was 2% in CLL/SLL monotherapy studies."
+
+  NOTE: Any training that teaches reps to downplay the TLS Boxed Warning
+  creates significant regulatory and liability risk.
+
+
+SECTION 4.5 — PATIENT IDENTIFICATION AND HIPAA RISK
+------------------------------------------------------
+Prohibited in all training sessions:
+
+  - Real patient names, dates of birth, medical record numbers
+  - Identifiable case descriptions: "My patient at Northwestern last month..."
+  - Hospital or practice names combined with patient-specific clinical details
+  - Any Protected Health Information (PHI) per 45 CFR Section 164.514
+  - Insurance member IDs, claim numbers, payer-specific patient identifiers
+
+  ACTION: Immediate block + Urgent Compliance Flag
+  Any PHI detection is escalated to the Compliance Officer.
+
+
+SECTION 4.6 — FINANCIAL AND ACCESS TOPICS
+------------------------------------------
+  - Specific rebate percentages or net price figures
+  - Guaranteed payer coverage or formulary placement promises
+  - "Venclexta is cheaper than ibrutinib" (without citing published cost data)
+  - Any contract discount negotiation language
+
+  REDIRECT: "Pricing and contract discussions are handled by your account
+  manager. Let's focus on the clinical data."
 
 
 ITEMS TO BE COMPLETED BY CLIENT
 ---------------------------------
-[ ] Review and confirm all prohibited terms with Legal and Regulatory Affairs.
-[ ] Add any company-specific or brand-specific prohibited phrases.
-[ ] Define the full competitor product list to be monitored (brand names AND
-    generic/INN names for each competitor product in the same therapeutic area).
-[ ] Confirm HIPAA training requirement for all PitchMD(tm) users.
-[ ] Define escalation procedure when a rep repeatedly triggers PHI flags.
+[ ] Confirm with Legal whether CAPTIVATE (venetoclax + ibrutinib) combination
+    data may be discussed given it is not a single FDA-approved label.
+[ ] Confirm the current regulatory status of the venetoclax + ibrutinib
+    combination labeling.
+[ ] Add any additional off-label uses specific to your client's product
+    portfolio (e.g., any investigational indications currently in Phase 3).
+[ ] Define the competitor list for the Compliance Rules Snowflake table —
+    include both brand names AND INN/generic names for each competitor.
+[ ] Review and confirm the "permitted" comparative claims list with Legal
+    to ensure consistent position across the sales force.
 
 
 ================================================================================
 END OF DOCUMENT 3 — Prohibited Language List
-Next: 04_Operational_Design_Domain.txt
 ================================================================================
