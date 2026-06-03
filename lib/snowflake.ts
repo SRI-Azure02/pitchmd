@@ -1185,6 +1185,9 @@ export class SnowflakeClient {
 
   /** Aggregated session list for the compliance dashboard. */
   async getComplianceSessions(limit: number, offset: number): Promise<{ sessions: any[]; total: number }> {
+    // LIMIT / OFFSET must be literal integers — Snowflake rejects bound parameters there.
+    const safeLimit  = Math.max(1, Math.min(200, Math.floor(limit)));
+    const safeOffset = Math.max(0, Math.floor(offset));
     const [sessions, countRows] = await Promise.all([
       this.executeQuery(`
         SELECT
@@ -1202,8 +1205,8 @@ export class SnowflakeClient {
         FROM CORTEX_TESTING.PUBLIC.SYNTHETIC_COMPLIANCE_LOG
         GROUP BY SESSION_ID, APP_USER_ID, PHYSICIAN_ID
         ORDER BY SESSION_START DESC
-        LIMIT :1 OFFSET :2
-      `, { '1': { type: 'TEXT', value: String(limit) }, '2': { type: 'TEXT', value: String(offset) } }),
+        LIMIT ${safeLimit} OFFSET ${safeOffset}
+      `, {}),
       this.executeQuery(
         `SELECT COUNT(DISTINCT SESSION_ID) AS TOTAL FROM CORTEX_TESTING.PUBLIC.SYNTHETIC_COMPLIANCE_LOG`,
         {},
