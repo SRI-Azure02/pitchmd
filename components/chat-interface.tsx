@@ -1377,7 +1377,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
             ) : filteredPhysicians.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-40 gap-2 text-slate-400">
                 <p className="text-sm font-medium">No physicians match your filters.</p>
-                <button onClick={() => { physicianHook.setSearch(''); physicianHook.setFilterSegment(null); physicianHook.setFilterSpecialty(null); setFilterValues({ overallScore: null, fieldReadiness: null }); setSortConfig(null); }} className="text-xs text-blue-500 hover:underline">Clear filters</button>
+                <button onClick={() => { physicianHook.setSearch(''); setFilterValues(EMPTY_FILTERS); setSortConfig(null); }} className="text-xs text-blue-500 hover:underline">Clear filters</button>
               </div>
             ) : (
               <table className="w-full text-base border-collapse min-w-[700px]">
