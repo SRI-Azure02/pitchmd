@@ -1144,6 +1144,16 @@ export class SnowflakeClient {
     });
   }
 
+  /** All active compliance rules — used by Phase 2 Output Compliance Filter. */
+  async getActiveComplianceRules(): Promise<any[]> {
+    return await this.executeQuery(`
+      SELECT RULE_ID, RULE_CODE, RULE_NAME, RULE_TYPE, SEVERITY, DESCRIPTION, ACTIVE
+      FROM CORTEX_TESTING.PUBLIC.SYNTHETIC_COMPLIANCE_RULES
+      WHERE ACTIVE = TRUE
+      ORDER BY RULE_TYPE, RULE_CODE
+    `, {});
+  }
+
   /** All distinct brand names from SYNTHETIC_RX — used to seed the STT product-name corrector. */
   async getAllBrands(): Promise<string[]> {
     const rows = await this.executeQuery(

@@ -2,8 +2,41 @@ import { NextRequest } from 'next/server';
 import { getSessionFromRequest } from '@/lib/auth';
 import Anthropic from '@anthropic-ai/sdk';
 import { getSnowflakeClient } from '@/lib/snowflake';
+import {
+  checkOutput,
+  buildBalanceInjection,
+  type ComplianceRule,
+  type ComplianceViolation,
+} from '@/lib/compliance-filter';
 
 const FLUSH_PAD = ' '.repeat(1024);
+
+// ── Module-level compliance rules cache ──────────────────────────────────────
+// Serverless functions are warm for ~5 min; this avoids a Snowflake round-trip
+// on every single message while still picking up rule changes within ~5 min.
+let _rulesCache: ComplianceRule[] | null = null;
+let _rulesCacheTime = 0;
+const RULES_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+async function getComplianceRules(): Promise<ComplianceRule[]> {
+  const now = Date.now();
+  if (_rulesCache && now - _rulesCacheTime < RULES_CACHE_TTL_MS) {
+    return _rulesCache;
+  }
+  try {
+    const sf = getSnowflakeClient();
+    const rows = await sf.getActiveComplianceRules();
+    _rulesCache = rows as ComplianceRule[];
+    _rulesCacheTime = now;
+    console.log(`[compliance] rules loaded: ${_rulesCache.length}`);
+    return _rulesCache;
+  } catch (err: any) {
+    console.error('[compliance] failed to load rules — fail open:', err?.message);
+    return _rulesCache ?? []; // serve stale cache or empty (fail open)
+  }
+}
+
+// ── System prompt ─────────────────────────────────────────────────────────────
 
 function buildSystemPrompt(
   physician: any,
@@ -16,9 +49,6 @@ function buildSystemPrompt(
   const segment     = physician.SEGMENT_NAME           ?? 'Standard';
   const attitudinal = physician.ATTITUDINAL_DESCRIPTION ?? 'Professional and evidence-focused';
 
-  // Mindset section overrides or supplements the attitudinal profile.
-  // When present it takes precedence — the mindset is more granular and
-  // specific than the attitudinal description.
   const mindsetSection = mindsetDescription
     ? `\n${mindsetDescription}\n\nIMPORTANT: The HCP MINDSET above is your PRIMARY behavioral directive. It overrides any generic instructions. Every response MUST authentically reflect the mindset traits listed above. Do not blend in generic "balanced" physician behavior — commit fully to the mindset.`
     : '';
@@ -55,6 +85,8 @@ RULES:
 - Push back, ask probing questions, or express enthusiasm depending on the rep's quality.
 - When the user says "done", "end", or "goodbye", give a brief natural closing line.`;
 }
+
+// ── Route ─────────────────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
   const encoder = new TextEncoder();
@@ -96,12 +128,12 @@ export async function POST(request: NextRequest) {
         }
 
         const anthropic = new Anthropic({ apiKey });
+        const sf = getSnowflakeClient();
         const systemPrompt = buildSystemPrompt(physician, username, mindsetDescription);
 
         // ── Compliance logging: rep turn (fire-and-forget) ────────────────────
         const repText = messages.filter(m => !m.internal).slice(-1)[0]?.content ?? '';
         if (sessionId && repText) {
-          const sf = getSnowflakeClient();
           sf.logComplianceTurn({
             sessionId,
             appUserId: session.userId,
@@ -114,17 +146,18 @@ export async function POST(request: NextRequest) {
         }
 
         // Map to Anthropic format.
-        // Internal messages (the silent "begin roleplay" trigger) are replaced
-        // with a neutral seed phrase so Claude knows to open as the physician.
         const anthropicMessages = messages
           .filter((m) => m.content?.trim())
           .map((m) => ({
             role: m.role as 'user' | 'assistant',
-            content: m.internal ? '(Begin the roleplay session by greeting the rep. Mention that you have up to two minutes for this visit.)' : m.content,
+            content: m.internal
+              ? '(Begin the roleplay session by greeting the rep. Mention that you have up to two minutes for this visit.)'
+              : m.content,
           }));
 
         safeEnqueue({ type: 'status', message: 'Connecting...' });
 
+        // ── Primary Claude call (streaming for UX) ────────────────────────────
         const claudeStream = anthropic.messages.stream({
           model: 'claude-haiku-4-5-20251001',
           max_tokens: 150,
@@ -133,22 +166,95 @@ export async function POST(request: NextRequest) {
         });
 
         let fullText = '';
-
         claudeStream.on('text', (token: string) => {
           fullText += token;
           safeEnqueue({ type: 'chunk', text: token });
         });
-
         await claudeStream.finalMessage();
 
         // Guarantee emotion tag is present
         let output = fullText.trim();
-        if (!/^\[EMOTION:/i.test(output)) {
-          output = `[EMOTION:neutral] ${output}`;
+        if (!/^\[EMOTION:/i.test(output)) output = `[EMOTION:neutral] ${output}`;
+
+        // ── Phase 2: Output Compliance Filter ────────────────────────────────
+        // Runs after streaming completes. The `done` event (sent below) carries
+        // the FINAL canonical text — if the filter rewrites or blocks, the
+        // client sees the corrected version even though chunks may have streamed.
+        let complianceStatus: string = 'clean';
+        let complianceFlags: ComplianceViolation[] = [];
+
+        try {
+          const rules = await getComplianceRules();
+
+          if (rules.length > 0) {
+            const filterResult = checkOutput(output, rules);
+            complianceFlags = filterResult.violations;
+
+            if (filterResult.status === 'blocked' && filterResult.primaryViolation) {
+              // ── BLOCK: substitute redirect message ─────────────────────────
+              const redirect = filterResult.primaryViolation.redirect_message!;
+              output = `/^\[EMOTION:/i.test(redirect)` ? redirect : `[EMOTION:neutral] ${redirect}`;
+              if (!/^\[EMOTION:/i.test(output)) output = `[EMOTION:neutral] ${redirect}`;
+              complianceStatus = 'blocked';
+              console.log(`[compliance] BLOCKED by ${filterResult.primaryViolation.rule_code}`);
+
+            } else if (filterResult.status === 'rewrite_needed') {
+              // ── REWRITE: re-generate with balance injection (up to 2 attempts)
+              const balanceInjection = buildBalanceInjection(filterResult.violations);
+              const rewriteSystemPrompt = systemPrompt + balanceInjection;
+              let rewriteSucceeded = false;
+
+              for (let attempt = 0; attempt < 2; attempt++) {
+                try {
+                  const regenMsg = await anthropic.messages.create({
+                    model: 'claude-haiku-4-5-20251001',
+                    max_tokens: 250,
+                    system: rewriteSystemPrompt,
+                    messages: anthropicMessages,
+                  });
+                  const regenText = ((regenMsg.content[0] as any)?.text ?? '').trim();
+                  const regenOutput = /^\[EMOTION:/i.test(regenText)
+                    ? regenText
+                    : `[EMOTION:neutral] ${regenText}`;
+
+                  // Verify re-generation passes the filter
+                  const recheck = checkOutput(regenOutput, rules);
+                  if (recheck.status === 'clean' || recheck.status === 'flagged') {
+                    output = regenOutput;
+                    complianceStatus = 'flagged'; // was non-compliant, now corrected
+                    rewriteSucceeded = true;
+                    console.log(`[compliance] rewrite succeeded (attempt ${attempt + 1}) — ${filterResult.violations.map(v => v.rule_code).join(', ')}`);
+                    break;
+                  }
+                } catch (regenErr: any) {
+                  console.error(`[compliance] rewrite attempt ${attempt + 1} failed:`, regenErr?.message);
+                }
+              }
+
+              if (!rewriteSucceeded) {
+                // Fallback: use safe fallback message from first violation
+                const fallback = filterResult.primaryViolation?.fallback
+                  ?? "I would recommend reviewing the full VENCLEXTA Prescribing Information for the complete benefit-risk profile.";
+                output = `[EMOTION:neutral] ${fallback}`;
+                complianceStatus = 'flagged';
+                console.log(`[compliance] rewrite fallback used — ${filterResult.violations.map(v => v.rule_code).join(', ')}`);
+              }
+
+            } else if (filterResult.status === 'flagged') {
+              complianceStatus = 'flagged';
+              console.log(`[compliance] flagged (warning) — ${filterResult.violations.map(v => v.rule_code).join(', ')}`);
+            }
+          }
+        } catch (filterErr: any) {
+          // Filter errors must never break the session — fail open
+          console.error('[compliance] filter error (fail open):', filterErr?.message);
         }
 
         console.log('[roleplay] done, first 200:', output.slice(0, 200));
 
+        // ── Send final output ─────────────────────────────────────────────────
+        // The `done` text is what the client renders as the final message,
+        // overwriting the streamed chunks — so the corrected version always wins.
         safeEnqueue({
           type: 'done',
           text: output,
@@ -162,7 +268,6 @@ export async function POST(request: NextRequest) {
 
         // ── Compliance logging: persona turn (fire-and-forget) ───────────────
         if (sessionId && output) {
-          const sf = getSnowflakeClient();
           sf.logComplianceTurn({
             sessionId,
             appUserId: session.userId,
@@ -170,7 +275,12 @@ export async function POST(request: NextRequest) {
             turnIndex: messages.length,
             speaker: 'persona',
             rawText: output,
-            overallStatus: 'clean',
+            overallStatus: complianceStatus as 'clean' | 'flagged' | 'blocked',
+            complianceFlags: complianceFlags.map(v => ({
+              rule_code: v.rule_code,
+              rule_type: v.rule_type,
+              action:    v.action,
+            })),
           }).catch(err => console.error('[compliance] persona log error:', err?.message));
         }
 
