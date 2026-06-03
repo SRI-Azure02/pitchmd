@@ -193,8 +193,7 @@ export async function POST(request: NextRequest) {
             if (filterResult.status === 'blocked' && filterResult.primaryViolation) {
               // ── BLOCK: substitute redirect message ─────────────────────────
               const redirect = filterResult.primaryViolation.redirect_message!;
-              output = `/^\[EMOTION:/i.test(redirect)` ? redirect : `[EMOTION:neutral] ${redirect}`;
-              if (!/^\[EMOTION:/i.test(output)) output = `[EMOTION:neutral] ${redirect}`;
+              output = /^\[EMOTION:/i.test(redirect) ? redirect : `[EMOTION:neutral] ${redirect}`;
               complianceStatus = 'blocked';
               console.log(`[compliance] BLOCKED by ${filterResult.primaryViolation.rule_code}`);
 
