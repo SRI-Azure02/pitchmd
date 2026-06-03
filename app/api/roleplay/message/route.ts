@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { getSessionFromRequest } from '@/lib/auth';
 import Anthropic from '@anthropic-ai/sdk';
+import { getSnowflakeClient } from '@/lib/snowflake';
 
 const FLUSH_PAD = ' '.repeat(1024);
 
@@ -78,11 +79,12 @@ export async function POST(request: NextRequest) {
           return;
         }
 
-        const { messages, physician, username, mindsetDescription } = (await request.json()) as {
+        const { messages, physician, username, mindsetDescription, sessionId } = (await request.json()) as {
           messages: Array<{ role: string; content: string; internal?: boolean }>;
           physician: any;
           username: string;
           mindsetDescription?: string;
+          sessionId?: string;
         };
 
         const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -95,6 +97,21 @@ export async function POST(request: NextRequest) {
 
         const anthropic = new Anthropic({ apiKey });
         const systemPrompt = buildSystemPrompt(physician, username, mindsetDescription);
+
+        // ── Compliance logging: rep turn (fire-and-forget) ────────────────────
+        const repText = messages.filter(m => !m.internal).slice(-1)[0]?.content ?? '';
+        if (sessionId && repText) {
+          const sf = getSnowflakeClient();
+          sf.logComplianceTurn({
+            sessionId,
+            appUserId: session.userId,
+            physicianId: physician.PHYSICIAN_ID ?? null,
+            turnIndex: messages.length - 1,
+            speaker: 'rep',
+            rawText: repText,
+            overallStatus: 'clean',
+          }).catch(err => console.error('[compliance] rep log error:', err?.message));
+        }
 
         // Map to Anthropic format.
         // Internal messages (the silent "begin roleplay" trigger) are replaced
@@ -142,6 +159,21 @@ export async function POST(request: NextRequest) {
           suppressed: false,
           wasStreamed: true,
         });
+
+        // ── Compliance logging: persona turn (fire-and-forget) ───────────────
+        if (sessionId && output) {
+          const sf = getSnowflakeClient();
+          sf.logComplianceTurn({
+            sessionId,
+            appUserId: session.userId,
+            physicianId: physician.PHYSICIAN_ID ?? null,
+            turnIndex: messages.length,
+            speaker: 'persona',
+            rawText: output,
+            overallStatus: 'clean',
+          }).catch(err => console.error('[compliance] persona log error:', err?.message));
+        }
+
         safeClose();
 
       } catch (err: any) {

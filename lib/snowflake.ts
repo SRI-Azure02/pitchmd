@@ -1152,6 +1152,85 @@ export class SnowflakeClient {
     );
     return (rows as any[]).map((r) => r.BRAND as string).filter(Boolean);
   }
+
+  // ─── Compliance Audit Methods ────────────────────────────────────────
+
+  /** Log a single conversation turn for compliance audit. Fire-and-forget from routes. */
+  async logComplianceTurn(params: {
+    sessionId: string;
+    appUserId: string;
+    physicianId: string | null;
+    turnIndex: number;
+    speaker: 'rep' | 'persona';
+    rawText: string;
+    overallStatus: 'clean' | 'flagged' | 'blocked';
+    complianceFlags?: object[];
+  }): Promise<void> {
+    await this.executeQuery(`
+      INSERT INTO CORTEX_TESTING.PUBLIC.SYNTHETIC_COMPLIANCE_LOG
+        (SESSION_ID, APP_USER_ID, PHYSICIAN_ID, TURN_INDEX, SPEAKER, RAW_TEXT,
+         COMPLIANCE_FLAGS, OVERALL_STATUS)
+      VALUES (:1, :2, :3, :4, :5, :6, PARSE_JSON(:7), :8)
+    `, {
+      '1': { type: 'TEXT',    value: params.sessionId },
+      '2': { type: 'TEXT',    value: params.appUserId },
+      '3': { type: 'TEXT',    value: params.physicianId ?? '' },
+      '4': { type: 'TEXT',    value: String(params.turnIndex) },
+      '5': { type: 'TEXT',    value: params.speaker },
+      '6': { type: 'TEXT',    value: params.rawText },
+      '7': { type: 'TEXT',    value: JSON.stringify(params.complianceFlags ?? []) },
+      '8': { type: 'TEXT',    value: params.overallStatus },
+    });
+  }
+
+  /** Aggregated session list for the compliance dashboard. */
+  async getComplianceSessions(limit: number, offset: number): Promise<{ sessions: any[]; total: number }> {
+    const [sessions, countRows] = await Promise.all([
+      this.executeQuery(`
+        SELECT
+          SESSION_ID,
+          APP_USER_ID,
+          PHYSICIAN_ID,
+          MIN(TIMESTAMP_UTC)                              AS SESSION_START,
+          MAX(TIMESTAMP_UTC)                              AS SESSION_END,
+          COUNT(*)                                         AS TOTAL_TURNS,
+          COUNT_IF(OVERALL_STATUS = 'flagged')             AS FLAGGED_TURNS,
+          COUNT_IF(OVERALL_STATUS = 'blocked')             AS BLOCKED_TURNS,
+          COUNT_IF(REVIEWED_BY IS NOT NULL)                AS REVIEWED_TURNS,
+          CASE WHEN COUNT_IF(REVIEWED_BY IS NULL) = 0
+               THEN TRUE ELSE FALSE END                    AS FULLY_REVIEWED
+        FROM CORTEX_TESTING.PUBLIC.SYNTHETIC_COMPLIANCE_LOG
+        GROUP BY SESSION_ID, APP_USER_ID, PHYSICIAN_ID
+        ORDER BY SESSION_START DESC
+        LIMIT :1 OFFSET :2
+      `, { '1': { type: 'TEXT', value: String(limit) }, '2': { type: 'TEXT', value: String(offset) } }),
+      this.executeQuery(
+        `SELECT COUNT(DISTINCT SESSION_ID) AS TOTAL FROM CORTEX_TESTING.PUBLIC.SYNTHETIC_COMPLIANCE_LOG`,
+        {},
+      ),
+    ]);
+    return { sessions: sessions as any[], total: Number((countRows as any[])[0]?.TOTAL ?? 0) };
+  }
+
+  /** All turns for a specific session, ordered chronologically. */
+  async getComplianceSessionTurns(sessionId: string): Promise<any[]> {
+    return await this.executeQuery(`
+      SELECT LOG_ID, TURN_INDEX, SPEAKER, RAW_TEXT, COMPLIANCE_FLAGS,
+             OVERALL_STATUS, TIMESTAMP_UTC, REVIEWED_BY, REVIEWED_AT
+      FROM CORTEX_TESTING.PUBLIC.SYNTHETIC_COMPLIANCE_LOG
+      WHERE SESSION_ID = :1
+      ORDER BY TURN_INDEX ASC, TIMESTAMP_UTC ASC
+    `, { '1': { type: 'TEXT', value: sessionId } });
+  }
+
+  /** Mark all turns in a session as reviewed by a compliance officer. */
+  async markSessionReviewed(sessionId: string, reviewedBy: string): Promise<void> {
+    await this.executeQuery(`
+      UPDATE CORTEX_TESTING.PUBLIC.SYNTHETIC_COMPLIANCE_LOG
+      SET REVIEWED_BY = :1, REVIEWED_AT = CURRENT_TIMESTAMP()
+      WHERE SESSION_ID = :2
+    `, { '1': { type: 'TEXT', value: reviewedBy }, '2': { type: 'TEXT', value: sessionId } });
+  }
 }
 
 // ─── Singleton ─────────────────────────────────────────────────────────

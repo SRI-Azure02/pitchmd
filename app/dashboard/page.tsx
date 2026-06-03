@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import ChatInterface from '@/components/chat-interface';
-import { Settings, User, ChevronDown, LogOut, Map, Camera, Monitor, Scan, X } from 'lucide-react';
+import ComplianceDashboard from '@/components/compliance-dashboard';
+import { Settings, User, ChevronDown, LogOut, Map, Camera, Monitor, Scan, X, Shield } from 'lucide-react';
 
 const ROADMAP_ITEMS = [
   {
@@ -38,12 +39,21 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [roadmapOpen, setRoadmapOpen] = useState(false);
+  const [isComplianceAdmin, setIsComplianceAdmin] = useState(false);
+  const [complianceMode, setComplianceMode] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const roadmapRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
   useEffect(() => {
     checkSession();
+  }, []);
+
+  useEffect(() => {
+    fetch('/api/compliance/is-admin')
+      .then(r => r.json())
+      .then(d => setIsComplianceAdmin(d.isAdmin ?? false))
+      .catch(() => {});
   }, []);
 
   // Close dropdown / roadmap on outside click
@@ -96,6 +106,18 @@ export default function DashboardPage() {
   // First name only for the button label
   const firstName = session?.username?.split(' ')[0] ?? 'User';
 
+  if (complianceMode) {
+    return (
+      <div className="h-screen bg-[#F1EFE9] flex flex-col overflow-hidden">
+        <div className="flex flex-col flex-1 w-full min-h-0">
+          <Card className="p-0 bg-white flex flex-col flex-1 min-h-0 overflow-hidden rounded-none border-x-0 border-b-0">
+            <ComplianceDashboard onBack={() => setComplianceMode(false)} />
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-screen bg-[#F1EFE9] flex flex-col overflow-hidden">
       <div className="flex flex-col flex-1 w-full min-h-0">
@@ -117,6 +139,17 @@ export default function DashboardPage() {
 
           {/* Right controls */}
           <div className="flex items-center gap-2">
+
+            {/* Compliance audit (admin only) */}
+            {isComplianceAdmin && (
+              <button
+                onClick={() => setComplianceMode(true)}
+                title="Compliance Audit"
+                className="p-1.5 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                <Shield className="w-4 h-4" />
+              </button>
+            )}
 
             {/* Roadmap */}
             <div className="relative" ref={roadmapRef}>

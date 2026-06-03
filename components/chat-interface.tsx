@@ -324,6 +324,8 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   const correctorRef = useRef<Corrector>((t) => t);
   // Mindset description — set at session start from the assigned mindset for this physician
   const selectedMindsetDescRef = useRef<string | null>(null);
+  // Compliance session ID — generated at session start, included in every roleplay message call
+  const sessionIdRef = useRef<string | null>(null);
   const loadingRef = useRef(false);
 
   // ── Sync state → refs ─────────────────────────────────────────────────────
@@ -583,6 +585,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
             physician: selectedPhysicianDataRef.current,
             username,
             mindsetDescription: selectedMindsetDescRef.current ?? undefined,
+            sessionId: sessionIdRef.current ?? undefined,
           }
         : {
             messages: contextMessages.map((m) => ({ role: m.role, content: m.content })),
@@ -818,6 +821,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     // Capture assigned mindset (if any) for this session — locked in at start.
     const assignedMindset = physicianMindsets[id] ?? null;
     selectedMindsetDescRef.current = getMindsetDescription(assignedMindset, savedMindsets);
+    sessionIdRef.current = crypto.randomUUID();
     if (assignedMindset) console.log(`[mindset] Physician ${id} — mindset: ${assignedMindset}`);
 
     setSelectedPhysician({
