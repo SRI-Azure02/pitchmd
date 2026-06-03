@@ -1319,6 +1319,16 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                 onOpen={() => setOpenDropdown('specialty')}
                 onClose={() => setOpenDropdown(v => v === 'specialty' ? null : v)}
               />
+              {/* Mindset */}
+              <PhysicianFilterDropdown
+                label="Mindset"
+                options={[...PRESET_MINDSETS, 'Custom', 'Not Assigned']}
+                activeFilters={filterValues.mindset}
+                onFilter={vals => setFilterValues(prev => ({ ...prev, mindset: vals }))}
+                isOpen={openDropdown === 'mindset'}
+                onOpen={() => setOpenDropdown('mindset')}
+                onClose={() => setOpenDropdown(v => v === 'mindset' ? null : v)}
+              />
               {/* Overall Score */}
               <PhysicianFilterDropdown label="Score" options={scoreBucketOptions}
                 activeFilters={filterValues.overallScore}
@@ -1334,16 +1344,6 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                 isOpen={openDropdown === 'fieldReadiness'}
                 onOpen={() => setOpenDropdown('fieldReadiness')}
                 onClose={() => setOpenDropdown(v => v === 'fieldReadiness' ? null : v)}
-              />
-              {/* HCP Mindset */}
-              <PhysicianFilterDropdown
-                label="HCP Mindset"
-                options={[...PRESET_MINDSETS, 'Custom', 'Not Assigned']}
-                activeFilters={filterValues.mindset}
-                onFilter={vals => setFilterValues(prev => ({ ...prev, mindset: vals }))}
-                isOpen={openDropdown === 'mindset'}
-                onOpen={() => setOpenDropdown('mindset')}
-                onClose={() => setOpenDropdown(v => v === 'mindset' ? null : v)}
               />
 
               {/* Clear all */}
@@ -1385,11 +1385,10 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                       { label: 'Physician ID', field: 'physicianId',   align: 'left',   tooltip: null },
                       { label: 'Physician',    field: 'name',          align: 'left',   tooltip: null },
                       { label: 'Specialty',    field: 'specialty',     align: 'left',   tooltip: null },
-                      { label: 'Segment',     field: 'segment',       align: 'left',   tooltip: null },
-                      { label: 'State',       field: 'state',         align: 'left',   tooltip: null },
-                      { label: 'Score',       field: 'overallScore',  align: 'center', tooltip: 'Median score across your 3 most recent sessions with the physician' },
-                      { label: 'Readiness',   field: 'fieldReadiness',align: 'left',   tooltip: 'Most frequent readiness rating across your 3 most recent sessions with the physician' },
-                      { label: 'HCP Mindset', field: 'mindset',       align: 'left',   tooltip: 'Hover to assign a mindset persona for this practice session' },
+                      { label: 'Segment',  field: 'segment',       align: 'left',   tooltip: null },
+                      { label: 'Mindset',  field: 'mindset',       align: 'left',   tooltip: 'Hover to assign a mindset persona for this practice session' },
+                      { label: 'Score',    field: 'overallScore',  align: 'center', tooltip: 'Median score across your 3 most recent sessions with the physician' },
+                      { label: 'Readiness',field: 'fieldReadiness',align: 'left',   tooltip: 'Most frequent readiness rating across your 3 most recent sessions with the physician' },
                     ] as const).map(({ label, field, align, tooltip }) => {
                       if (field === 'physicianId' && !showPhysicianId) return null;
                       const active = sortConfig?.field === field;
@@ -1459,31 +1458,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                           {p.SEGMENT_NAME ?? <span className="text-slate-300">—</span>}
                         </td>
 
-                        {/* State */}
-                        <td className="px-4 py-3 text-slate-600">
-                          {p.STATE ?? <span className="text-slate-300">—</span>}
-                        </td>
-
-                        {/* Overall Score */}
-                        <td className="px-4 py-3 text-slate-700 font-semibold text-center">
-                          {hasScore
-                            ? Number(p.OVERALL_SCORE).toFixed(1)
-                            : <span className="text-slate-300 font-normal text-sm">—</span>}
-                        </td>
-
-                        {/* Field Readiness */}
-                        <td className="px-4 py-3">
-                          {p.FIELD_READINESS ? (
-                            <span
-                              className="text-sm font-medium px-2 py-0.5 rounded-full whitespace-nowrap"
-                              style={readinessBadge(p.FIELD_READINESS)}
-                            >
-                              {p.FIELD_READINESS}
-                            </span>
-                          ) : <span className="text-slate-300 text-sm">—</span>}
-                        </td>
-
-                        {/* HCP Mindset */}
+                        {/* Mindset */}
                         <td className="px-4 py-3 relative">
                           <div
                             className="relative inline-block"
@@ -1503,6 +1478,25 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                               <span className="text-slate-300 text-sm cursor-default hover:text-slate-400">Set mindset…</span>
                             )}
                           </div>
+                        </td>
+
+                        {/* Overall Score */}
+                        <td className="px-4 py-3 text-slate-700 font-semibold text-center">
+                          {hasScore
+                            ? Number(p.OVERALL_SCORE).toFixed(1)
+                            : <span className="text-slate-300 font-normal text-sm">—</span>}
+                        </td>
+
+                        {/* Field Readiness */}
+                        <td className="px-4 py-3">
+                          {p.FIELD_READINESS ? (
+                            <span
+                              className="text-sm font-medium px-2 py-0.5 rounded-full whitespace-nowrap"
+                              style={readinessBadge(p.FIELD_READINESS)}
+                            >
+                              {p.FIELD_READINESS}
+                            </span>
+                          ) : <span className="text-slate-300 text-sm">—</span>}
                         </td>
 
                         {/* Actions */}
@@ -1637,7 +1631,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
                   <div>
-                    <p className="text-base font-semibold text-slate-900">Custom HCP Mindset</p>
+                    <p className="text-base font-semibold text-slate-900">Custom Mindset</p>
                     <p className="text-xs text-slate-400 mt-0.5">Toggle each dimension, name your mindset, then save.</p>
                   </div>
                   <button onClick={() => setCustomBuilder(null)} className="p-1.5 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"><X className="w-4 h-4" /></button>
