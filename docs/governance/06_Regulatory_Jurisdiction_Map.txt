@@ -1,0 +1,134 @@
+================================================================================
+PITCHMD(tm) AI SALES TRAINING PLATFORM
+PHASE 0 GOVERNANCE — DOCUMENT 6 OF 7
+Regulatory Jurisdiction Scope and Requirements Map
+--------------------------------------------------------------------------------
+Prepared by : Strategic Research Insights, Inc.
+Version     : v0.1 — Proof of Concept
+Date        : June 2026
+Status      : DRAFT — For Internal Review
+Classification: Internal / Confidential
+================================================================================
+
+
+PURPOSE
+-------
+This document records the regulatory jurisdictions in scope for PitchMD(tm),
+the applicable regulatory framework for each, and the requirements for future
+geographic expansion. Each jurisdiction requires its own claim library,
+compliance rules, and language localization before deployment.
+
+
+CURRENT SCOPE — UNITED STATES ONLY (PHASE 1 POC)
+--------------------------------------------------
+All platform operations in the proof-of-concept phase are governed exclusively
+by United States federal regulations.
+
+  REGULATORY BODY  : FDA (Food and Drug Administration)
+  KEY FRAMEWORKS   :
+    - 21 CFR Part 202: Prescription Drug Advertising
+      Governs all promotional claims and fair balance requirements.
+    - FDA OPDP (Office of Prescription Drug Promotion) Guidance
+      Including guidance on social media, digital communications, and
+      interactive media. Key documents:
+        * Draft Guidance: Internet/Social Media Platforms (2014)
+        * Guidance: Brief Summary and Adequate Directions for Use (2015)
+        * Guidance: Presenting Risk Information (2009)
+    - PhRMA Code on Interactions with Healthcare Professionals (2022)
+      Governs the nature and conduct of rep-HCP communications.
+    - 21 CFR Part 11: Electronic Records and Electronic Signatures
+      Applies to audit logs and training records. See Document 7.
+    - HIPAA Privacy Rule (45 CFR Parts 160 and 164)
+      Applies to any incidental processing of PHI in training content.
+
+  US-SPECIFIC IMPLEMENTATION NOTES:
+    1. All claims must reference the CURRENT FDA-approved Prescribing
+       Information (PI). Prior versions of the PI may not be cited.
+    2. Reminder advertisements (name-only, no indication) have different
+       fair balance requirements than full product claims. The platform
+       must distinguish between these content types.
+    3. Per FDA Draft Guidance on Interactive Promotional Media (2014):
+       AI-generated responses are treated as promotional communications
+       subject to the same standards as traditional materials.
+    4. Any mention of an adverse event in a training session — even
+       simulated — must be evaluated for MedWatch (FDA Form 3500A)
+       reporting obligation. A triage process must be established with
+       the Pharmacovigilance team before go-live.
+    5. Off-label scientific exchange (MSL activities) is governed by
+       different rules than promotional detailing. PitchMD(tm) is scoped
+       to promotional training only. MSL mode would require separate
+       governance.
+
+
+PLANNED INTERNATIONAL EXPANSION
+---------------------------------
+The following jurisdictions are planned for future expansion. Each requires:
+  (a) Jurisdiction-specific Approved Claims Library
+  (b) Jurisdiction-specific Prohibited Language rules
+  (c) Local language localization of AI persona
+  (d) Legal review by locally qualified counsel
+  (e) Separate MLR approval process
+
+  JURISDICTION    TARGET   REGULATORY BODY             KEY REQUIREMENTS
+  --------------- -------  --------------------------  -------------------------
+  European Union  Phase 3  EMA + National Competent    - GDPR Article 9 for HCP
+                           Authorities (per Member       personal data processing
+                           State)                       - EFPIA Code of Practice
+                                                        - Country-specific codes
+                                                          (e.g., ABPI, LEEM,
+                                                          vfa) vary by Member
+                                                          State
+                                                        - Stricter comparative
+                                                          claim requirements
+                                                          vs. US
+
+  United Kingdom  Phase 3  MHRA + PMCPA                - ABPI Code of Practice
+                           (Prescription Medicines      - Stricter comparative
+                           Code of Practice              claim rules than US
+                           Authority)                   - Post-Brexit: separate
+                                                          from EMA regime
+                                                        - 15-day AE reporting
+                                                          to MHRA
+                                                        - Yellow Card scheme
+
+  Canada          Phase 4  Health Canada               - Food and Drugs Act
+                                                          (R.S.C. 1985, c. F-27)
+                                                        - Bilingual requirement:
+                                                          English AND French for
+                                                          all promotional content
+                                                        - Rx&D Code of Conduct
+
+  Japan           Phase 4  PMDA (Pharmaceuticals       - Yakuji-ho Act (PAL)
+                           and Medical Devices          - Extremely strict
+                           Agency)                        off-label restrictions
+                                                        - Promotional materials
+                                                          require PMDA review
+                                                          prior to distribution
+                                                        - JPMA Code of Practice
+
+  Australia       Phase 4  TGA (Therapeutic Goods      - TGA Advertising Code
+                           Administration)              - Strict comparative
+                                                          advertising controls
+                                                        - ARCS/Medicines
+                                                          Australia Code
+
+
+ITEMS TO BE COMPLETED BY CLIENT
+---------------------------------
+[ ] Confirm Phase 1 US-only scope is correct (no other markets at POC).
+[ ] Identify which international markets are the highest priority for
+    expansion (confirm Phase 3 and Phase 4 targets).
+[ ] Engage local regulatory counsel for each planned jurisdiction before
+    Phase 3 build begins.
+[ ] Define the localization strategy: will the AI persona speak in local
+    languages, or English only for all markets?
+[ ] Confirm pharmacovigilance triage process for AE mentions in training
+    sessions (MedWatch obligation, US).
+[ ] Determine whether MSL (medical science liaison) use cases are in scope
+    for any future phase.
+
+
+================================================================================
+END OF DOCUMENT 6 — Regulatory Jurisdiction Map
+Next: 07_21CFR_Part11_Assessment.txt
+================================================================================

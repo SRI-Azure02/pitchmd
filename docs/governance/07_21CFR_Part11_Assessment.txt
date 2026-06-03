@@ -1,0 +1,181 @@
+================================================================================
+PITCHMD(tm) AI SALES TRAINING PLATFORM
+PHASE 0 GOVERNANCE — DOCUMENT 7 OF 7
+Electronic Records and Signatures — 21 CFR Part 11 Applicability Assessment
+--------------------------------------------------------------------------------
+Prepared by : Strategic Research Insights, Inc.
+Version     : v0.1 — Proof of Concept
+Date        : June 2026
+Status      : DRAFT — For Internal Review
+Classification: Internal / Confidential
+================================================================================
+
+
+PURPOSE
+-------
+This document assesses whether PitchMD(tm) constitutes a system subject to the
+requirements of 21 CFR Part 11, which governs electronic records and electronic
+signatures used in connection with FDA-regulated activities.
+
+
+REGULATORY BACKGROUND
+---------------------
+21 CFR Part 11 applies when electronic records are created, modified,
+maintained, archived, retrieved, or transmitted UNDER ANY FDA REGULATION THAT
+REQUIRES RECORDS.
+
+Key elements required by Part 11 for covered systems:
+  - System validation to ensure accuracy, reliability, and consistent operation
+  - Audit trails that are computer-generated, date/time-stamped, and secure
+  - Access controls limiting system use to authorized individuals
+  - Unique user identification and accountability
+  - Electronic signatures that are legally binding equivalents of handwritten
+    signatures
+  - Controls to prevent unauthorized use of electronic signatures
+  - Tamper-evident records
+
+
+APPLICABILITY ANALYSIS
+-----------------------
+The following table assesses each key Part 11 criterion for PitchMD(tm) in
+its current proof-of-concept state.
+
+  CRITERION                      CURRENT STATUS   NOTES
+  -----------------------------  ---------------  ----------------------------
+  Records created under          CONDITIONAL      Applies if PitchMD(tm)
+  FDA-required training                           sessions are used to document
+  documentation                                   mandatory sales force
+                                                   promotional training under
+                                                   21 CFR 202 compliance.
+                                                   [TO BE DETERMINED BY CLIENT]
+
+  Records used in regulatory     NOT APPLICABLE   Training logs are internal
+  submissions (POC phase)        (POC)            only; not submitted to FDA.
+
+  Tamper-evident audit trail     PARTIALLY MET    SYNTHETIC_COMPLIANCE_LOG in
+                                                   Snowflake captures all session
+                                                   turns with timestamps and
+                                                   user IDs. Immutable write
+                                                   pattern in place. Full
+                                                   tamper-evidence controls
+                                                   to be confirmed pre-launch.
+
+  Unique user identification     PARTIALLY MET    JWT authentication in place.
+  and access controls                             Role-based access controls
+                                                   (RBAC) and multi-factor
+                                                   authentication (MFA) planned
+                                                   for Phase 6 enterprise build.
+
+  Computer-generated timestamps  MET              All Snowflake records include
+                                                   TIMESTAMP_UTC (server-side,
+                                                   UTC). No client-side
+                                                   timestamping.
+
+  Electronic signatures on       NOT YET          Rep training completion
+  training completion records    IMPLEMENTED      acknowledgment (electronic
+                                                   signature equivalent) planned
+                                                   for Phase 6.
+
+  Audit trail of system config   NOT YET          Change management logging for
+  changes                        IMPLEMENTED      platform configuration to be
+                                                   implemented prior to
+                                                   enterprise deployment.
+
+  System validation              NOT YET          Formal validation (IQ/OQ/PQ)
+  documentation                  IMPLEMENTED      required before enterprise
+                                                   deployment. See timeline
+                                                   below.
+
+
+CURRENT VERDICT: CONDITIONAL
+-----------------------------
+21 CFR Part 11 applies to PitchMD(tm) IF the platform is used to satisfy
+formally required sales force training documentation obligations.
+
+Even if formal Part 11 obligations do not apply at POC stage, SRI RECOMMENDS
+operating as if they do — collecting all data with tamper-evident logs,
+server-side timestamps, and user attribution. This ensures no retroactive
+data remediation is required at enterprise deployment.
+
+
+RECOMMENDATION FOR POC PHASE
+------------------------------
+  DO NOW (before any client use):
+    [x] Server-side, UTC-stamped immutable audit log in Snowflake (DONE)
+    [x] User attribution on every session record (DONE)
+    [x] Role-based access to compliance audit dashboard (DONE)
+    [ ] Confirm Snowflake cannot be written to directly by application users
+        (only via API — verify IAM controls in Snowflake)
+    [ ] Document the system architecture for future validation package
+
+  BEFORE ENTERPRISE DEPLOYMENT:
+    [ ] Complete formal system validation per GAMP 5 Category 4 or 5
+    [ ] Engage a qualified CRO or validation specialist
+    [ ] Produce all validation deliverables listed below
+
+
+VALIDATION DELIVERABLES REQUIRED FOR ENTERPRISE DEPLOYMENT
+------------------------------------------------------------
+The following documents are required for a fully 21 CFR Part 11 compliant
+system. Each must be authored, reviewed, and approved per the client's
+Standard Operating Procedures.
+
+  Document                              Abbreviation  Typical Owner
+  ------------------------------------  ------------  ---------------------
+  Validation Plan                       VP            IT / Quality
+  User Requirements Specification       URS           Business / Compliance
+  Functional Requirements Spec.         FRS           IT / Platform Team
+  Design Qualification                  DQ            IT / Platform Team
+  Installation Qualification            IQ            IT / Quality
+  Operational Qualification             OQ            IT / Quality
+  Performance Qualification             PQ            IT / Quality / Users
+  Traceability Matrix                   TM            Quality
+  System Validation Report              SVR           Quality
+  Periodic Review Plan                  PRP           Quality
+
+
+ESTIMATED TIMELINE AND COST
+-----------------------------
+  Full GxP system validation to 21 CFR Part 11 standards:
+    Estimated effort  : 3–6 months
+    Recommended route : Engage a CRO or validation specialist with
+                        demonstrated experience in validated SaaS platforms
+                        in the pharmaceutical sector.
+    Budget estimate   : [TO BE COMPLETED BY CLIENT based on vendor scope]
+
+  Annual re-validation trigger events:
+    - Any major platform release (new features, architecture changes)
+    - Any change to the underlying AI model or version
+    - Any change to the Snowflake schema for compliance-related tables
+    - Periodic review (annually from initial validation date)
+
+
+ITEMS TO BE COMPLETED BY CLIENT
+---------------------------------
+[ ] Determine whether PitchMD(tm) sessions will be used to document formally
+    required training (this triggers full Part 11 applicability).
+[ ] Confirm Snowflake IAM: application users should have write access only
+    via API, not direct database access.
+[ ] Identify a qualified validation specialist or CRO for Phase 6.
+[ ] Decide on the electronic signature approach for training completion:
+    typed name? SMS OTP? PKI certificate?
+[ ] Draft the Validation Plan and URS before Phase 6 build begins.
+[ ] Confirm whether the client's internal SOPs require validation before ANY
+    use, or only before use as mandatory training documentation.
+
+
+================================================================================
+END OF DOCUMENT 7 — 21 CFR Part 11 Assessment
+
+PHASE 0 GOVERNANCE DOCUMENT SET COMPLETE
+Files in this set:
+  01_MLR_Review_Process.txt
+  02_Approved_Claims_Library_Template.txt
+  03_Prohibited_Language_List.txt
+  04_Operational_Design_Domain.txt
+  05_Fair_Balance_Trigger_List.txt
+  06_Regulatory_Jurisdiction_Map.txt
+  07_21CFR_Part11_Assessment.txt
+
+Location: docs/governance/ in the PitchMD project repository
+================================================================================

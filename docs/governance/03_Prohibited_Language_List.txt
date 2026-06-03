@@ -1,0 +1,157 @@
+================================================================================
+PITCHMD(tm) AI SALES TRAINING PLATFORM
+PHASE 0 GOVERNANCE — DOCUMENT 3 OF 7
+Prohibited Language and Claim Restrictions
+--------------------------------------------------------------------------------
+Prepared by : Strategic Research Insights, Inc.
+Version     : v0.1 — Proof of Concept
+Date        : June 2026
+Status      : DRAFT — For Internal Review
+Classification: Internal / Confidential
+================================================================================
+
+
+PURPOSE
+-------
+This document defines all language, phrases, and claim types that are prohibited
+on the PitchMD(tm) platform. These restrictions will be enforced by:
+
+  - Phase 2 (Output Compliance Filter): Scans AI persona responses before
+    delivery to the user.
+  - Phase 3 (Input Firewall): Scans sales representative inputs before they
+    reach the AI model.
+
+Any interaction containing prohibited language is automatically flagged in the
+Compliance Audit Log. Blocked content is not delivered to the user.
+
+
+SECTION 4.1 — ABSOLUTE SUPERLATIVES AND UNSUPPORTED CLAIMS
+------------------------------------------------------------
+The following terms are prohibited in all platform interactions regardless
+of context. Each creates liability for false or misleading promotion.
+
+  PROHIBITED TERM           WHY PROHIBITED
+  ------------------------  --------------------------------------------------
+  "the best"                Unsupported comparative claim — requires published
+                            head-to-head data in approved labeling.
+
+  "the #1 drug"             Unsupported market leadership claim — requires
+                            cited, current, in-label comparative data.
+
+  "the most effective"      Unsupported superlative — no universal comparator
+                            trial supports an absolute statement.
+
+  "the safest"              No drug is without risk. Absolute safety claims
+  "completely safe"         are categorically prohibited by FDA OPDP.
+  "zero side effects"
+
+  "proven to cure"          Unapproved cure claim. FDA does not recognize
+  "will cure"               "cure" claims except in narrow, specific contexts
+                            with supporting clinical evidence.
+
+  "guaranteed"              No therapeutic outcome is guaranteed. Prohibited
+  "guaranteed to work"      regardless of what follow-up data is cited.
+
+  "100% effective"          Absolute efficacy claim — unsupported by any
+                            clinical trial evidence for any medicine.
+
+  COMPLIANT ALTERNATIVES:
+  Use specific, cited language from the Approved Claims Library, e.g.:
+    "In the VELORIN-301 trial, Velorin demonstrated a mean HbA1c reduction
+     of 1.4% versus 0.7% for placebo (p<0.001)."
+
+
+SECTION 4.2 — OFF-LABEL INDICATION TRIGGERS
+--------------------------------------------
+Any mention of the following patterns for products not listed under the
+corresponding indication in the Approved Claims Library triggers an automatic
+compliance flag and content block:
+
+  - Pediatric or neonatal use for products approved for adults only
+  - Combination regimens not described in the approved Prescribing Information
+  - Dosing frequencies, routes, or durations outside the PI-specified regimen
+  - Disease states, biomarker subpopulations, or lines of therapy not in the
+    approved indication statement
+  - Use in patient populations explicitly excluded from the approved label
+    (e.g., severe renal impairment if contraindicated, pregnancy if Category X)
+  - Mentions of investigational or pipeline uses before FDA approval
+  - Any phrasing suggesting the product "might work" for an unapproved use
+
+  REDIRECT MESSAGE (displayed to user):
+  "I'm only able to discuss FDA-approved indications. For information on
+   investigational uses, please contact Medical Affairs."
+
+
+SECTION 4.3 — COMPETITOR DISPARAGEMENT
+----------------------------------------
+The following are prohibited in all platform interactions:
+
+  - Direct negative comparisons to competitor products WITHOUT published,
+    FDA-recognized head-to-head trial data cited in the approved labeling.
+  - Statements implying competitor products are unsafe, ineffective, or
+    inferior without specific supporting evidence from approved comparative
+    labeling.
+  - Language such as:
+      "[Competitor] failed"
+      "[Competitor] doesn't work"
+      "[Competitor] is dangerous"
+      "[Competitor] caused [adverse event]" (without cited PI data)
+  - Misrepresentation of competitor product labeling or trial methodology.
+  - Any disparaging language about competitor company, personnel, or practices.
+
+  NOTE: Comparative claims ARE permitted if and only if:
+  (a) the head-to-head data is in the product's approved labeling, AND
+  (b) the claim appears in the Approved Claims Library with a valid
+      MLR reference number.
+
+
+SECTION 4.4 — PATIENT IDENTIFICATION AND HIPAA RISK
+-----------------------------------------------------
+To protect patient privacy and comply with HIPAA (45 CFR Parts 160 and 164),
+the following are strictly prohibited in training sessions:
+
+  - Real patient names, dates of birth, medical record numbers, or Social
+    Security numbers.
+  - Identifiable case descriptions from actual clinical practice, such as:
+      "My patient at [Hospital Name] last Tuesday..."
+      "I had a 64-year-old woman with [diagnosis] who..."
+  - Hospital, clinic, or practice names combined with patient-specific
+    clinical details.
+  - Any Protected Health Information (PHI) as defined under 45 CFR Section
+    164.514.
+  - Insurance member IDs, claim numbers, or payer-specific patient identifiers.
+
+  ACTION: Immediate block + Urgent Compliance Flag + user notification.
+  Any session containing PHI will be escalated to the Compliance Officer
+  regardless of whether the session was completed.
+
+
+SECTION 4.5 — FINANCIAL AND LEGAL TOPICS
+-----------------------------------------
+The following topics are outside the promotional domain and must be redirected:
+
+  - Drug pricing, net price, or list price discussions
+  - Rebate structures, contract terms, or discount negotiations
+  - Insurance coverage guarantees or payer access promises
+  - Legal advice or regulatory interpretation
+  - Investment, pipeline, or financial performance information
+
+  REDIRECT MESSAGE:
+  "Pricing and contract discussions are handled by your account manager.
+   Let's refocus on the clinical profile."
+
+
+ITEMS TO BE COMPLETED BY CLIENT
+---------------------------------
+[ ] Review and confirm all prohibited terms with Legal and Regulatory Affairs.
+[ ] Add any company-specific or brand-specific prohibited phrases.
+[ ] Define the full competitor product list to be monitored (brand names AND
+    generic/INN names for each competitor product in the same therapeutic area).
+[ ] Confirm HIPAA training requirement for all PitchMD(tm) users.
+[ ] Define escalation procedure when a rep repeatedly triggers PHI flags.
+
+
+================================================================================
+END OF DOCUMENT 3 — Prohibited Language List
+Next: 04_Operational_Design_Domain.txt
+================================================================================

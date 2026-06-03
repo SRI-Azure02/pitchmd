@@ -1,0 +1,134 @@
+================================================================================
+PITCHMD(tm) AI SALES TRAINING PLATFORM
+PHASE 0 GOVERNANCE — DOCUMENT 2 OF 7
+Approved Claims Library — Template and Example Entries
+--------------------------------------------------------------------------------
+Prepared by : Strategic Research Insights, Inc.
+Version     : v0.1 — Proof of Concept
+Date        : June 2026
+Status      : DRAFT — Illustrative examples only. Full library to be populated
+              by Medical Affairs prior to platform go-live.
+Classification: Internal / Confidential
+================================================================================
+
+
+PURPOSE
+-------
+The Approved Claims Library is the single authoritative source of truth for all
+factual claims that the PitchMD(tm) AI physician persona may make, reference, or
+respond to during training sessions.
+
+The AI system may ONLY assert claims that are:
+  (a) explicitly present in this library, AND
+  (b) have current MLR APPROVED status with a valid effective date.
+
+Any claim not in this library is treated as off-label or unapproved and will be
+blocked by the Phase 2 output compliance filter.
+
+
+LIBRARY ENTRY STRUCTURE
+------------------------
+Each entry must contain all fields below. Incomplete entries will be rejected
+during the MLR review process.
+
+  Field               Description
+  ------------------  ---------------------------------------------------------
+  CLAIM_ID            Unique identifier (e.g., VEL-EFF-001)
+  PRODUCT             Brand name of the drug
+  INDICATION          Exact approved indication as written in the PI
+  APPROVED_CLAIM      Verbatim claim text as approved by MLR
+  CLAIM_TYPE          EFFICACY | SAFETY | MECHANISM | COMPARATIVE | ACCESS
+  SUPPORTING_SOURCE   Study name or PI section number
+  MLR_REF_NUMBER      MLR reference number assigned at approval (Stage 5)
+  EFFECTIVE_DATE      Date from which this claim is active on the platform
+  EXPIRY_DATE         Date on which this claim must be re-reviewed
+  CURRENT_STATUS      APPROVED | PENDING | EXPIRED | WITHDRAWN
+  APPROVED_BY         Name of Compliance Officer who approved
+  NOTES               Any additional context or usage restrictions
+
+
+EXAMPLE ENTRIES (Illustrative — Using Fictional Products)
+---------------------------------------------------------
+NOTE: Velorin, Cardantix, and Imvexin are fictional product names used for
+proof-of-concept purposes only. Replace with actual product names before
+go-live.
+
+  CLAIM_ID    : VEL-EFF-001
+  PRODUCT     : Velorin
+  INDICATION  : Type 2 Diabetes Mellitus — HbA1c Reduction
+  CLAIM       : "Velorin demonstrated a mean HbA1c reduction of 1.4% vs. 0.7%
+                 for placebo at 26 weeks (p<0.001, 95% CI: 0.5-0.9%)"
+  CLAIM_TYPE  : EFFICACY
+  SOURCE      : VELORIN-301 Phase 3 Trial, N=847
+  STATUS      : [TO BE COMPLETED]
+  EXPIRY DATE : [TO BE COMPLETED]
+
+  CLAIM_ID    : VEL-SAF-001
+  PRODUCT     : Velorin
+  INDICATION  : Type 2 Diabetes Mellitus — Safety Profile
+  CLAIM       : "Most common adverse events (>=5%): nausea (12%), headache (8%),
+                 upper respiratory infection (6%), diarrhea (5%)"
+  CLAIM_TYPE  : SAFETY
+  SOURCE      : VELORIN-301 Prescribing Information, Section 6.1
+  STATUS      : [TO BE COMPLETED]
+  EXPIRY DATE : [TO BE COMPLETED]
+
+  CLAIM_ID    : CAR-EFF-001
+  PRODUCT     : Cardantix
+  INDICATION  : Hypertension — First-Line Therapy in Adults
+  CLAIM       : "Cardantix reduced mean systolic blood pressure by 18.3 mmHg
+                 vs. 9.1 mmHg for placebo at 12 weeks (p<0.0001)"
+  CLAIM_TYPE  : EFFICACY
+  SOURCE      : CARDANTIX-201 Phase 3 Trial, N=1,204
+  STATUS      : [TO BE COMPLETED]
+  EXPIRY DATE : [TO BE COMPLETED]
+
+  CLAIM_ID    : IMV-EFF-001
+  PRODUCT     : Imvexin
+  INDICATION  : Non-Small Cell Lung Cancer — EGFR-mutated, 1st Line
+  CLAIM       : "Imvexin demonstrated median PFS of 11.1 months vs. 4.7 months
+                 for platinum-based chemotherapy (HR 0.35; 95% CI: 0.26-0.46;
+                 p<0.0001)"
+  CLAIM_TYPE  : EFFICACY
+  SOURCE      : IMVEXIN-101 Phase 3 Trial, N=364
+  STATUS      : [TO BE COMPLETED]
+  EXPIRY DATE : [TO BE COMPLETED]
+
+  CLAIM_ID    : IMV-SAF-001
+  PRODUCT     : Imvexin
+  INDICATION  : Non-Small Cell Lung Cancer — BOXED WARNING
+  CLAIM       : "WARNING: Interstitial Lung Disease (ILD) reported in 3.4% of
+                 patients including fatal cases. Withhold Imvexin for Grade 2
+                 ILD; permanently discontinue for Grade 3 or 4 ILD."
+  CLAIM_TYPE  : SAFETY
+  SOURCE      : IMVEXIN PI, Boxed Warning
+  STATUS      : [TO BE COMPLETED]
+  EXPIRY DATE : [TO BE COMPLETED]
+
+
+LIBRARY GOVERNANCE RULES
+--------------------------
+1. Only Medical Affairs may submit new entries for MLR review.
+2. No claim may be active on the platform without a valid MLR_REF_NUMBER.
+3. Entries with EXPIRED status are automatically removed from the active
+   library. The AI will not use them even if they remain in the database.
+4. When a Prescribing Information is updated by the FDA, ALL entries for that
+   product must be reviewed and re-approved within 30 days.
+5. Withdrawn entries (e.g., due to safety signals) must be removed from the
+   platform within 24 hours of withdrawal decision.
+
+
+ITEMS TO BE COMPLETED BY CLIENT
+---------------------------------
+[ ] Populate full library for each approved product and indication.
+[ ] Obtain MLR sign-off for each entry before platform go-live.
+[ ] Define the expiry date policy (e.g., 12 months standard unless label
+    changes).
+[ ] Connect this library to the Snowflake RAG repository (Phase 4 build).
+[ ] Define process for Medical Affairs submissions into the claims database.
+
+
+================================================================================
+END OF DOCUMENT 2 — Approved Claims Library
+Next: 03_Prohibited_Language_List.txt
+================================================================================

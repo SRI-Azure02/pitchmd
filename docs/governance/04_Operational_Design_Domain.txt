@@ -1,0 +1,146 @@
+================================================================================
+PITCHMD(tm) AI SALES TRAINING PLATFORM
+PHASE 0 GOVERNANCE — DOCUMENT 4 OF 7
+Operational Design Domain (ODD) — Permitted Topic Boundaries
+--------------------------------------------------------------------------------
+Prepared by : Strategic Research Insights, Inc.
+Version     : v0.1 — Proof of Concept
+Date        : June 2026
+Status      : DRAFT — For Internal Review
+Classification: Internal / Confidential
+================================================================================
+
+
+PURPOSE
+-------
+The Operational Design Domain (ODD) defines the universe of topics that
+PitchMD(tm) is permitted to address during training sessions. It functions as
+the "topic guardrail" — enforced by the Phase 3 Input Firewall — that keeps
+all training interactions focused on compliant pharmaceutical promotion.
+
+Any user input or AI-generated output that falls outside this domain will be
+blocked, redirected, or flagged according to the action specified below.
+
+
+SECTION 6.1 — IN-SCOPE TOPICS (PERMITTED)
+------------------------------------------
+The following topics are within the permitted operational domain of PitchMD(tm).
+The AI physician persona may discuss any of these topics, and sales
+representative inputs on these topics will be processed normally.
+
+  TOPIC AREA                    SCOPE BOUNDARY
+  ----------------------------  -----------------------------------------------
+  Approved Product Indications  As listed in the Approved Claims Library only
+                                 (Document 2). No extrapolation permitted.
+
+  Mechanism of Action           As described in the current FDA-approved PI.
+                                 No speculative MoA discussion permitted.
+
+  Clinical Trial Data           Only trials explicitly cited in approved labeling.
+                                 Trial data from peer-reviewed publications not
+                                 in the PI requires MLR review before use.
+
+  Dosing and Administration     Per PI only. No alternative dosing regimens.
+
+  Patient Support Programs      Factual descriptions of co-pay assistance, hub
+                                 services, and patient access programs.
+
+  Formulary and Payer Access    Factual, non-speculative. Current formulary
+                                 status only; no future coverage promises.
+
+  Objection Handling            Using approved clinical data and communication
+                                 techniques only. No prohibited language (Doc 3).
+
+  Adverse Event Profiles        Approved safety data from PI and REMS materials
+                                 only. Must be accompanied by fair balance
+                                 (see Document 5).
+
+  Comparative Claims            ONLY if head-to-head data is in the approved
+                                 labeling AND listed in the Claims Library.
+
+
+SECTION 6.2 — OUT-OF-SCOPE TOPICS (BLOCKED OR REDIRECTED)
+----------------------------------------------------------
+The following topics are outside the permitted ODD. The Action column describes
+the system response. All blocks and flags are recorded in the Compliance Audit
+Log.
+
+  TOPIC                           ACTION              REDIRECT MESSAGE
+  ------------------------------  ------------------  -------------------------------
+  Off-label indications or        Block + Flag        "I can connect you with our
+  unapproved patient populations                       Medical Affairs team for
+                                                       information on that use."
+
+  Pipeline products not yet       Block + Flag        "I'm only able to discuss
+  FDA-approved                                         products with current FDA
+                                                       approval. Please contact
+                                                       Medical Affairs."
+
+  Pricing negotiations,           Block + Redirect    "Pricing and contract
+  contract discounts, or                               discussions are handled by
+  rebate structures                                    your account manager."
+
+  Personal medical advice or      Block + Flag        "I'm not able to provide
+  patient-specific treatment                           personal medical advice.
+  recommendations                                      Please direct patients to
+                                                       their treating physician."
+
+  Politics, religion, social      Redirect            "Let's keep our focus on
+  commentary, or personal topics                       today's product discussion."
+
+  Competitor safety               Block + Flag        "I can share the head-to-head
+  disparagement without                                comparative data from our
+  comparative data                                     approved trial."
+
+  Patient-identifiable            Immediate           "Please do not include
+  information (PHI)               Block + Urgent       patient-identifying information
+                                  Flag                 in training sessions. This
+                                                       interaction has been flagged
+                                                       for compliance review."
+
+  Financial performance,          Block + Redirect    "For investor or financial
+  pipeline, or M&A discussion                          information, please contact
+                                                       Investor Relations."
+
+  Requests to override AI         Block + Flag        "I'm designed to provide
+  compliance constraints or                             compliant training only.
+  "act as" different persona                            Please stay within the
+                                                       training scenario."
+
+
+SECTION 6.3 — REPEATED VIOLATION ESCALATION
+--------------------------------------------
+Single violation:
+  - Generates a compliance flag in SYNTHETIC_COMPLIANCE_LOG.
+  - User sees the redirect message.
+  - No immediate user notification beyond the redirect.
+
+Repeated violations (3+ of same category within rolling 30 days):
+  - System generates an escalation notification to:
+      (a) The user's direct manager
+      (b) The Compliance Officer
+  - User receives an in-app notice that their account is under review.
+
+Severe violations (PHI disclosure, jailbreak attempts):
+  - Immediate flag to Compliance Officer regardless of frequency.
+  - Session may be suspended pending compliance review at Compliance
+    Officer's discretion.
+
+
+ITEMS TO BE COMPLETED BY CLIENT
+---------------------------------
+[ ] Review and approve the full in-scope topic list with Legal and Medical
+    Affairs.
+[ ] Confirm the escalation chain: who receives escalation notifications?
+    (Manager name/role, Compliance Officer contact).
+[ ] Define the redirect message tone and voice for your brand guidelines.
+[ ] Confirm whether "pipeline product" discussions are permitted in any
+    context (e.g., scientific exchange outside a promotional call).
+[ ] Define the suspension process: who can suspend an account, what
+    review is required before reinstatement?
+
+
+================================================================================
+END OF DOCUMENT 4 — Operational Design Domain
+Next: 05_Fair_Balance_Trigger_List.txt
+================================================================================

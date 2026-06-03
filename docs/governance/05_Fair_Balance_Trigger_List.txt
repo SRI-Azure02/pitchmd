@@ -1,0 +1,123 @@
+================================================================================
+PITCHMD(tm) AI SALES TRAINING PLATFORM
+PHASE 0 GOVERNANCE — DOCUMENT 5 OF 7
+Fair Balance Requirements — Efficacy-to-Safety Pairing
+--------------------------------------------------------------------------------
+Prepared by : Strategic Research Insights, Inc.
+Version     : v0.1 — Proof of Concept
+Date        : June 2026
+Status      : DRAFT — Illustrative examples only. Full list to be completed
+              by Medical Affairs for each approved product/indication.
+Classification: Internal / Confidential
+================================================================================
+
+
+PURPOSE
+-------
+Under FDA promotional regulations (21 CFR Part 202 and OPDP guidance), every
+efficacy or benefit claim must be accompanied by fair balance — a truthful and
+non-misleading presentation of risk information with prominence and readability
+reasonably comparable to the efficacy claim.
+
+PitchMD(tm) enforces these pairings automatically in the Phase 2 Output
+Compliance Filter: when the AI persona makes an efficacy claim matching a
+trigger phrase below, the corresponding safety balance statement MUST appear
+in the same response turn. If it does not, the response is re-generated before
+delivery.
+
+
+HOW THIS WORKS IN THE PLATFORM
+--------------------------------
+  Step 1: AI generates a response containing an efficacy claim.
+  Step 2: Output Compliance Filter scans the response for trigger phrases.
+  Step 3: If a trigger is matched WITHOUT the required safety balance:
+            - Response is flagged as "unbalanced"
+            - Re-generation is triggered with the safety balance appended
+            - The compliance flag is logged with rule code FAIR_BALANCE
+  Step 4: Re-generated response is delivered to the user.
+
+If re-generation fails to include the balance after 2 attempts:
+  - The response is replaced with a safe fallback:
+    "I'd refer you to the full Prescribing Information for the benefit-risk
+     profile of [product]."
+  - Compliance Officer is notified.
+
+
+FAIR BALANCE TRIGGER TABLE
+----------------------------
+NOTE: The entries below use fictional product names for POC purposes.
+[TO BE COMPLETED BY CLIENT] — Full table to be populated by Medical Affairs
+for each approved product and indication before Phase 2 go-live.
+
+  PRODUCT    TRIGGER PHRASES                  MANDATORY SAFETY BALANCE
+  ---------  -------------------------------  ----------------------------------
+  Velorin    Any claim about HbA1c            "Velorin is contraindicated in
+             reduction, glycemic control, or   patients with eGFR <30 mL/min/
+             blood sugar improvement           1.73m2. Most common adverse
+                                               events: nausea (12%), headache
+                                               (8%), upper respiratory infection
+                                               (6%)."
+             SEVERITY: Required
+
+  Velorin    Any reference to cardiovascular  "VELORIN-CVOT: No significant
+             outcomes, MACE data, or CV        difference in MACE vs placebo.
+             risk reduction                    BOXED WARNING: Risk of acute
+                                               pancreatitis. Discontinue
+                                               immediately if pancreatitis
+                                               is suspected."
+             SEVERITY: Required — Boxed Warning
+
+  Cardantix  Any claim about blood pressure   "Cardantix is contraindicated
+             reduction, antihypertensive       in bilateral renal artery
+             efficacy, or systolic/diastolic   stenosis and in all trimesters
+             improvement                       of pregnancy. Monitor serum
+                                               potassium in patients receiving
+                                               ACE inhibitors or potassium-
+                                               sparing diuretics."
+             SEVERITY: Required
+
+  Imvexin    Any reference to PFS, OS,        "BOXED WARNING: Interstitial
+             objective response rate, or       Lung Disease (ILD) reported in
+             tumor shrinkage                   3.4% of patients including
+                                               fatal cases. Withhold for
+                                               Grade 2 ILD; permanently
+                                               discontinue for Grade 3-4 ILD.
+                                               Hepatotoxicity: monitor LFTs
+                                               every 3 weeks."
+             SEVERITY: Required — Black Box Warning
+
+  Imvexin    Any reference to EGFR mutation   "EGFR mutation testing using an
+             response rates or mutation-       FDA-approved companion diagnostic
+             specific efficacy                 is required prior to initiation.
+                                               Imvexin is NOT indicated for
+                                               EGFR wild-type NSCLC."
+             SEVERITY: Required — Companion Diagnostic Requirement
+
+
+SEVERITY LEVELS
+----------------
+  Required              Standard balance. Must be present in the same turn.
+  Required — BBW        Boxed Warning must be prominent. Re-gen if absent.
+  Required — REMS       REMS-required safety messaging. Highest priority.
+  Required — CD         Companion diagnostic requirement must be stated.
+
+
+ITEMS TO BE COMPLETED BY CLIENT
+---------------------------------
+[ ] Populate the full trigger table for all approved products and indications.
+[ ] Obtain MLR sign-off on each safety balance statement (it is itself a
+    regulated claim).
+[ ] Identify all products with Boxed Warnings — these require enhanced
+    treatment in the output filter.
+[ ] Identify all products with REMS programs — REMS messaging requirements
+    must be incorporated as mandatory safety blocks.
+[ ] Define the fallback message for each product (used when re-generation
+    fails to produce a balanced response).
+[ ] Connect this list to the Snowflake COMPLIANCE_RULES table so it can be
+    maintained and updated without code changes (Phase 2 build).
+
+
+================================================================================
+END OF DOCUMENT 5 — Fair Balance Trigger List
+Next: 06_Regulatory_Jurisdiction_Map.txt
+================================================================================
