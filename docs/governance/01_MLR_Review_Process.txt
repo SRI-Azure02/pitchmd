@@ -320,15 +320,35 @@ All MLR review records retained for a minimum of SEVEN (7) YEARS per
 21 CFR Part 202.1(j). Records stored in a tamper-evident, auditable system.
 
 
-ITEMS TO BE COMPLETED BY CLIENT
----------------------------------
-[ ] Identify named individuals for each reviewer role.
-[ ] Define document management system for MLR records.
-[ ] Confirm whether existing MLR workflow tools (e.g., Veeva Vault PromoMats)
-    will be integrated with PitchMD(tm).
-[ ] Confirm the emergency contact list for FDA safety communications.
-[ ] Designate a single Medical Affairs point of contact responsible for
-    monitoring FDA labeling updates for VENCLEXTA and all 8 competitive products.
+CONFIRMED DECISIONS (POC DEMO — June 2026)
+------------------------------------------
+[x] MLR Reviewers (all stages): Harshad Chiddarwar
+    Email: Harshad.Chiddarwar@srinsights.com
+    Role: All reviewer roles (Medical, Legal, Regulatory, Compliance) held by
+    single designated reviewer for POC demo purposes.
+
+[x] Document management: Email distribution + Microsoft SharePoint storage.
+    No Veeva Vault or dedicated MLR workflow tool at POC stage.
+
+[x] FDA emergency contact: Harshad Chiddarwar
+    Email: Harshad.Chiddarwar@srinsights.com
+
+[x] 21 CFR Part 11 applicability: CONFIRMED — sessions will be used to satisfy
+    formal training requirements. Full Part 11 compliance obligations apply.
+    Validation deliverables required before enterprise deployment (see Doc 7).
+
+[x] Training scope: CLL/SLL ONLY for this demonstration. AML indication
+    excluded from active training rules at POC stage.
+
+[x] VEN+ibrutinib combination: IN-SCOPE for training discussions. Reps may
+    discuss the combination in the context of sequential/combination therapy
+    despite it not being in a single FDA-approved label.
+
+[x] All compliance rules: ACTIVE as of June 2026. All 25 rules in
+    SYNTHETIC_COMPLIANCE_RULES are set ACTIVE = TRUE.
+
+NOTE: Legal and Medical Affairs sign-offs are deferred for the product
+demonstration phase. These must be completed before commercial deployment.
 
 
 ================================================================================
