@@ -10,8 +10,9 @@ function isComplianceAdmin(email: string | undefined): boolean {
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { sessionId: string } }
+  { params }: { params: Promise<{ sessionId: string }> }
 ) {
+  const { sessionId } = await params;
   const session = await getSessionFromRequest(request);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   if (!isComplianceAdmin(session.email))
@@ -19,7 +20,7 @@ export async function POST(
 
   try {
     const sf = getSnowflakeClient();
-    await sf.markSessionReviewed(params.sessionId, session.email ?? session.username);
+    await sf.markSessionReviewed(sessionId, session.email ?? session.username);
     return NextResponse.json({ success: true });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? 'Failed to mark reviewed' }, { status: 500 });

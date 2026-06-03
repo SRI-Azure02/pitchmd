@@ -10,8 +10,9 @@ function isComplianceAdmin(email: string | undefined): boolean {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { sessionId: string } }
+  { params }: { params: Promise<{ sessionId: string }> }
 ) {
+  const { sessionId } = await params;
   const session = await getSessionFromRequest(request);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   if (!isComplianceAdmin(session.email))
@@ -19,7 +20,7 @@ export async function GET(
 
   try {
     const sf = getSnowflakeClient();
-    const turns = await sf.getComplianceSessionTurns(params.sessionId);
+    const turns = await sf.getComplianceSessionTurns(sessionId);
     return NextResponse.json({ turns });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? 'Failed to load session' }, { status: 500 });
