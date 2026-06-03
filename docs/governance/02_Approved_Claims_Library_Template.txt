@@ -4,7 +4,7 @@ PHASE 0 GOVERNANCE — DOCUMENT 2 OF 7
 Approved Claims Library — VENCLEXTA (venetoclax) and Competitive Landscape
 --------------------------------------------------------------------------------
 Prepared by : Strategic Research Insights, Inc.
-Version     : v0.4 — PI-verified data confirmed from local PDF files, June 2026
+Version     : v0.5 — Updated with corrections confirmed from direct PI reading (GAZYVA PI 12/2025, BRUKINSA PI 6/2025)
 Date        : June 2026
 Status      : DRAFT — Requires MLR sign-off before platform go-live
 Classification: Internal / Confidential
@@ -595,12 +595,28 @@ COMP-IBR-003: Most Common AEs in CLL/SLL
 COMP-ZAN-001: ALPINE Head-to-Head vs. Ibrutinib (R/R CLL)
   [Confirmed from PI, Section 14.4, BRUKINSA PI revised 06/2025]:
   SEQUOIA trial (previously untreated CLL/SLL without 17p deletion):
-  HR 0.42 (95% CI 0.28, 0.63); p<0.0001 vs. BR. ORR 93% BRUKINSA vs. 85% BR.
-  ALPINE trial data (zanubrutinib vs. ibrutinib) — "Published data - not in
-  PI" section of current BRUKINSA PI (06/2025): HR 0.68 for PFS per prior
-  ALPINE publication. Confirm whether ALPINE data appears in the current
-  BRUKINSA PI Section 14 before citing specific ALPINE HR.
-  Source: BRUKINSA PI, Section 14.4 (SEQUOIA data confirmed)
+  [Confirmed from PI Section 14.4, Table 22, BRUKINSA PI Revised 6/2025]:
+  CORRECTION — SEQUOIA HR: HR 0.42 (95% CI 0.28–0.63; p<0.0001) vs. BR.
+  NOTE: HR 0.28 is the LOWER BOUND of the confidence interval, NOT the HR.
+  Median PFS: BRUKINSA not reached vs. BR 33.7 months (95% CI 28.1, NE).
+  ORR 93% BRUKINSA vs. 85% BR.
+  ALPINE trial (zanubrutinib vs. ibrutinib in R/R CLL):
+  [Confirmed from PI Section 14.4, Table 24, BRUKINSA PI Revised 6/2025]:
+  CORRECTION — ALPINE PFS HR: HR 0.65 (95% CI 0.49–0.86; p=0.0024).
+  NOTE: The previously cited "HR 0.68" is INCORRECT. The correct figure is
+  HR 0.65 (95% CI 0.49–0.86; p=0.0024) per PI Section 14.4, Table 24.
+  ALPINE ORR: BRUKINSA 80% vs. ibrutinib 73%; Response Rate Ratio 1.10
+  (95% CI 1.01, 1.20); p=0.0264. [Confirmed from PI Section 14.4, Table 24]
+  Source: BRUKINSA PI, Section 14.4, Tables 22 and 24 (both confirmed)
+
+COMP-ZAN-001b: ALPINE ORR (R/R CLL — Head-to-Head vs. Ibrutinib)
+  [Confirmed from PI Section 14.4, Table 24, BRUKINSA PI Revised 6/2025]:
+  "In the ALPINE trial, BRUKINSA demonstrated a superior overall response rate
+  vs. ibrutinib in R/R CLL:
+    - ORR: BRUKINSA 80% vs. ibrutinib 73%
+    - Response Rate Ratio: 1.10 (95% CI 1.01, 1.20); p=0.0264"
+  Source: BRUKINSA PI, Section 14.4, Table 24
+  MLR Status: [TO BE COMPLETED]
 
 COMP-ZAN-002: Approved Indications
   [Confirmed from PI, Section 1, BRUKINSA PI revised 06/2025]:
@@ -612,15 +628,25 @@ COMP-ZAN-002: Approved Indications
   1.5 R/R FL in combination with obinutuzumab (≥2 prior lines) — accelerated
       approval
 
-COMP-ZAN-003: Boxed Warning Status
+COMP-ZAN-003: Boxed Warning Status and Contraindications
   [Confirmed from PI, BRUKINSA PI revised 06/2025]:
   BRUKINSA has NO Boxed Warnings. All safety items are Section 5 W&P:
+  CONTRAINDICATIONS [Confirmed from PI Section 4, BRUKINSA PI]: "None" —
+  BRUKINSA has NO contraindications per Section 4. CYP3A interactions are
+  drug interactions/dose modifications (not contraindications). Do NOT use
+  language suggesting BRUKINSA has contraindications; correct language is
+  "dose modification required" for strong CYP3A inhibitors/inducers.
+  [Confirmed from PI Section 4, BRUKINSA PI Revised 6/2025]
   - 5.1 Hemorrhage: Grade 3+ hemorrhage in 3.8%; fatalities 0.2%; any grade
     excluding purpura/petechiae 32%.
   - 5.2 Infections
   - 5.3 Cytopenias
   - 5.4 Second Primary Malignancies
-  - 5.5 Cardiac Arrhythmias
+  - 5.5 Cardiac Arrhythmias [BRUKINSA AF/flutter rate in ALPINE: 4.6%
+    (Section 6.1 BRUKINSA PI). The ibrutinib AF comparison rate (17%) is from
+    published ALPINE trial results and is NOT in the BRUKINSA PI — it requires
+    separate Medical Affairs verification against the IMBRUVICA PI before use
+    in training. Do NOT cite "17% ibrutinib AF rate" as PI-confirmed.]
   - 5.6 Hepatotoxicity Including DILI
   - 5.7 Embryo-Fetal Toxicity
   Most common AEs (≥30%) including lab abnormalities: neutrophil count decreased,
@@ -674,6 +700,18 @@ COMP-GAZ-001: Role as Venetoclax Partner
       patients with active lupus nephritis who are receiving standard therapy."
   (LN indication added 10/2025 — recent change to GAZYVA label)
 
+  GAZYVA CLL11 EFFICACY DATA [Confirmed from PI Section 14.1, GAZYVA PI]:
+  NOTE: The GAZYVA PI does NOT contain CLL14 data — CLL14 data resides in the
+  VENCLEXTA PI. The GAZYVA PI Section 14.1 reports CLL11 data:
+    - Stage 1: G+Clb median PFS 27.2 months vs. Clb 11.2 months
+      (HR 0.19 [0.14, 0.27]; p<0.0001)
+    - Stage 2: G+Clb median PFS 26.7 months vs. R+Clb 14.9 months
+      (HR 0.42 [0.33, 0.54]; p<0.0001)
+    - Stage 2 ORR: 79.6% (G+Clb) vs. 66.3% (R+Clb)
+  When citing GAZYVA efficacy, use CLL11 data from the GAZYVA PI Section 14.1.
+  For VEN+G (CLL14) efficacy data, cite the VENCLEXTA PI, not the GAZYVA PI.
+  [Confirmed from PI Section 14.1, GAZYVA PI Revised 12/2025]
+
 COMP-GAZ-002: Boxed Warnings (2 warnings)
   [Confirmed from PI, Boxed Warning section, GAZYVA PI]:
   Verbatim from PI:
@@ -687,11 +725,18 @@ COMP-GAZ-002: Boxed Warnings (2 warnings)
     medications in the event of HBV reactivation.
   - Progressive Multifocal Leukoencephalopathy (PML) including fatal PML, can
     occur in patients receiving GAZYVA."
-  NOTE: The 69% IRR rate previously cited in training context applies to the
-  GALLIUM (NHL/FL) study: infusion-related reactions 72% (Grade 3-5: 12%) in
-  GAZYVA+chemotherapy vs. 60% rituximab+chemotherapy. For CLL (CLL11), IRR
-  rates are separately reported. The IRR rate of "69% Cycle 1 Day 1 predominant"
-  requires specific verification against the CLL11 AE tables in the current PI.
+  NOTE [PI-VERIFIED CORRECTION — GAZYVA IRR RATES]:
+  The 72% IRR figure is from GALLIUM (previously untreated NHL/FL patients),
+  NOT CLL. It should NOT be used when discussing GAZYVA in the CLL context.
+  CLL-specific rates from CLL11 (GAZYVA PI, Section 5.3, Revised 12/2025):
+    - CLL11 overall: 65% experienced a reaction to the first 1,000 mg
+    - CLL11 Stage 2 (Table 7): 66% in GAZYVA+chlorambucil arm vs 38% in
+      rituximab+chlorambucil arm
+    - Grade 3-4 IRRs in CLL11: 20%, with 7% discontinuing
+  Whenever "72%" appears in training context, add the clarifying note:
+  "72% is the GALLIUM (previously untreated NHL) rate — CLL-specific rate from
+  CLL11 is 65% (Section 5.3 GAZYVA PI)"
+  [Confirmed from PI Section 5.3, GAZYVA PI Revised 12/2025]
 
 
 --- JAYPIRCA (pirtobrutinib) — Non-Covalent BTK Inhibitor ---
@@ -893,9 +938,10 @@ ITEMS TO BE COMPLETED BY CLIENT
 [ ] Update IMBRUVICA-related training materials to remove all references to
     "Boxed Warnings" for IMBRUVICA — confirmed to have NO Boxed Warnings
     per the current PI (10/2025).
-[ ] Verify GAZYVA CLL-specific IRR rate from CLL11 AE tables (separate from
-    the 72% rate in GALLIUM NHL study). Medical Affairs should specify which
-    rate to use when training on the VEN+G combination.
+[x] GAZYVA CLL-specific IRR rate from CLL11 AE tables has been updated per
+    PI Section 5.3 (GAZYVA PI Revised 12/2025): CLL11 overall 65%, Stage 2
+    66% (G+Clb) vs. 38% (R+Clb), Grade 3-4 20%, 7% discontinuing.
+    The 72% figure is the GALLIUM (NHL) rate — see COMP-GAZ-002 note.
 
 
 ================================================================================

@@ -4,7 +4,7 @@ PHASE 0 GOVERNANCE — DOCUMENT 3 OF 7
 Prohibited Language and Claim Restrictions
 --------------------------------------------------------------------------------
 Prepared by : Strategic Research Insights, Inc.
-Version     : v0.4 — PI-verified data confirmed from local PDF files, June 2026
+Version     : v0.5 — Updated with corrections confirmed from direct PI reading (GAZYVA PI 12/2025, BRUKINSA PI 6/2025)
 Date        : June 2026
 Client Product: VENCLEXTA (venetoclax)
 Therapeutic Area: B-Cell Malignancies (CLL/SLL, AML)
@@ -125,14 +125,14 @@ The following are prohibited. The competitive set includes:
 
   PERMITTED (when citing approved comparative data):
   - Citing ALPINE trial data (zanubrutinib vs. ibrutinib — head-to-head):
-    "The ALPINE trial showed zanubrutinib demonstrated superior PFS vs.
-    ibrutinib (HR 0.68)" — This is factual data from published labeling.
-    NOTE [Confirmed from PI, BRUKINSA PI revised 06/2025]: The current
-    BRUKINSA PI (06/2025) references ALPINE data in Section 14.4 for the
-    SEQUOIA study. Medical Affairs should confirm whether HR 0.68 from ALPINE
-    appears in the current BRUKINSA PI Section 14 before permitting this
-    specific HR claim in training; if not in PI, it requires separate
-    "Published data — not in PI" citation and additional MLR review.
+    CORRECTION [Confirmed from PI Section 14.4, Table 24, BRUKINSA PI Revised
+    6/2025]: The correct ALPINE PFS HR is 0.65 (95% CI 0.49–0.86; p=0.0024),
+    NOT "HR 0.68" as previously cited. The HR 0.68 figure is INCORRECT.
+    Permitted claim: "The ALPINE trial showed zanubrutinib demonstrated
+    superior PFS vs. ibrutinib (HR 0.65; 95% CI 0.49–0.86; p=0.0024)"
+    [Confirmed from PI Section 14.4, Table 24, BRUKINSA PI Revised 6/2025]
+    Any training material citing "HR 0.68" for ALPINE must be corrected to
+    "HR 0.65 (95% CI 0.49–0.86; p=0.0024)".
   - Citing ibrutinib Section 5 Warning content directly:
     "IMBRUVICA carries a Section 5 Warning and Precaution for serious cardiac
     arrhythmias, cardiac failure, and sudden death" — Permitted factual citation
@@ -172,19 +172,29 @@ The following are prohibited. The competitive set includes:
     confirm exact all-grade percentage from Section 6 before citing in training.
     [Confirmed from PI: Grade 3+ 3.7% — Section 5.3]
   - IMBRUVICA: Grade 3+ AF rate 3.7% [Confirmed from PI, Section 5.3]
-  - BRUKINSA: AF/flutter rates from ALPINE — Medical Affairs to confirm exact
-    ALPINE AF rates (7.1% BRUKINSA vs. 17.0% ibrutinib) appear in Section 14
-    of the current BRUKINSA PI (06/2025) before permitting in training.
+  - BRUKINSA: AF/flutter rates — CORRECTION [Confirmed from PI Section 6.1,
+    BRUKINSA PI Revised 6/2025]: BRUKINSA AF/flutter rate in ALPINE is 4.6%
+    (confirmed in Section 6.1 of the BRUKINSA PI). The ibrutinib comparison
+    AF rate of "17%" is from published ALPINE trial results and is NOT
+    confirmed in the BRUKINSA PI — it requires separate Medical Affairs
+    verification against the IMBRUVICA PI before use in training.
+    Do NOT cite "17% ibrutinib AF rate" as PI-confirmed without that
+    additional verification step.
     [Confirmed from PI: BRUKINSA has NO Boxed Warning; cardiac arrhythmias
     are Section 5.5 W&P per current PI (06/2025)]
   - CALQUENCE: Headache rate 35% (pooled safety N=2,055) [Confirmed from PI,
     CALQUENCE PI, Section 5.1 pooled safety data]. CALQUENCE has NO Boxed Warning.
-  - GAZYVA: Infusion-related reactions — 69% rate cited previously requires
-    verification. The current GAZYVA PI (confirmed from local PDF) reports IRR
-    in 72% (GALLIUM, NHL/FL). The CLL-specific IRR rate from CLL11 AE tables
-    should be used when discussing VEN+G; Medical Affairs to specify which rate
-    to cite for CLL training. [Confirmed from PI: GAZYVA has 2 Boxed Warnings:
-    HBV Reactivation and PML]
+  - GAZYVA: Infusion-related reactions — CORRECTION [Confirmed from PI Section
+    5.3, GAZYVA PI Revised 12/2025]: The 72% figure is from GALLIUM (previously
+    untreated NHL/FL patients), NOT CLL. Do NOT use "72%" in CLL training context.
+    CLL-specific rates from CLL11:
+      Overall: 65% experienced a reaction to the first 1,000 mg
+      Stage 2 (Table 7): 66% GAZYVA+Clb arm vs. 38% rituximab+Clb arm
+      Grade 3-4 IRRs: 20%, with 7% discontinuing
+    Whenever "72%" appears in CLL training, add clarification:
+    "72% is the GALLIUM (previously untreated NHL) rate — CLL-specific rate
+    from CLL11 is 65% (Section 5.3 GAZYVA PI)"
+    [Confirmed from PI: GAZYVA has 2 Boxed Warnings: HBV Reactivation and PML]
   - COPIKTRA: HR 1.09 vs. ofatumumab — this figure does NOT appear as a
     standalone Boxed Warning item in the current COPIKTRA PI. The Treatment-
     Related Mortality Boxed Warning states 15% of COPIKTRA-treated patients.

@@ -4,7 +4,7 @@ PHASE 0 GOVERNANCE — DOCUMENT 5 OF 7
 Fair Balance Requirements — Efficacy-to-Safety Pairing
 --------------------------------------------------------------------------------
 Prepared by : Strategic Research Insights, Inc.
-Version     : v0.4 — PI-verified data confirmed from local PDF files, June 2026
+Version     : v0.5 — Updated with corrections confirmed from direct PI reading (GAZYVA PI 12/2025, BRUKINSA PI 6/2025)
 Date        : June 2026
 Client Product: VENCLEXTA (venetoclax)
 Therapeutic Area: B-Cell Malignancies (CLL/SLL, AML)
@@ -192,14 +192,17 @@ REQUIRED SAFETY BALANCE — COMBINATION PARTNER CONSIDERATIONS:
   [Confirmed from PI]:
   (a) GAZYVA Boxed Warning categories (HBV Reactivation and PML) confirmed
       in the current GAZYVA PI (42 pages). [Confirmed from PI]
-  (b) The previously cited "69% IRR rate" requires clarification: the
-      current GAZYVA PI reports 72% IRR in the GALLIUM (NHL/FL) study
-      (Grade 3-5: 12%). The CLL-specific IRR rate from CLL11 AE tables is
-      separately reported. Medical Affairs should specify which rate to use
-      when training on the VEN+G CLL combination. The Cycle 1 Day 1
-      predominance characterization is clinically accurate but the exact
-      percentage should cite CLL11 data specifically. Update this balance
-      statement before deployment.
+  (b) CORRECTION — GAZYVA IRR RATES [Confirmed from PI Section 5.3, GAZYVA PI
+      Revised 12/2025]: The 72% figure is from GALLIUM (previously untreated
+      NHL/FL patients), NOT CLL. Do NOT cite "72%" in CLL/VEN+G training.
+      CLL-specific rates from CLL11 to use when training on VEN+G combination:
+        Overall: 65% experienced a reaction to the first 1,000 mg
+        Stage 2 (Table 7): 66% GAZYVA+Clb arm vs. 38% rituximab+Clb arm
+        Grade 3-4 IRRs: 20%, with 7% discontinuing
+      Where "72%" appears in CLL training context, add the note:
+      "72% is the GALLIUM (previously untreated NHL) rate — CLL-specific
+      rate from CLL11 is 65% (Section 5.3 GAZYVA PI)"
+      [Confirmed from PI Section 5.3, GAZYVA PI Revised 12/2025]
   (c) HBV screening requirement confirmed in current GAZYVA PI Section 5.
       [Confirmed from PI]
 
