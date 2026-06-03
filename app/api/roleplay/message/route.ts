@@ -4,12 +4,23 @@ import Anthropic from '@anthropic-ai/sdk';
 
 const FLUSH_PAD = ' '.repeat(1024);
 
-function buildSystemPrompt(physician: any, username: string): string {
-  const name      = `Dr. ${physician.FIRST_NAME} ${physician.LAST_NAME}`;
-  const specialty = physician.SPECIALTY ?? 'General Practice';
-  const state     = physician.STATE     ?? '';
-  const segment   = physician.SEGMENT_NAME          ?? 'Standard';
+function buildSystemPrompt(
+  physician: any,
+  username: string,
+  mindsetDescription?: string | null,
+): string {
+  const name        = `Dr. ${physician.FIRST_NAME} ${physician.LAST_NAME}`;
+  const specialty   = physician.SPECIALTY ?? 'General Practice';
+  const state       = physician.STATE     ?? '';
+  const segment     = physician.SEGMENT_NAME           ?? 'Standard';
   const attitudinal = physician.ATTITUDINAL_DESCRIPTION ?? 'Professional and evidence-focused';
+
+  // Mindset section overrides or supplements the attitudinal profile.
+  // When present it takes precedence — the mindset is more granular and
+  // specific than the attitudinal description.
+  const mindsetSection = mindsetDescription
+    ? `\n${mindsetDescription}\n\nIMPORTANT: The HCP MINDSET above is your PRIMARY behavioral directive. It overrides any generic instructions. Every response MUST authentically reflect the mindset traits listed above. Do not blend in generic "balanced" physician behavior — commit fully to the mindset.`
+    : '';
 
   return `You are roleplaying as ${name}, a ${specialty} physician${state ? ` based in ${state}` : ''}.
 
@@ -18,9 +29,9 @@ PHYSICIAN PROFILE:
 - Specialty: ${specialty}
 - Patient Segment: ${segment}
 - Attitudinal Profile: ${attitudinal}
-
+${mindsetSection}
 SCENARIO:
-${username} is a pharmaceutical sales representative visiting you for a brief office call. You have up to two minutes for this visit. Engage with them realistically and consistently based on your attitudinal profile above.
+${username} is a pharmaceutical sales representative visiting you for a brief office call. You have up to two minutes for this visit. Engage with them realistically and consistently based on your profile above.
 
 GLOBAL FORMAT GUARANTEE (NON-NEGOTIABLE):
 Every response you speak AS THE PHYSICIAN must begin with exactly ONE emotion tag:
@@ -37,7 +48,7 @@ RULES:
 - Never explain the emotion tag to the user.
 - Stay in character as the physician at all times.
 - Keep responses concise — 1 to 2 sentences maximum.
-- React authentically based on your attitudinal profile.
+- React authentically based on your profile${mindsetDescription ? ' and the HCP mindset directives' : ''}.
 - Do not hallucinate clinical data, drug efficacy figures, or study results.
 - If the rep makes a strong clinical point, show genuine engagement.
 - Push back, ask probing questions, or express enthusiasm depending on the rep's quality.
@@ -67,10 +78,11 @@ export async function POST(request: NextRequest) {
           return;
         }
 
-        const { messages, physician, username } = (await request.json()) as {
+        const { messages, physician, username, mindsetDescription } = (await request.json()) as {
           messages: Array<{ role: string; content: string; internal?: boolean }>;
           physician: any;
           username: string;
+          mindsetDescription?: string;
         };
 
         const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -82,7 +94,7 @@ export async function POST(request: NextRequest) {
         }
 
         const anthropic = new Anthropic({ apiKey });
-        const systemPrompt = buildSystemPrompt(physician, username);
+        const systemPrompt = buildSystemPrompt(physician, username, mindsetDescription);
 
         // Map to Anthropic format.
         // Internal messages (the silent "begin roleplay" trigger) are replaced
