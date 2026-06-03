@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import ChatInterface from '@/components/chat-interface';
 import ComplianceDashboard from '@/components/compliance-dashboard';
-import { Settings, User, ChevronDown, LogOut, Map, Camera, Monitor, Scan, X, Shield } from 'lucide-react';
+import { User, ChevronDown, LogOut, Map, Camera, Monitor, Scan, X, Shield } from 'lucide-react';
 
 const ROADMAP_ITEMS = [
   {
@@ -204,9 +204,7 @@ export default function DashboardPage() {
               )}
             </div>
 
-            <button className="p-1.5 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
-              <Settings className="w-4 h-4" />
-            </button>
+
 
             {/* User dropdown */}
             <div className="relative" ref={dropdownRef}>
