@@ -11,7 +11,7 @@ import PerformancePanel from './performance-panel';
 import CallJournal from './call-journal';
 import LoopBack from './loop-back';
 import EngagementPlaybook from './engagement-playbook';
-import { Send, RotateCcw, Square, Volume2, VolumeX, Video, VideoOff, MessageSquare, Search, ChevronDown, X, Check, BarChart2, ArrowUp, ArrowDown, ArrowUpDown, Hash, Mic, BookOpen, NotebookPen, Map, Camera, Monitor, Scan } from 'lucide-react';
+import { Send, RotateCcw, Square, Volume2, VolumeX, Video, VideoOff, MessageSquare, Search, ChevronDown, X, Check, BarChart2, ArrowUp, ArrowDown, ArrowUpDown, Hash, Mic, BookOpen, NotebookPen, Map, Camera, Monitor } from 'lucide-react';
 import { parseEmotion, speakText, stopCurrentAudio } from '@/lib/elevenlabs';
 import { buildCorrector, type Corrector } from '@/lib/product-name-corrector';
 import { getMindsetDescription } from '@/lib/mindset-descriptions';
@@ -72,12 +72,6 @@ function physicianSortValue(p: any, field: string): any {
 
 // ── Roadmap items ────────────────────────────────────────────────────────
 const ROADMAP_ITEMS = [
-  {
-    icon: <Scan className="w-5 h-5" />,
-    title: 'Document Camera Scanner',
-    description: 'Hold a document up to your device camera and instantly extract its contents for use during a call or session.',
-    status: 'Planned',
-  },
   {
     icon: <Monitor className="w-5 h-5" />,
     title: 'Screen Content Reader',
