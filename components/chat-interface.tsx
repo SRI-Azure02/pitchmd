@@ -109,7 +109,7 @@ interface FilterDropdownProps {
 }
 
 function PhysicianFilterDropdown({ label, options, activeFilters, onFilter, isOpen, onOpen, onClose }: FilterDropdownProps) {
-  const closeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isActive = activeFilters.length > 0;
 
   const handleEnter = () => {
@@ -281,7 +281,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   const [savedMindsets, setSavedMindsets] = useState<Record<string, CustomMindset>>({});
   // mindsetPopup: hovering over a mindset cell
   const [mindsetPopup, setMindsetPopup] = useState<{ physicianId: string; rect: DOMRect } | null>(null);
-  const mindsetPopupTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mindsetPopupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // customBuilder: open custom mindset builder modal
   const [customBuilder, setCustomBuilder] = useState<{
     physicianId: string;
