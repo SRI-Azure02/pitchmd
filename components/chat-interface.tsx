@@ -11,7 +11,7 @@ import PerformancePanel from './performance-panel';
 import CallJournal from './call-journal';
 import LoopBack from './loop-back';
 import EngagementPlaybook from './engagement-playbook';
-import { Send, RotateCcw, Square, Volume2, VolumeX, Video, VideoOff, MessageSquare, Search, ChevronDown, X, Check, BarChart2, ArrowUp, ArrowDown, ArrowUpDown, Hash, Mic, BookOpen, NotebookPen, Map, Camera, Monitor, Sparkles, Database } from 'lucide-react';
+import { Send, RotateCcw, Square, Volume2, VolumeX, Video, VideoOff, MessageSquare, Search, ChevronDown, X, Check, BarChart2, ArrowUp, ArrowDown, ArrowUpDown, Hash, Mic, BookOpen, NotebookPen, Map, Camera, Monitor, Sparkles, Database, ShieldAlert } from 'lucide-react';
 import { parseEmotion, speakText, stopCurrentAudio } from '@/lib/elevenlabs';
 import { buildCorrector, type Corrector } from '@/lib/product-name-corrector';
 import { getMindsetDescription } from '@/lib/mindset-descriptions';
@@ -24,6 +24,10 @@ interface Message {
   isEvaluation?: boolean;
   /** Internal seed messages (e.g. "begin roleplay") — never shown in chat UI */
   internal?: boolean;
+  /** Phase 3: rep input was blocked by compliance filter */
+  isComplianceBlock?: boolean;
+  /** Rule code that triggered the block */
+  complianceRuleCode?: string;
 }
 
 
@@ -802,6 +806,23 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                 }
               }
 
+              setStatusMessage('');
+              setLoading(false);
+
+            } else if (event.type === 'input_blocked') {
+              // Phase 3: rep input blocked by compliance filter
+              // Show a compliance notice instead of a physician response
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: `compliance_block_${Date.now()}`,
+                  role: 'assistant' as const,
+                  content: event.message ?? 'This message was blocked by the compliance filter.',
+                  isComplianceBlock: true,
+                  complianceRuleCode: event.rule_code,
+                },
+              ]);
+              setStreamingContent('');
               setStatusMessage('');
               setLoading(false);
 
@@ -2017,28 +2038,44 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                   key={message.id}
                   className={`flex items-end gap-2 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
-                  {message.role === 'assistant' && (
-                    <div className="w-2 h-2 rounded-full bg-gray-500 shrink-0 mb-1.5" />
-                  )}
-                  <div
-                    className={`max-w-sm lg:max-w-xl px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
-                      message.role === 'user'
-                        ? 'bg-gray-800 text-white rounded-br-sm'
-                        : 'bg-white text-slate-800 rounded-bl-sm shadow-sm'
-                    }`}
-                  >
-                    {message.content}
-                    {message.isEvaluation && (
-                      <button
-                        onClick={() => { setEvalPhysicianId(physicianIdRef.current); setEvalOpen(true); }}
-                        className="mt-2 flex items-center gap-1.5 text-gray-600 hover:text-gray-800 font-medium text-xs"
+                  {/* Compliance block notice — distinct amber treatment */}
+                  {message.isComplianceBlock ? (
+                    <div className="max-w-sm lg:max-w-xl px-3.5 py-2.5 rounded-2xl rounded-bl-sm bg-amber-50 border border-amber-200 text-amber-900 text-sm leading-relaxed shadow-sm">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <ShieldAlert className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                        <span className="text-[10px] font-semibold uppercase tracking-widest text-amber-500">
+                          Compliance Notice
+                          {message.complianceRuleCode && ` · ${message.complianceRuleCode}`}
+                        </span>
+                      </div>
+                      {message.content}
+                    </div>
+                  ) : (
+                    <>
+                      {message.role === 'assistant' && (
+                        <div className="w-2 h-2 rounded-full bg-gray-500 shrink-0 mb-1.5" />
+                      )}
+                      <div
+                        className={`max-w-sm lg:max-w-xl px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
+                          message.role === 'user'
+                            ? 'bg-gray-800 text-white rounded-br-sm'
+                            : 'bg-white text-slate-800 rounded-bl-sm shadow-sm'
+                        }`}
                       >
-                        View Evaluation Report →
-                      </button>
-                    )}
-                  </div>
-                  {message.role === 'user' && (
-                    <div className="w-2 h-2 rounded-full bg-gray-500 shrink-0 mb-1.5" />
+                        {message.content}
+                        {message.isEvaluation && (
+                          <button
+                            onClick={() => { setEvalPhysicianId(physicianIdRef.current); setEvalOpen(true); }}
+                            className="mt-2 flex items-center gap-1.5 text-gray-600 hover:text-gray-800 font-medium text-xs"
+                          >
+                            View Evaluation Report →
+                          </button>
+                        )}
+                      </div>
+                      {message.role === 'user' && (
+                        <div className="w-2 h-2 rounded-full bg-gray-500 shrink-0 mb-1.5" />
+                      )}
+                    </>
                   )}
                 </div>
               ))}

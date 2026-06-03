@@ -3,6 +3,7 @@ import { getSessionFromRequest } from '@/lib/auth';
 import Anthropic from '@anthropic-ai/sdk';
 import { getSnowflakeClient } from '@/lib/snowflake';
 import {
+  checkInput,
   checkOutput,
   buildBalanceInjection,
   type ComplianceRule,
@@ -131,9 +132,68 @@ export async function POST(request: NextRequest) {
         const sf = getSnowflakeClient();
         const systemPrompt = buildSystemPrompt(physician, username, mindsetDescription);
 
-        // ── Compliance logging: rep turn (fire-and-forget) ────────────────────
+        // ── Phase 3: Input Firewall ────────────────────────────────────────────
+        // Check the rep's message BEFORE calling Claude.
+        // A blocked input never reaches the model — the redirect is returned
+        // immediately and logged as 'blocked'.
         const repText = messages.filter(m => !m.internal).slice(-1)[0]?.content ?? '';
-        if (sessionId && repText) {
+        let repTurnLogged = false; // guard against double-logging
+
+        try {
+          const rules = await getComplianceRules();
+          if (rules.length > 0 && repText) {
+            const inputCheck = checkInput(repText, rules);
+
+            if (inputCheck.status === 'blocked' && inputCheck.primaryViolation) {
+              const v = inputCheck.primaryViolation;
+              console.log(`[compliance:input] BLOCKED by ${v.rule_code}`);
+
+              if (sessionId) {
+                repTurnLogged = true;
+                sf.logComplianceTurn({
+                  sessionId,
+                  appUserId: session.userId,
+                  physicianId: physician.PHYSICIAN_ID ?? null,
+                  turnIndex: messages.length - 1,
+                  speaker: 'rep',
+                  rawText: repText,
+                  overallStatus: 'blocked',
+                  complianceFlags: [{ rule_code: v.rule_code, rule_type: v.rule_type, action: 'blocked' }],
+                }).catch(e => console.error('[compliance] rep block log error:', e?.message));
+              }
+
+              safeEnqueue({
+                type: 'input_blocked',
+                rule_code: v.rule_code,
+                rule_type: v.rule_type,
+                message: v.redirect_message,
+              });
+              safeClose();
+              return;
+            }
+
+            if (inputCheck.status === 'flagged' && sessionId) {
+              repTurnLogged = true;
+              sf.logComplianceTurn({
+                sessionId,
+                appUserId: session.userId,
+                physicianId: physician.PHYSICIAN_ID ?? null,
+                turnIndex: messages.length - 1,
+                speaker: 'rep',
+                rawText: repText,
+                overallStatus: 'flagged',
+                complianceFlags: inputCheck.violations.map(v2 => ({
+                  rule_code: v2.rule_code, rule_type: v2.rule_type, action: v2.action,
+                })),
+              }).catch(e => console.error('[compliance] rep flag log error:', e?.message));
+            }
+          }
+        } catch (inputFilterErr: any) {
+          console.error('[compliance:input] filter error (fail open):', inputFilterErr?.message);
+        }
+
+        // Log clean rep turn only if not already logged above
+        if (sessionId && repText && !repTurnLogged) {
           sf.logComplianceTurn({
             sessionId,
             appUserId: session.userId,

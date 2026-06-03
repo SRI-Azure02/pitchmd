@@ -177,6 +177,76 @@ export function checkOutput(
   };
 }
 
+// ── Input firewall (Phase 3) ──────────────────────────────────────────────────
+//
+// Rules that apply to REP INPUTS.  Fair-balance rules are output-only
+// (the physician makes efficacy claims, not the rep scanning trigger).
+// Everything else — off-label, superlative, ODD, PHI, injection,
+// safety_minimization — applies to what the rep types.
+//
+const INPUT_RULE_TYPES = new Set([
+  'off_label',
+  'superlative',
+  'ood',
+  'pii',
+  'injection',
+  'safety_minimization',
+  'competitor_disparagement',
+]);
+
+/**
+ * Scan a sales rep's input text against active compliance rules.
+ * Returns immediately on the first BLOCK-severity match.
+ * Warning/info violations are accumulated without blocking.
+ */
+export function checkInput(
+  text: string,
+  rules: ComplianceRule[],
+): FilterResult {
+  const lowerText = text.toLowerCase();
+  const violations: ComplianceViolation[] = [];
+
+  for (const rule of rules) {
+    if (!rule.ACTIVE) continue;
+    if (!INPUT_RULE_TYPES.has(rule.RULE_TYPE)) continue;
+
+    const desc = parseDesc(rule.DESCRIPTION);
+    const triggers = getTriggers(desc);
+    if (triggers.length === 0) continue;
+
+    if (!hasTrigger(lowerText, triggers)) continue;
+
+    if (rule.SEVERITY === 'block') {
+      const v: ComplianceViolation = {
+        rule_code:    rule.RULE_CODE,
+        rule_name:    rule.RULE_NAME,
+        rule_type:    rule.RULE_TYPE,
+        severity:     rule.SEVERITY,
+        action:       'blocked',
+        redirect_message: desc.redirect_message ??
+          "That topic is outside the scope of this training session. Please focus on approved CLL/SLL clinical topics.",
+      };
+      return { status: 'blocked', violations: [v], primaryViolation: v };
+    }
+
+    violations.push({
+      rule_code: rule.RULE_CODE,
+      rule_name: rule.RULE_NAME,
+      rule_type: rule.RULE_TYPE,
+      severity:  rule.SEVERITY,
+      action:    'flagged',
+      redirect_message: desc.redirect_message,
+    });
+  }
+
+  const hasFlagged = violations.some(v => v.action === 'flagged');
+  return {
+    status: hasFlagged ? 'flagged' : 'clean',
+    violations,
+    primaryViolation: violations[0],
+  };
+}
+
 /**
  * Build a compliance-injection system prompt suffix.
  * Appended to the original system prompt for re-generation calls so the
