@@ -33,7 +33,14 @@ function randomSessionDuration(): number {
 
 type SortDir = 'asc' | 'desc';
 type SortConfig = { field: string; dir: SortDir } | null;
-type FilterMap = { overallScore: string | null; fieldReadiness: string | null };
+type FilterMap = {
+  overallScore: string[];
+  fieldReadiness: string[];
+  segment: string[];
+  specialty: string[];
+  mindset: string[];
+};
+const EMPTY_FILTERS: FilterMap = { overallScore: [], fieldReadiness: [], segment: [], specialty: [], mindset: [] };
 
 function scoreBucket(score: number | null | undefined): string {
   if (score == null) return 'Not Evaluated';
@@ -52,61 +59,128 @@ function physicianSortValue(p: any, field: string): any {
     case 'state':         return (p.STATE            ?? '').toLowerCase();
     case 'overallScore':  return p.OVERALL_SCORE  ?? -1;
     case 'fieldReadiness':return (p.FIELD_READINESS ?? '').toLowerCase();
+    case 'mindset':       return '';
     default:              return '';
   }
 }
 
-// ── Physician filter dropdown ──────────────────────────────────────────────
+// ── HCP Mindset constants ──────────────────────────────────────────────────
+
+export const PRESET_MINDSETS = [
+  'Data Hawk',
+  'Skeptical Traditionalist',
+  'Friendly Derailer',
+  'Bureaucratic Defensive',
+  'Cost-Conscious Pragmatist',
+] as const;
+export type PresetMindset = typeof PRESET_MINDSETS[number];
+
+export interface MindsetDimension {
+  id: string;
+  category: string;
+  name: string;
+  leftLabel: string;
+  rightLabel: string;
+  leftDesc: string;
+  rightDesc: string;
+}
+export interface CustomMindset { name: string; dimensions: Record<string, 'left' | 'right'>; }
+
+export const MINDSET_DIMENSIONS: MindsetDimension[] = [
+  { id: 'evidence',  category: 'Clinical Disposition',                name: 'Evidence Orientation',       leftLabel: 'Data-Driven',              rightLabel: 'Experiential',              leftDesc: 'Demands specific clinical trials, p-values, endpoints, and head-to-head data. Punishes marketing buzzwords.',            rightDesc: 'Relies on personal clinical success, peer opinions, and high-level guideline recommendations.' },
+  { id: 'adoption',  category: 'Clinical Disposition',                name: 'Adoption Profile',            leftLabel: 'Innovator / Early Adopter', rightLabel: 'Late Majority / Laggard',    leftDesc: 'Eager to try new mechanisms of action; willing to tolerate early operational friction for superior efficacy.',           rightDesc: 'Deeply entrenched in current protocols; heavily relies on old, proven generics or established blockbusters.' },
+  { id: 'risk',      category: 'Clinical Disposition',                name: 'Risk Tolerance',              leftLabel: 'Conservative (Low)',        rightLabel: 'Aggressive (High)',          leftDesc: 'Fixates on safety, adverse events, black-box warnings, and drug-to-drug interactions.',                                  rightDesc: 'Prioritizes absolute efficacy, speed of onset, or disease clearance; accepts standard class-effect risks.' },
+  { id: 'skeptic',   category: 'Interaction & Communication',         name: 'Skepticism',                  leftLabel: 'High (Combative)',          rightLabel: 'Low (Passive)',              leftDesc: 'Actively interrupts, challenges data validity, brings up competitor advantages, and pushes back on claims.',             rightDesc: 'Polite, nods along, but hard to pin down for a concrete behavioral commitment or script change.' },
+  { id: 'verbose',   category: 'Interaction & Communication',         name: 'Verbosity',                   leftLabel: 'Succinct (Low)',            rightLabel: 'Expressive (High)',          leftDesc: 'Gives 1-to-5 word answers. Forces the rep to ask tight, targeted questions or face awkward silence.',                   rightDesc: 'Tells long stories about specific patients, easily derails the timeline, requires the rep to aggressively control the room.' },
+  { id: 'formulary', category: 'Institutional & Systemic Constraints',name: 'Formulary Status Awareness',  leftLabel: 'Restricted',                rightLabel: 'Flexible',                  leftDesc: 'Bound tightly by hospital or regional insurance tiering; refuses scripts that require heavy Prior Authorization paperwork.',rightDesc: 'Willing to navigate PA processes, call medical directors, or utilize co-pay cards if the clinical benefit justifies it.' },
+  { id: 'patients',  category: 'Institutional & Systemic Constraints',name: 'Patient Demographic Split',   leftLabel: 'Fixed Income / Medicare',   rightLabel: 'Commercial / Premium',       leftDesc: 'Highly sensitive to out-of-pocket patient costs, tier-3 copays, and coverage gaps.',                                     rightDesc: 'Has patients with robust private insurance or employer-backed plans where specialty drug access is smoother.' },
+];
+
+// ── Multi-select filter dropdown (hover-to-open) ───────────────────────────
 
 interface FilterDropdownProps {
   label: string;
   options: string[];
-  activeFilter: string | null;
-  onFilter: (val: string | null) => void;
+  activeFilters: string[];
+  onFilter: (vals: string[]) => void;
   isOpen: boolean;
-  onToggle: () => void;
+  onOpen: () => void;
+  onClose: () => void;
 }
 
-function PhysicianFilterDropdown({
-  label, options, activeFilter, onFilter, isOpen, onToggle,
-}: FilterDropdownProps) {
-  const isActive = !!activeFilter;
+function PhysicianFilterDropdown({ label, options, activeFilters, onFilter, isOpen, onOpen, onClose }: FilterDropdownProps) {
+  const closeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isActive = activeFilters.length > 0;
+
+  const handleEnter = () => {
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    onOpen();
+  };
+  const handleLeave = () => {
+    closeTimerRef.current = setTimeout(() => onClose(), 180);
+  };
+
+  const toggle = (opt: string) => {
+    if (activeFilters.includes(opt)) onFilter(activeFilters.filter(v => v !== opt));
+    else onFilter([...activeFilters, opt]);
+  };
+
+  // Pill label: "Segment" | "Segment (2)" | "Segment: Cardiology"
+  const pillLabel = isActive
+    ? activeFilters.length === 1 ? `${label}: ${activeFilters[0]}` : `${label} (${activeFilters.length})`
+    : label;
 
   return (
-    <div className="relative">
-      {isOpen && <div className="fixed inset-0 z-40" onClick={onToggle} />}
+    <div className="relative" onMouseEnter={handleEnter} onMouseLeave={handleLeave}>
       <button
-        onClick={onToggle}
-        className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full border text-base font-medium transition-colors ${
+        className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full border text-sm font-medium transition-colors ${
           isActive
             ? 'border-blue-400 bg-blue-50 text-blue-700'
             : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
         }`}
       >
-        {label}
-        {isActive && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 ml-0.5" />}
+        {pillLabel}
+        {isActive && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onFilter([]); }}
+            className="ml-0.5 rounded-full hover:bg-blue-200 p-0.5 transition-colors"
+          >
+            <X className="w-2.5 h-2.5" />
+          </button>
+        )}
         <ChevronDown className={`w-3 h-3 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-lg min-w-max py-1 overflow-hidden">
-          <button
-            onClick={() => { onFilter(null); onToggle(); }}
-            className={`w-full text-left px-4 py-2 text-base flex items-center justify-between hover:bg-slate-50 ${!activeFilter ? 'text-blue-600 font-medium' : 'text-slate-600'}`}
-          >
-            <span className="whitespace-nowrap">All</span>
-            {!activeFilter && <Check className="w-3.5 h-3.5 ml-4" />}
-          </button>
-          {options.map((opt) => (
-            <button
-              key={opt}
-              onClick={() => { onFilter(opt); onToggle(); }}
-              className={`w-full text-left px-4 py-2 text-base flex items-center justify-between hover:bg-slate-50 ${activeFilter === opt ? 'text-blue-600 font-medium bg-blue-50' : 'text-slate-600'}`}
-            >
-              <span className="whitespace-nowrap">{opt}</span>
-              {activeFilter === opt && <Check className="w-3.5 h-3.5 ml-4 shrink-0" />}
-            </button>
-          ))}
+        <div className="absolute top-full left-0 mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-lg min-w-[200px] py-1 overflow-hidden">
+          {options.length === 0 && (
+            <p className="px-4 py-2 text-sm text-slate-400">No options</p>
+          )}
+          {options.map((opt) => {
+            const checked = activeFilters.includes(opt);
+            return (
+              <button
+                key={opt}
+                onClick={() => toggle(opt)}
+                className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2.5 hover:bg-slate-50 transition-colors ${checked ? 'text-blue-700 font-medium' : 'text-slate-600'}`}
+              >
+                <span className={`flex-shrink-0 w-4 h-4 rounded border flex items-center justify-center transition-colors ${checked ? 'bg-blue-500 border-blue-500' : 'border-slate-300'}`}>
+                  {checked && <Check className="w-2.5 h-2.5 text-white" />}
+                </span>
+                <span className="whitespace-nowrap">{opt}</span>
+              </button>
+            );
+          })}
+          {isActive && (
+            <div className="border-t border-slate-100 mt-1 pt-1">
+              <button
+                onClick={() => onFilter([])}
+                className="w-full text-left px-3 py-1.5 text-xs text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+              >
+                Clear selection
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -195,10 +269,25 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
 
   // ── Physician list filter / sort state ────────────────────────────────────
   const [sortConfig, setSortConfig] = useState<SortConfig>({ field: 'overallScore', dir: 'asc' });
-  const [filterValues, setFilterValues] = useState<FilterMap>({ overallScore: null, fieldReadiness: null });
+  const [filterValues, setFilterValues] = useState<FilterMap>(EMPTY_FILTERS);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [tableTooltip, setTableTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
   const [showPhysicianId, setShowPhysicianId] = useState(false);
+
+  // ── HCP Mindset state ─────────────────────────────────────────────────────
+  // physicianMindsets: session-scoped assignment per physician
+  const [physicianMindsets, setPhysicianMindsets] = useState<Record<string, string>>({});
+  // savedMindsets: named custom mindsets saved this session
+  const [savedMindsets, setSavedMindsets] = useState<Record<string, CustomMindset>>({});
+  // mindsetPopup: hovering over a mindset cell
+  const [mindsetPopup, setMindsetPopup] = useState<{ physicianId: string; rect: DOMRect } | null>(null);
+  const mindsetPopupTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  // customBuilder: open custom mindset builder modal
+  const [customBuilder, setCustomBuilder] = useState<{
+    physicianId: string;
+    dims: Record<string, 'left' | 'right'>;
+    name: string;
+  } | null>(null);
   const [hoveredSplashBtn, setHoveredSplashBtn] = useState<string | null>(null);
 
   // ── Physician-list button hover state ─────────────────────────────────────
@@ -1085,22 +1174,30 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     return order.filter(b => buckets.has(b));
   }, [physicianHook.physicians]);
 
-  // ── Client-side filter on current page (overallScore + fieldReadiness buckets) ──
+  // ── Client-side multi-select filter ──────────────────────────────────────
   const filteredPhysicians = useMemo(() => {
     let result = [...physicianHook.physicians];
 
-    if (filterValues.fieldReadiness) {
-      if (filterValues.fieldReadiness === 'Not Evaluated')
-        result = result.filter(p => !p.FIELD_READINESS);
-      else
-        result = result.filter(p => p.FIELD_READINESS === filterValues.fieldReadiness);
-    }
-    if (filterValues.overallScore) {
-      if (filterValues.overallScore === 'Not Evaluated')
-        result = result.filter(p => p.OVERALL_SCORE == null);
-      else
-        result = result.filter(p => scoreBucket(p.OVERALL_SCORE) === filterValues.overallScore);
-    }
+    if (filterValues.segment.length > 0)
+      result = result.filter(p => filterValues.segment.includes(p.SEGMENT_NAME ?? 'Unknown'));
+
+    if (filterValues.specialty.length > 0)
+      result = result.filter(p => filterValues.specialty.includes(p.SPECIALTY ?? 'Unknown'));
+
+    if (filterValues.fieldReadiness.length > 0)
+      result = result.filter(p => {
+        const v = p.FIELD_READINESS;
+        return filterValues.fieldReadiness.includes(v ?? 'Not Evaluated');
+      });
+
+    if (filterValues.overallScore.length > 0)
+      result = result.filter(p => filterValues.overallScore.includes(scoreBucket(p.OVERALL_SCORE)));
+
+    if (filterValues.mindset.length > 0)
+      result = result.filter(p => {
+        const m = physicianMindsets[p.PHYSICIAN_ID] ?? 'Not Assigned';
+        return filterValues.mindset.includes(m);
+      });
 
     // physicianId is not server-sortable — sort client-side when selected
     if (sortConfig?.field === 'physicianId') {
@@ -1114,9 +1211,10 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     }
 
     return result;
-  }, [physicianHook.physicians, filterValues, sortConfig]);
+  }, [physicianHook.physicians, filterValues, sortConfig, physicianMindsets]);
 
-  const anyFilterActive = physicianHook.search.trim() || sortConfig || Object.values(filterValues).some(Boolean) || physicianHook.filterSegment || physicianHook.filterSpecialty;
+  const anyFilterActive = physicianHook.search.trim() || sortConfig ||
+    Object.values(filterValues).some((arr) => arr.length > 0);
 
   const visibleMessages = messages.filter(
     (m, i) =>
@@ -1197,73 +1295,69 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
               {/* Physician ID column toggle */}
               <button
                 onClick={() => setShowPhysicianId(v => !v)}
-                className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full border text-base font-medium transition-colors ${
+                className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full border text-sm font-medium transition-colors ${
                   showPhysicianId
                     ? 'border-blue-300 bg-blue-50 text-blue-700'
                     : 'border-slate-200 bg-white text-slate-400 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-600'
                 }`}
               >
                 <Hash className="w-3 h-3" />
-                {showPhysicianId ? 'Hide Physician ID' : 'Show Physician ID'}
+                {showPhysicianId ? 'Hide ID' : 'Show ID'}
               </button>
 
-              {/* Segment dropdown */}
-              <PhysicianFilterDropdown
-                label="Segment"
-                options={uniqueSegments}
-                activeFilter={physicianHook.filterSegment}
-                onFilter={val => physicianHook.setFilterSegment(val)}
+              {/* Segment */}
+              <PhysicianFilterDropdown label="Segment" options={uniqueSegments}
+                activeFilters={filterValues.segment}
+                onFilter={vals => setFilterValues(prev => ({ ...prev, segment: vals }))}
                 isOpen={openDropdown === 'segment'}
-                onToggle={() => setOpenDropdown(v => v === 'segment' ? null : 'segment')}
+                onOpen={() => setOpenDropdown('segment')}
+                onClose={() => setOpenDropdown(v => v === 'segment' ? null : v)}
               />
-
-              {/* Specialty dropdown */}
-              <PhysicianFilterDropdown
-                label="Specialty"
-                options={uniqueSpecialties}
-                activeFilter={physicianHook.filterSpecialty}
-                onFilter={val => physicianHook.setFilterSpecialty(val)}
+              {/* Specialty */}
+              <PhysicianFilterDropdown label="Specialty" options={uniqueSpecialties}
+                activeFilters={filterValues.specialty}
+                onFilter={vals => setFilterValues(prev => ({ ...prev, specialty: vals }))}
                 isOpen={openDropdown === 'specialty'}
-                onToggle={() => setOpenDropdown(v => v === 'specialty' ? null : 'specialty')}
+                onOpen={() => setOpenDropdown('specialty')}
+                onClose={() => setOpenDropdown(v => v === 'specialty' ? null : v)}
               />
-
-              {/* Overall Score dropdown */}
-              <PhysicianFilterDropdown
-                label="Overall Score"
-                options={scoreBucketOptions}
-                activeFilter={filterValues.overallScore}
-                onFilter={val => setFilterValues(prev => ({ ...prev, overallScore: val }))}
+              {/* Overall Score */}
+              <PhysicianFilterDropdown label="Score" options={scoreBucketOptions}
+                activeFilters={filterValues.overallScore}
+                onFilter={vals => setFilterValues(prev => ({ ...prev, overallScore: vals }))}
                 isOpen={openDropdown === 'overallScore'}
-                onToggle={() => setOpenDropdown(v => v === 'overallScore' ? null : 'overallScore')}
+                onOpen={() => setOpenDropdown('overallScore')}
+                onClose={() => setOpenDropdown(v => v === 'overallScore' ? null : v)}
               />
-
-              {/* Field Readiness dropdown */}
-              <PhysicianFilterDropdown
-                label="Field Readiness"
-                options={uniqueReadiness}
-                activeFilter={filterValues.fieldReadiness}
-                onFilter={val => setFilterValues(prev => ({ ...prev, fieldReadiness: val }))}
+              {/* Field Readiness */}
+              <PhysicianFilterDropdown label="Readiness" options={uniqueReadiness}
+                activeFilters={filterValues.fieldReadiness}
+                onFilter={vals => setFilterValues(prev => ({ ...prev, fieldReadiness: vals }))}
                 isOpen={openDropdown === 'fieldReadiness'}
-                onToggle={() => setOpenDropdown(v => v === 'fieldReadiness' ? null : 'fieldReadiness')}
+                onOpen={() => setOpenDropdown('fieldReadiness')}
+                onClose={() => setOpenDropdown(v => v === 'fieldReadiness' ? null : v)}
+              />
+              {/* HCP Mindset */}
+              <PhysicianFilterDropdown
+                label="HCP Mindset"
+                options={[...PRESET_MINDSETS, 'Custom', 'Not Assigned']}
+                activeFilters={filterValues.mindset}
+                onFilter={vals => setFilterValues(prev => ({ ...prev, mindset: vals }))}
+                isOpen={openDropdown === 'mindset'}
+                onOpen={() => setOpenDropdown('mindset')}
+                onClose={() => setOpenDropdown(v => v === 'mindset' ? null : v)}
               />
 
               {/* Clear all */}
               {anyFilterActive && (
                 <button
-                  onClick={() => {
-                    physicianHook.setSearch('');
-                    physicianHook.setFilterSegment(null);
-                    physicianHook.setFilterSpecialty(null);
-                    setSortConfig(null);
-                    setFilterValues({ overallScore: null, fieldReadiness: null });
-                  }}
+                  onClick={() => { physicianHook.setSearch(''); setSortConfig(null); setFilterValues(EMPTY_FILTERS); }}
                   className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-sm text-slate-500 hover:text-red-500 hover:bg-red-50 border border-transparent hover:border-red-200 transition-colors"
                 >
                   <X className="w-3 h-3" />
                   Clear
                 </button>
               )}
-
             </div>
 
             {/* Result count */}
@@ -1293,10 +1387,11 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                       { label: 'Physician ID', field: 'physicianId',   align: 'left',   tooltip: null },
                       { label: 'Physician',    field: 'name',          align: 'left',   tooltip: null },
                       { label: 'Specialty',    field: 'specialty',     align: 'left',   tooltip: null },
-                      { label: 'Segment',    field: 'segment',       align: 'left',   tooltip: null },
-                      { label: 'State',      field: 'state',         align: 'left',   tooltip: null },
-                      { label: 'Score',      field: 'overallScore',  align: 'center', tooltip: 'Median score across your 3 most recent sessions with the physician' },
-                      { label: 'Readiness',  field: 'fieldReadiness',align: 'left',   tooltip: 'Most frequent readiness rating across your 3 most recent sessions with the physician' },
+                      { label: 'Segment',     field: 'segment',       align: 'left',   tooltip: null },
+                      { label: 'State',       field: 'state',         align: 'left',   tooltip: null },
+                      { label: 'Score',       field: 'overallScore',  align: 'center', tooltip: 'Median score across your 3 most recent sessions with the physician' },
+                      { label: 'Readiness',   field: 'fieldReadiness',align: 'left',   tooltip: 'Most frequent readiness rating across your 3 most recent sessions with the physician' },
+                      { label: 'HCP Mindset', field: 'mindset',       align: 'left',   tooltip: 'Hover to assign a mindset persona for this practice session' },
                     ] as const).map(({ label, field, align, tooltip }) => {
                       if (field === 'physicianId' && !showPhysicianId) return null;
                       const active = sortConfig?.field === field;
@@ -1390,6 +1485,28 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                           ) : <span className="text-slate-300 text-sm">—</span>}
                         </td>
 
+                        {/* HCP Mindset */}
+                        <td className="px-4 py-3 relative">
+                          <div
+                            className="relative inline-block"
+                            onMouseEnter={(e) => {
+                              if (mindsetPopupTimerRef.current) clearTimeout(mindsetPopupTimerRef.current);
+                              setMindsetPopup({ physicianId: p.PHYSICIAN_ID, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() });
+                            }}
+                            onMouseLeave={() => {
+                              mindsetPopupTimerRef.current = setTimeout(() => setMindsetPopup(null), 200);
+                            }}
+                          >
+                            {physicianMindsets[p.PHYSICIAN_ID] ? (
+                              <span className="text-sm font-medium px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-200 whitespace-nowrap cursor-default">
+                                {physicianMindsets[p.PHYSICIAN_ID]}
+                              </span>
+                            ) : (
+                              <span className="text-slate-300 text-sm cursor-default hover:text-slate-400">Set mindset…</span>
+                            )}
+                          </div>
+                        </td>
+
                         {/* Actions */}
                         <td className="sticky right-0 bg-white group-hover:bg-slate-100/70 px-4 py-2.5 shadow-[-1px_0_0_0_#e2e8f0] transition-colors">
                           <div className="flex items-center gap-2">
@@ -1442,16 +1559,164 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
 
           <EvaluationPanel open={evalOpen} onClose={() => setEvalOpen(false)} content="" username={username} physicianId={evalPhysicianId} />
 
-          {/* Fixed-position column header tooltip — renders outside overflow container */}
+          {/* Fixed-position column header tooltip */}
           {tableTooltip && (
-            <div
-              className="pointer-events-none fixed z-[9999]"
-              style={{ left: tableTooltip.x, top: tableTooltip.y - 8, transform: 'translate(-50%, -100%)' }}
-            >
-              <div className="bg-amber-50 border border-amber-200 text-slate-900 text-xs font-medium leading-snug rounded-lg px-3 py-2 whitespace-nowrap shadow-md">
-                {tableTooltip.text}
-              </div>
+            <div className="pointer-events-none fixed z-[9999]" style={{ left: tableTooltip.x, top: tableTooltip.y - 8, transform: 'translate(-50%, -100%)' }}>
+              <div className="bg-amber-50 border border-amber-200 text-slate-900 text-xs font-medium leading-snug rounded-lg px-3 py-2 whitespace-nowrap shadow-md">{tableTooltip.text}</div>
               <div className="mx-auto w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-amber-200" />
+            </div>
+          )}
+
+          {/* ── Mindset hover popup ─────────────────────────────────────── */}
+          {mindsetPopup && (
+            <div
+              className="fixed z-[9000]"
+              style={{ left: mindsetPopup.rect.left, top: mindsetPopup.rect.bottom + 4 }}
+              onMouseEnter={() => { if (mindsetPopupTimerRef.current) clearTimeout(mindsetPopupTimerRef.current); }}
+              onMouseLeave={() => { mindsetPopupTimerRef.current = setTimeout(() => setMindsetPopup(null), 200); }}
+            >
+              <div className="bg-white border border-slate-200 rounded-xl shadow-xl py-1.5 min-w-[220px] overflow-hidden">
+                <p className="px-3 pb-1 pt-0.5 text-[10px] font-semibold uppercase tracking-widest text-slate-400">Assign Mindset</p>
+                {[...PRESET_MINDSETS].map((m) => {
+                  const active = physicianMindsets[mindsetPopup.physicianId] === m;
+                  return (
+                    <button key={m} onClick={() => {
+                      setPhysicianMindsets(prev => ({ ...prev, [mindsetPopup.physicianId]: m }));
+                      setMindsetPopup(null);
+                    }} className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 transition-colors ${active ? 'bg-violet-50 text-violet-700 font-medium' : 'text-slate-700 hover:bg-slate-50'}`}>
+                      {active && <Check className="w-3.5 h-3.5 text-violet-500 shrink-0" />}
+                      {!active && <span className="w-3.5 h-3.5 shrink-0" />}
+                      {m}
+                    </button>
+                  );
+                })}
+                {/* Custom saved mindsets */}
+                {Object.keys(savedMindsets).map((name) => {
+                  const active = physicianMindsets[mindsetPopup.physicianId] === name;
+                  return (
+                    <button key={name} onClick={() => {
+                      setPhysicianMindsets(prev => ({ ...prev, [mindsetPopup.physicianId]: name }));
+                      setMindsetPopup(null);
+                    }} className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 transition-colors ${active ? 'bg-violet-50 text-violet-700 font-medium' : 'text-slate-700 hover:bg-slate-50'}`}>
+                      {active && <Check className="w-3.5 h-3.5 text-violet-500 shrink-0" />}
+                      {!active && <span className="w-3.5 h-3.5 shrink-0" />}
+                      <span className="italic">{name}</span>
+                      <span className="ml-auto text-[10px] text-slate-400 bg-slate-100 px-1.5 rounded-full">Custom</span>
+                    </button>
+                  );
+                })}
+                <div className="border-t border-slate-100 mt-1">
+                  <button onClick={() => {
+                    const existing = savedMindsets[physicianMindsets[mindsetPopup.physicianId] ?? ''];
+                    setCustomBuilder({
+                      physicianId: mindsetPopup.physicianId,
+                      dims: existing?.dimensions ?? Object.fromEntries(MINDSET_DIMENSIONS.map(d => [d.id, 'left'])) as Record<string, 'left'|'right'>,
+                      name: '',
+                    });
+                    setMindsetPopup(null);
+                  }} className="w-full text-left px-3 py-2 text-sm text-slate-500 hover:bg-slate-50 flex items-center gap-2 transition-colors">
+                    <span className="w-3.5 h-3.5 shrink-0" />
+                    Custom mindset…
+                  </button>
+                  {physicianMindsets[mindsetPopup.physicianId] && (
+                    <button onClick={() => {
+                      setPhysicianMindsets(prev => { const n = { ...prev }; delete n[mindsetPopup.physicianId]; return n; });
+                      setMindsetPopup(null);
+                    }} className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-red-50 flex items-center gap-2 transition-colors">
+                      <span className="w-3.5 h-3.5 shrink-0" />
+                      Remove mindset
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Custom mindset builder modal ────────────────────────────── */}
+          {customBuilder && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/30 backdrop-blur-sm p-4">
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+                {/* Header */}
+                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                  <div>
+                    <p className="text-base font-semibold text-slate-900">Custom HCP Mindset</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Toggle each dimension, name your mindset, then save.</p>
+                  </div>
+                  <button onClick={() => setCustomBuilder(null)} className="p-1.5 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"><X className="w-4 h-4" /></button>
+                </div>
+
+                {/* Dimensions */}
+                <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
+                  {(['Clinical Disposition', 'Interaction & Communication', 'Institutional & Systemic Constraints'] as const).map((cat) => {
+                    const dims = MINDSET_DIMENSIONS.filter(d => d.category === cat);
+                    return (
+                      <div key={cat}>
+                        <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-3">{cat}</p>
+                        <div className="space-y-3">
+                          {dims.map((dim) => {
+                            const val = customBuilder.dims[dim.id] ?? 'left';
+                            return (
+                              <div key={dim.id} className="bg-slate-50 rounded-xl p-4">
+                                <p className="text-sm font-semibold text-slate-800 mb-3">{dim.name}</p>
+                                <div className="flex items-stretch gap-2">
+                                  {/* Left option */}
+                                  <button
+                                    onClick={() => setCustomBuilder(b => b ? { ...b, dims: { ...b.dims, [dim.id]: 'left' } } : b)}
+                                    className={`flex-1 text-left px-3 py-2.5 rounded-lg border text-sm transition-all ${val === 'left' ? 'border-violet-400 bg-violet-50 text-violet-800' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}
+                                  >
+                                    <p className="font-medium text-xs mb-1">{dim.leftLabel}</p>
+                                    <p className="text-xs leading-snug opacity-70">{dim.leftDesc}</p>
+                                  </button>
+                                  {/* Toggle indicator */}
+                                  <div className="flex flex-col items-center justify-center gap-1 px-1">
+                                    <div className={`w-2 h-2 rounded-full transition-colors ${val === 'left' ? 'bg-violet-400' : 'bg-slate-200'}`} />
+                                    <div className="w-0.5 h-3 bg-slate-200" />
+                                    <div className={`w-2 h-2 rounded-full transition-colors ${val === 'right' ? 'bg-violet-400' : 'bg-slate-200'}`} />
+                                  </div>
+                                  {/* Right option */}
+                                  <button
+                                    onClick={() => setCustomBuilder(b => b ? { ...b, dims: { ...b.dims, [dim.id]: 'right' } } : b)}
+                                    className={`flex-1 text-left px-3 py-2.5 rounded-lg border text-sm transition-all ${val === 'right' ? 'border-violet-400 bg-violet-50 text-violet-800' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}
+                                  >
+                                    <p className="font-medium text-xs mb-1">{dim.rightLabel}</p>
+                                    <p className="text-xs leading-snug opacity-70">{dim.rightDesc}</p>
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Footer — name + save */}
+                <div className="border-t border-slate-100 px-6 py-4 flex items-center gap-3">
+                  <input
+                    type="text"
+                    value={customBuilder.name}
+                    onChange={e => setCustomBuilder(b => b ? { ...b, name: e.target.value } : b)}
+                    placeholder="Name this mindset…"
+                    className="flex-1 px-3 py-2 rounded-lg border border-slate-200 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400"
+                  />
+                  <button
+                    disabled={!customBuilder.name.trim()}
+                    onClick={() => {
+                      const n = customBuilder.name.trim();
+                      if (!n) return;
+                      const saved: CustomMindset = { name: n, dimensions: customBuilder.dims };
+                      setSavedMindsets(prev => ({ ...prev, [n]: saved }));
+                      setPhysicianMindsets(prev => ({ ...prev, [customBuilder.physicianId]: n }));
+                      setCustomBuilder(null);
+                    }}
+                    className="px-4 py-2 rounded-lg bg-violet-600 text-white text-sm font-medium hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Save &amp; Apply
+                  </button>
+                  <button onClick={() => setCustomBuilder(null)} className="px-4 py-2 rounded-lg text-sm text-slate-500 hover:bg-slate-100 transition-colors">Cancel</button>
+                </div>
+              </div>
             </div>
           )}
         </div>
