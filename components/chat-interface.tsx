@@ -950,14 +950,16 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
       },
       '*',
     );
-    // Primary unlock: conversation.replica.stopped_speaking event (see app-message handler).
-    // Fallback: word-count estimate + generous startup-latency buffer, in case the
-    // Tavus event never arrives (e.g. network drop, API version change).
-    // 500 ms/word ≈ 120 WPM; +3 000 ms covers TTS synthesis + network startup lag.
+    // Primary unlock: conversation.replica.stopped_speaking app-message.
+    // Secondary unlock: audio track.onmute event (see track-started handler).
+    // Fallback: word-count estimate — fires if neither primary nor secondary
+    // triggers arrive (e.g. network drop, Tavus API version change).
+    // 200 ms/word ≈ 300 WPM; +1 200 ms covers TTS synthesis + network startup.
+    // Minimum 2 000 ms so very short responses don't race the TTS pipeline.
     const wordCount = text.split(/\s+/).length;
     avatarSpeakFallbackRef.current = setTimeout(
       clearAvatarSpeakingLock,
-      Math.max(4000, wordCount * 500 + 3000),
+      Math.max(2000, wordCount * 200 + 1200),
     );
   };
 
@@ -1022,6 +1024,20 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
           el.srcObject = new MediaStream([track]);
           el.play().catch(() => {});
           avatarAudioRef.current = el;
+
+          // Secondary mic-unlock: fires when the Tavus audio track goes silent
+          // (i.e. the avatar has stopped sending audio data). Acts as a reliable
+          // backup for the replica.stopped_speaking app-message, which can be
+          // delayed or missed on slow connections.
+          // Guard: only acts if avatarSpeakingRef is still true (prevents
+          // false triggers during brief mid-sentence network gaps by
+          // requiring it to be an intentional mute from the sender).
+          track.addEventListener('mute', () => {
+            if (avatarSpeakingRef.current) {
+              console.log('[tavus] audio track muted — unlocking mic (secondary trigger)');
+              clearAvatarSpeakingLock();
+            }
+          });
         }
       });
 

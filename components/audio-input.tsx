@@ -46,9 +46,11 @@ export default function AudioInput({ onTranscript, onAutoSubmit, onCountdown, di
   // Resume recording when no longer disabled (or when a previous recording session ends).
   // Depends on both disabled and isRecording so the effect re-fires once the Web Speech API
   // onend callback has settled isRecording to false after a stop() call.
+  // 50 ms gives React one render cycle to flush state; the recordingActiveRef guard
+  // inside startRecording() prevents a second instance from being created in any case.
   useEffect(() => {
     if (!disabled && supported && !isRecording) {
-      const t = setTimeout(() => startRecording(), 150);
+      const t = setTimeout(() => startRecording(), 50);
       return () => clearTimeout(t);
     }
   }, [disabled, isRecording]);
