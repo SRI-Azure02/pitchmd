@@ -4,11 +4,17 @@ PHASE 0 GOVERNANCE — DOCUMENT 2 OF 7
 Approved Claims Library — VENCLEXTA (venetoclax) and Competitive Landscape
 --------------------------------------------------------------------------------
 Prepared by : Strategic Research Insights, Inc.
-Version     : v0.2 — Updated with real product data
+Version     : v0.4 — PI-verified data confirmed from local PDF files, June 2026
 Date        : June 2026
 Status      : DRAFT — Requires MLR sign-off before platform go-live
 Classification: Internal / Confidential
 Therapeutic Area: B-Cell Malignancies (CLL/SLL, AML)
+================================================================================
+
+PI VERIFICATION STATUS: All 9 PIs verified from local PDF files, June 2026.
+Text extracted from local PDF prescribing information files. All annotations
+previously marked [PI NOT ACCESSED — VERIFY MANUALLY] have been replaced with
+[Confirmed from PI, Section X.X] or PI-verified data below.
 ================================================================================
 
 
@@ -49,180 +55,436 @@ BCL-2 Inhibitor | AbbVie/Genentech | FDA Initial Approval: April 2016
 --- APPROVED INDICATIONS ---
 
 VEN-IND-001: CLL/SLL
-  "For the treatment of adult patients with chronic lymphocytic leukemia
-   (CLL) or small lymphocytic lymphoma (SLL)."
-  Sub-categories:
-    - Frontline CLL/SLL in combination with obinutuzumab (CLL14)
+  Verbatim from PI Section 1.1 [Confirmed from PI, Section 1.1]:
+  "VENCLEXTA is indicated for the treatment of adult patients with chronic
+  lymphocytic leukemia (CLL) or small lymphocytic lymphoma (SLL)."
+  Sub-categories documented in PI Section 2.2 (Dosage and Administration):
+    - Frontline CLL/SLL in combination with obinutuzumab (CLL14 regimen)
     - Frontline CLL/SLL in combination with acalabrutinib (AMPLIFY, Feb 2026)
     - Relapsed/refractory CLL/SLL in combination with rituximab (MURANO)
     - Relapsed/refractory CLL/SLL monotherapy
+  NOTE [Confirmed from PI, Section 1.1]: The CLL/SLL indication text is broad —
+  it does not specify frontline vs. R/R in the indication itself. Specific
+  regimens and populations are addressed in Section 2.2 dosing instructions.
+  The AMPLIFY regimen (VEN+acalabrutinib) is specified in Section 2.2 as
+  Cycle 1 Day 1 start of acalabrutinib, with Venclexta added on Cycle 3 Day 1.
+  Obinutuzumab is NOT listed as part of the AMPLIFY indication in Section 1;
+  the VEN+ACA+obinutuzumab (AVO) arm in AMPLIFY is referenced in Section 5.3
+  as an "unapproved regimen" for this indication.
 
 VEN-IND-002: AML
-  "In combination with azacitidine, or decitabine, or low-dose cytarabine
-   for the treatment of newly diagnosed acute myeloid leukemia (AML) in
-   adults 75 years or older, or who have comorbidities that preclude use
-   of intensive induction chemotherapy."
-  Source: VIALE-A (azacitidine), VIALE-C (LDAC), decitabine data
+  Verbatim from PI Section 1.2 [Confirmed from PI, Section 1.2]:
+  "VENCLEXTA is indicated in combination with azacitidine, or decitabine, or
+  low-dose cytarabine for the treatment of newly diagnosed acute myeloid
+  leukemia (AML) in adults 75 years or older, or who have comorbidities that
+  preclude use of intensive induction chemotherapy."
+  NOTE [Confirmed from PI, Section 1.2]: The PI uses the exact phrase "low-dose
+  cytarabine" (not "LDAC" as an abbreviation in the indication text). The
+  conjunction is "azacitidine, or decitabine, or low-dose cytarabine."
 
 
 --- MECHANISM OF ACTION ---
 
 VEN-MOA-001: BCL-2 Inhibition
-  "VENCLEXTA is a selective, potent small-molecule inhibitor of BCL-2
-   (B-cell lymphoma 2 protein), the first and only approved BCL-2 inhibitor.
-   BCL-2 overexpression allows CLL and AML cells to evade programmed cell
-   death. VENCLEXTA binds directly to BCL-2 and displaces pro-apoptotic
-   proteins (such as BIM), triggering cancer cell death."
-  Source: VENCLEXTA PI, Section 12.1 (Mechanism of Action)
+  Verbatim from PI Section 12.1 [Confirmed from PI, Section 12.1]:
+  "Venetoclax is a selective and orally bioavailable small-molecule inhibitor
+  of BCL-2, an anti-apoptotic protein. Overexpression of BCL-2 has been
+  demonstrated in CLL and AML cells where it mediates tumor cell survival and
+  has been associated with resistance to chemotherapeutics. Venetoclax helps
+  restore the process of apoptosis by binding directly to the BCL-2 protein,
+  displacing pro-apoptotic proteins like BIM, triggering mitochondrial outer
+  membrane permeabilization and the activation of caspases. In nonclinical
+  studies, venetoclax has demonstrated cytotoxic activity in tumor cells that
+  overexpress BCL-2."
+  Source: VENCLEXTA PI, Section 12.1
   MLR Status: [TO BE COMPLETED]
+  NOTE: The claim "first and only approved BCL-2 inhibitor" is a promotional
+  superlative not found in PI Section 12.1 text. This claim requires independent
+  MLR verification against current FDA approvals as of June 2026.
 
 
 --- CLL/SLL EFFICACY CLAIMS ---
 
 VEN-EFF-001: MURANO — Primary PFS Endpoint (R/R CLL)
+  PI-verified data from Section 14 [Confirmed from PI, Section 14.1]:
   "In the MURANO trial (relapsed/refractory CLL), VENCLEXTA + rituximab
-   demonstrated a median PFS of 57.4 months vs. 17.0 months for
-   bendamustine + rituximab (HR 0.23; 95% CI 0.18-0.29) at final analysis."
-  Source: MURANO Phase 3 Trial, Final Analysis
+  demonstrated a median PFS not reached vs. 18.1 months (95% CI 15.8, 22.3)
+  for bendamustine + rituximab (HR 0.19; 95% CI 0.13-0.28; p<0.0001) at the
+  primary analysis (median follow-up 23.4 months). ORR was 92% VEN+R vs.
+  72% B+R."
+  Source: MURANO Phase 3 Trial — VENCLEXTA PI, Section 14.1 (Table 25)
+  MLR Status: [TO BE COMPLETED]
+  NOTE [Confirmed from PI, Section 14.1]: The primary analysis HR per PI
+  Section 14.1 is 0.19 (95% CI 0.13, 0.28), NOT HR 0.23 as previously cited
+  in this document. The 71-month follow-up investigator-assessed median PFS
+  was 53.6 months VEN+R vs. 17.0 months B+R. The PI does NOT report a median
+  PFS of 57.4 months — the previously cited figure of 57.4 months does NOT
+  appear in the current PI. The IRC-assessed primary analysis shows median PFS
+  "Not Reached" for VEN+R.
+
+VEN-EFF-002: MURANO — 5-Year OS Data (71-Month Follow-up)
+  PI-verified data from Section 14 [Confirmed from PI, Section 14.1]:
+  "In the MURANO trial at 71-month follow-up, death occurred in 16% (32/194)
+  of patients in the VEN+R arm and 33% (64/195) in the B+R arm (stratified
+  HR 0.40; 95% CI [0.26, 0.62])."
+  Source: VENCLEXTA PI, Section 14.1
+  MLR Status: [TO BE COMPLETED]
+  NOTE: The previously cited "5-year PFS rate 57.3% vs. 4.6%" does NOT appear
+  in the current PI. The current PI Section 14.1 reports the 71-month follow-up
+  OS data cited above. Claims about 5-year PFS rates at specific percentages
+  must be sourced from publications, not the current PI.
+  Published data claim (not in PI): The MURANO 7-year OS data (HR 0.53; 7-year
+  rates: 69.6% vs. 51%) is sourced from ASH 2025 publication — this is
+  "Published data - not in PI" and requires separate MLR review.
+
+VEN-EFF-003: MURANO — Overall Survival (71-Month)
+  PI-verified [Confirmed from PI, Section 14.1]:
+  "In MURANO at 71-month follow-up, median OS had not been reached in either
+  arm. Death occurred in 16% (VEN+R) vs. 33% (B+R) of patients (stratified
+  HR 0.40; 95% CI [0.26, 0.62])."
+  Source: VENCLEXTA PI, Section 14.1
+  MLR Status: [TO BE COMPLETED]
+  NOTE: The MURANO OS data with HR 0.53 and specific 7-year OS rates (69.6% vs.
+  51%) cited previously is from ASH 2025 publication — "Published data - not in
+  PI." The PI 71-month follow-up reports HR 0.40 (95% CI 0.26, 0.62).
+
+VEN-EFF-004: MURANO — Fixed Duration Regimen
+  PI-verified [Confirmed from PI, Section 2.2]:
+  "VENCLEXTA + rituximab in MURANO is a fixed-duration regimen: VENCLEXTA
+  400 mg once daily for 24 months from Cycle 1 Day 1 of rituximab, with
+  rituximab for 6 cycles (375 mg/m2 Cycle 1, 500 mg/m2 Cycles 2-6). Patients
+  complete treatment and may stop therapy after 24 months (absent progression
+  or unacceptable toxicity)."
+  Source: VENCLEXTA PI, Section 2.2
   MLR Status: [TO BE COMPLETED]
 
-VEN-EFF-002: MURANO — 5-Year PFS Rate
-  "In the MURANO trial, the 5-year PFS rate was 57.3% with VENCLEXTA +
-   rituximab versus 4.6% with bendamustine + rituximab."
-  Source: MURANO Phase 3 Trial, Final Analysis
+VEN-EFF-005: CLL14 — Primary PFS Endpoint (Treatment-Naive CLL with Comorbidities)
+  PI-verified data from Section 14 [Confirmed from PI, Section 14.1 Table 23]:
+  "In the CLL14 trial (treatment-naive CLL with coexisting medical conditions:
+  CIRS score >6 or CrCl <70 mL/min), VENCLEXTA + obinutuzumab demonstrated:
+    - PFS events: 29 (13%) VEN+G vs. 79 (37%) GClb
+    - Median PFS: Not Reached (both arms)
+    - HR 0.33 (95% CI 0.22, 0.51); p<0.0001
+    - ORR: 85% VEN+G vs. 71% GClb (p=0.0007)
+    - CR+CRi rate: 50% VEN+G vs. 23% GClb (p<0.0001)
+  At 28-month median follow-up."
+  Source: VENCLEXTA PI, Section 14.1 (Table 23)
   MLR Status: [TO BE COMPLETED]
+  NOTE [Confirmed from PI, Section 14.1]: The PI does NOT report a "52.4-month
+  follow-up HR 0.33; CI 0.25-0.45" as previously cited. The PI primary analysis
+  reports HR 0.33 (95% CI 0.22, 0.51) at 28-month median follow-up. Longer-
+  follow-up analyses with different CIs may be from publications (not PI).
 
-VEN-EFF-003: MURANO — Overall Survival
-  "In the MURANO trial, median OS was not reached with VENCLEXTA + rituximab
-   vs. 87.8 months with bendamustine + rituximab (HR 0.53; 95% CI 0.37-0.74).
-   7-year OS rates: 69.6% vs. 51%."
-  Source: MURANO Phase 3 Trial, Blood (ASH 2025)
+VEN-EFF-006: CLL14 — MRD Negativity
+  PI-verified [Confirmed from PI, Section 14.1 Table 24]:
+  "In CLL14, MRD negativity rates 3 months after treatment completion:
+    - Bone marrow MRD-negative: 57% VEN+G vs. 17% GClb (p<0.0001)
+    - Peripheral blood MRD-negative: 76% VEN+G vs. 35% GClb (p<0.0001)
+  At 12 months post-treatment, peripheral blood MRD-negative rate: 58% VEN+G
+  vs. 9% GClb."
+  Source: VENCLEXTA PI, Section 14.1 (Table 24)
   MLR Status: [TO BE COMPLETED]
-
-VEN-EFF-004: MURANO — Fixed Duration
-  "VENCLEXTA + rituximab is a fixed-duration, 2-year regimen (not continuous
-   daily therapy). Patients complete treatment and may stop therapy."
-  Source: MURANO Phase 3 Trial Protocol; VENCLEXTA PI
-  MLR Status: [TO BE COMPLETED]
-
-VEN-EFF-005: CLL14 — Primary PFS Endpoint (Treatment-Naive CLL)
-  "In the CLL14 trial (treatment-naive CLL with comorbidities), VENCLEXTA +
-   obinutuzumab demonstrated a median PFS not reached vs. 36.4 months for
-   chlorambucil + obinutuzumab (HR 0.33; 95% CI 0.25-0.45; P<0.0001) at
-   52.4-month follow-up."
-  Source: CLL14 Phase 3 Trial
-  MLR Status: [TO BE COMPLETED]
-
-VEN-EFF-006: CLL14 — 4-Year PFS Rate
-  "In the CLL14 trial, the 4-year PFS rate was 74.0% with VENCLEXTA +
-   obinutuzumab versus 35.4% with chlorambucil + obinutuzumab."
-  Source: CLL14 Phase 3 Trial
-  MLR Status: [TO BE COMPLETED]
+  NOTE: The previously cited "4-year PFS rate 74.0% vs. 35.4%" does NOT appear
+  in the current PI Section 14.1. Claims about 4-year PFS rates at specific
+  percentages must be sourced from publications.
 
 VEN-EFF-007: CLL14 — ORR
-  "In the CLL14 trial, overall response rate was 85% with VENCLEXTA +
-   obinutuzumab vs. 71% with chlorambucil + obinutuzumab (P=0.0007)."
-  Source: CLL14 Phase 3 Trial
+  PI-verified [Confirmed from PI, Section 14.1 Table 23]:
+  "In the CLL14 trial, overall response rate was 85% (95% CI 79, 89) with
+  VENCLEXTA + obinutuzumab vs. 71% (95% CI 65, 77) with GClb (p=0.0007)."
+  Source: VENCLEXTA PI, Section 14.1 (Table 23)
   MLR Status: [TO BE COMPLETED]
 
-VEN-EFF-008: CLL14 — Fixed Duration
+VEN-EFF-008: CLL14 — Fixed Duration Regimen
+  PI-verified [Confirmed from PI, Section 2.2]:
   "The VENCLEXTA + obinutuzumab regimen in CLL14 is a fixed 12-month
-   treatment duration (not continuous). Treatment concludes after
-   approximately 12 months of therapy."
-  Source: CLL14 Phase 3 Trial Protocol; VENCLEXTA PI
+  treatment duration for VENCLEXTA (Cycles 3-12, 400 mg orally once daily)
+  plus 6 cycles of obinutuzumab (Cycles 1-6). Total venetoclax treatment
+  duration is approximately 10 cycles (through Cycle 12 end)."
+  Source: VENCLEXTA PI, Section 2.2
   MLR Status: [TO BE COMPLETED]
 
 VEN-EFF-009: AMPLIFY — All-Oral Fixed-Duration Frontline CLL (Feb 2026)
-  "In the AMPLIFY trial (treatment-naive CLL/SLL), the all-oral fixed-duration
-   regimen of VENCLEXTA + acalabrutinib demonstrated a 3-year PFS rate of
-   76.5% (without obinutuzumab) and 83.1% (with obinutuzumab), vs. 66.5%
-   for standard chemoimmunotherapy (HR 0.65; P=0.0038) — the first all-oral,
-   fixed-duration frontline CLL regimen approved."
-  Source: AMPLIFY Phase 3 Trial; FDA Approval February 19, 2026
+  PI-verified data from Section 14 [Confirmed from PI, Section 14.1 Table 22]:
+  "In the AMPLIFY trial (previously untreated CLL/SLL, without del(17p) or
+  TP53 mutation), VENCLEXTA + acalabrutinib demonstrated:
+    - PFS events: 89 (31%) VEN+A vs. 95 (33%) FCR/BR
+    - Median PFS: Not Reached VEN+A vs. 47.6 months (95% CI 43.3, NR) FCR/BR
+    - HR 0.65 (95% CI 0.49, 0.87); p=0.0038
+    - ORR: 93% (95% CI 89, 95) VEN+A vs. 75% (95% CI 70, 80) FCR/BR
+    - CR rate: 9% VEN+A vs. 5% FCR/BR
+  Median follow-up for PFS: 42.6 months. At 41.0-month overall follow-up:
+  18 death events VEN+A vs. 42 death events FCR/BR."
+  Source: VENCLEXTA PI, Section 14.1 (Table 22)
+  MLR Status: [TO BE COMPLETED]
+  NOTE [Confirmed from PI, Section 14.1]: The PI does NOT report 3-year PFS
+  rates (76.5% / 83.1% / 66.5%) in Section 14. These figures may be from
+  publications — "Published data - not in PI." The approved VEN+ACA arm is
+  the 2-agent regimen (without obinutuzumab). The AVO arm (VEN+ACA+obinutuzumab)
+  is described in Section 5.3 as "an unapproved regimen for previously untreated
+  CLL/SLL." The AMPLIFY trial enrolled patients without del(17p) or TP53
+  mutation — this patient selection criterion is important for the indication.
+  Total VENCLEXTA treatment: 12 cycles (starting Cycle 3 Day 1 through Cycle
+  14 end) per Section 2.2. Acalabrutinib: up to 14 cycles.
+
+VEN-EFF-010: del(17p) Activity — Monotherapy
+  PI-verified [Confirmed from PI, Section 14.1 Table 27]:
+  "VENCLEXTA demonstrated activity in CLL patients with del(17p): In the M13-982
+  trial (N=106, all patients with del(17p)), ORR was 80% (95% CI 71, 87) by
+  IRC, including CR+CRi 8% and PR 70%. Median DOR not reached at 22-month
+  median follow-up."
+  Source: VENCLEXTA PI, Section 14.1 (Table 27)
   MLR Status: [TO BE COMPLETED]
 
-VEN-EFF-010: del(17p) Activity
-  "VENCLEXTA demonstrated activity in CLL patients with del(17p), a
-   high-risk genetic feature associated with poor outcomes with
-   chemoimmunotherapy."
-  Source: VENCLEXTA PI; CLL14 subgroup analysis; MURANO subgroup analysis
+VEN-EFF-011: M14-032 — Post-BTK/Post-Idelalisib Monotherapy
+  PI-verified [Confirmed from PI, Section 14.1]:
+  "In M14-032 (N=127, patients with prior ibrutinib or idelalisib), ORR was
+  70% (95% CI 61, 78), CR+CRi 5%, PR 65%. Median DOR not reached at 19.9-month
+  median follow-up."
+  Source: VENCLEXTA PI, Section 14.1
   MLR Status: [TO BE COMPLETED]
 
 
 --- AML EFFICACY CLAIMS ---
 
 VEN-EFF-AML-001: VIALE-A — Overall Survival (Primary Endpoint)
-  "In the VIALE-A trial (newly diagnosed AML, ineligible for intensive
-   chemotherapy), VENCLEXTA + azacitidine demonstrated median OS of
-   14.7 months vs. 9.6 months for placebo + azacitidine (HR 0.66; 95% CI
-   0.52-0.85; P<0.001) — a 34% reduction in risk of death."
-  Source: VIALE-A Phase 3 Trial; NEJM August 2020
+  PI-verified data from Section 14 [Confirmed from PI, Section 14.2 Table 29]:
+  "In the VIALE-A trial (newly diagnosed AML, adults ≥75 or with comorbidities
+  precluding intensive chemotherapy), VENCLEXTA + azacitidine demonstrated:
+    - Median OS: 14.7 months (95% CI 11.9, 18.7) vs. 9.6 months (95% CI 7.4,
+      12.7) for placebo + azacitidine
+    - HR 0.66 (95% CI 0.52, 0.85); p<0.001
+    - CR rate: 37% VEN+AZA vs. 18% PBO+AZA (p<0.001)
+    - CR+CRh rate: 65% VEN+AZA vs. 23% PBO+AZA (p<0.001)
+    - Median DOCR: 18.0 months VEN+AZA vs. 13.4 months PBO+AZA"
+  Source: VENCLEXTA PI, Section 14.2 (Table 29)
   MLR Status: [TO BE COMPLETED]
+  NOTE [Confirmed from PI, Section 14.2]: CR+CRh rate is 65% (not 66.4%).
+  The PI reports CR+CRh as 185/286 = 65% (not 66.4%). CR rate alone is 37%.
+  The "34% reduction in risk of death" derivation (1-0.66=0.34) is a
+  mathematical representation of the HR — confirm MLR acceptability of this
+  framing separate from PI language.
 
 VEN-EFF-AML-002: VIALE-A — Complete Remission Rate
-  "In the VIALE-A trial, the CR+CRi rate was 66.4% with VENCLEXTA +
-   azacitidine vs. 28.3% with placebo + azacitidine (P<0.001)."
-  Source: VIALE-A Phase 3 Trial; NEJM August 2020
+  PI-verified [Confirmed from PI, Section 14.2 Table 29]:
+  "In the VIALE-A trial, the CR+CRh (composite complete remission) rate was
+  65% with VENCLEXTA + azacitidine vs. 23% with placebo + azacitidine (p<0.001).
+  CR alone was 37% VEN+AZA vs. 18% PBO+AZA (p<0.001)."
+  Source: VENCLEXTA PI, Section 14.2 (Table 29)
+  MLR Status: [TO BE COMPLETED]
+  NOTE [Confirmed from PI, Section 14.2]: The PI uses the term "CRh" (complete
+  remission with partial hematological recovery), not "CRi" (complete remission
+  with incomplete blood count recovery), for the composite AML response endpoint.
+  Using "CR+CRh" (65%) is the correct PI language. "CR+CRi" (66.4%) was
+  previously cited — this is INCORRECT; the correct PI term/rate is CR+CRh 65%.
+
+VEN-EFF-AML-003: VIALE-C — LDAC Combination (Primary Endpoint NOT Met)
+  PI-verified [Confirmed from PI, Section 14.2]:
+  "In the VIALE-C trial (newly diagnosed AML, ineligible for intensive
+  chemotherapy), VENCLEXTA + low-dose cytarabine (LDAC) demonstrated:
+    - CR rate: 27% (95% CI 20, 35) VEN+LDAC vs. 7.4% (95% CI 2.4, 16) PBO+LDAC
+    - CR+CRh rate: 47% (95% CI 39, 55) VEN+LDAC vs. 15% (95% CI 7.3, 25) PBO+LDAC
+    - Median OS: 7.2 months (95% CI 5.6, 10.1) VEN+LDAC vs. 4.1 months (95% CI
+      3.1, 8.8) PBO+LDAC
+    - OS HR 0.75 (95% CI 0.52, 1.07); p=0.114
+  The primary endpoint of overall survival did NOT meet statistical significance."
+  Source: VENCLEXTA PI, Section 14.2
+  MLR Status: [TO BE COMPLETED]
+  NOTE [Confirmed from PI, Section 14.2]: The PI confirms the primary endpoint
+  was not met (p=0.114). The p-value is 0.114 (not 0.11 as previously cited).
+  IMPORTANT: Do not discuss VIALE-C efficacy positively without noting the
+  failed primary endpoint — this is a fair balance requirement.
+
+VEN-EFF-AML-004: VIALE-A — CR Duration
+  PI-verified [Confirmed from PI, Section 14.2 Table 29]:
+  "In the VIALE-A trial, the median duration of CR was 18.0 months (95% CI
+  15.3, not reached) with VEN+AZA vs. 13.4 months (95% CI 8.7, 17.6) with
+  PBO+AZA. Median time to first CR or CRh was 1.0 month with VEN+AZA."
+  Source: VENCLEXTA PI, Section 14.2 (Table 29)
+  MLR Status: [TO BE COMPLETED]
+
+VEN-EFF-AML-005: VIALE-A — Transfusion Independence
+  PI-verified [Confirmed from PI, Section 14.2]:
+  "Among transfusion-dependent patients in VIALE-A, 49% (76/155) treated with
+  VEN+AZA became transfusion independent during any consecutive ≥56-day period,
+  vs. 27% (22/81) with PBO+AZA. Among transfusion-independent patients, 69%
+  (90/131) treated with VEN+AZA remained transfusion independent."
+  Source: VENCLEXTA PI, Section 14.2
   MLR Status: [TO BE COMPLETED]
 
 
 --- SAFETY CLAIMS (Required for Fair Balance) ---
 
-VEN-SAF-001: BOXED WARNING — Tumor Lysis Syndrome (CLL/SLL)
-  "BOXED WARNING: Tumor lysis syndrome (TLS), including fatal events and
-   renal failure requiring dialysis, has occurred in patients treated with
-   VENCLEXTA. Assess all patients for TLS risk prior to initiation. Provide
-   appropriate prophylaxis including hydration and anti-hyperuricemics.
-   Employ more intensive measures for higher-risk patients. Use the 5-week
-   dose ramp-up schedule in CLL/SLL patients."
-  Source: VENCLEXTA PI, Boxed Warning
+VEN-SAF-001: BOXED WARNING — Tumor Lysis Syndrome
+  Verbatim from PI Section 5.1 and Highlights [Confirmed from PI, Section 5.1]:
+  "Tumor lysis syndrome (TLS), including fatal events and renal failure
+  requiring dialysis, has occurred in patients treated with VENCLEXTA.
+  VENCLEXTA can cause rapid reduction in tumor and thus poses a risk for TLS
+  at initiation and during the ramp-up phase in all patients, and during
+  reinitiation after dosage interruption in patients with CLL/SLL. Changes in
+  blood chemistries consistent with TLS that require prompt management can occur
+  as early as 6 to 8 hours following the first dose of VENCLEXTA and at each
+  dose increase. TLS, including fatal cases, has been reported after a single
+  20 mg dose of VENCLEXTA."
+  Source: VENCLEXTA PI, Section 5.1 (Warnings and Precautions)
   MLR Status: [TO BE COMPLETED]
-  NOTE: This claim MUST be paired with any CLL/SLL efficacy claim.
+  NOTE [Confirmed from PI]: VENCLEXTA has 1 Boxed Warning (TLS). There is NO
+  Boxed Warning for embryo-fetal toxicity. Embryo-fetal toxicity is addressed
+  in Section 5.5 (Warnings and Precautions). The Highlights page does not
+  display a separate Boxed Warning section — the TLS warning is in Section 5.1.
 
 VEN-SAF-002: TLS — Ramp-Up Dosing Schedule
-  "VENCLEXTA requires a 5-week dose ramp-up in CLL/SLL patients (20 mg ->
-   50 mg -> 100 mg -> 200 mg -> 400 mg) to reduce the risk of TLS. With
-   current ramp-up and prophylaxis protocols, TLS occurred in 2% of patients
-   in CLL/SLL monotherapy trials (vs. 12% with earlier protocols)."
-  Source: VENCLEXTA PI, Sections 2 and 5.1
+  PI-verified [Confirmed from PI, Sections 2.2 and 5.1]:
+  "VENCLEXTA requires a 5-week dose ramp-up in CLL/SLL patients:
+  Week 1: 20 mg, Week 2: 50 mg, Week 3: 100 mg, Week 4: 200 mg,
+  Week 5 and beyond: 400 mg (maintenance dose).
+  In AML, a 3-day ramp-up (100 mg Day 1, 200 mg Day 2, 400 mg Day 3+) is
+  used with azacitidine or decitabine; a 4-day ramp-up (100 mg Day 1, 200 mg
+  Day 2, 400 mg Day 3, 600 mg Day 4+ for LDAC) is used with low-dose cytarabine.
+  With current 5-week ramp-up and prophylaxis protocols, TLS occurred in 2%
+  of patients in CLL/SLL monotherapy trials (vs. 13% with earlier 2-3 week
+  ramp-up protocols)."
+  Source: VENCLEXTA PI, Sections 2.2, 2.3, 5.1
   MLR Status: [TO BE COMPLETED]
+  NOTE [Confirmed from PI, Section 5.1]: The 2% rate (current ramp-up) and
+  the 13% rate (historical short ramp-up) both appear in PI Section 5.1. The
+  AML 3-day ramp-up (azacitidine/decitabine) and 4-day ramp-up (LDAC) are
+  confirmed in Section 2.3. These are distinct from the 5-week CLL schedule.
 
 VEN-SAF-003: Neutropenia (CLL/SLL)
-  "The most common Grade 3 or 4 adverse reaction in patients with CLL/SLL
-   treated with VENCLEXTA was neutropenia (63-64%). Monitor blood counts
-   regularly. Grade 3-4 neutropenia may require dose interruptions."
-  Source: VENCLEXTA PI, Section 6.1
+  PI-verified [Confirmed from PI, Section 5.2]:
+  "In patients with CLL treated with VENCLEXTA in monotherapy studies and
+  in combination studies with obinutuzumab or rituximab, Grade 3 or 4
+  neutropenia developed in 63% to 64% of patients. Grade 4 neutropenia
+  developed in 31% to 33% of patients. Febrile neutropenia occurred in 4%
+  to 6% of patients in these settings.
+  In patients with CLL treated with VENCLEXTA in combination with acalabrutinib
+  (AMPLIFY), Grade 3 or 4 neutropenia developed in 38% of patients; Grade 4
+  in 15%; febrile neutropenia in 2%."
+  Source: VENCLEXTA PI, Section 5.2
   MLR Status: [TO BE COMPLETED]
+  NOTE [Confirmed from PI, Section 5.2]: The 63-64% Grade 3/4 neutropenia range
+  applies to monotherapy and VEN+G/VEN+R combinations specifically. The VEN+ACA
+  (AMPLIFY) combination has a significantly lower rate (38% Grade 3/4).
 
 VEN-SAF-004: Most Common Adverse Events — CLL Monotherapy
-  "The most common adverse events (any grade, >=20%) in patients with
-   CLL/SLL treated with VENCLEXTA monotherapy include: neutropenia (50%),
-   diarrhea (43%), nausea (42%), upper respiratory tract infection (36%),
-   anemia (33%), fatigue (32%), thrombocytopenia (29%), musculoskeletal pain
-   (29%), edema (22%), and cough (22%)."
-  Source: VENCLEXTA PI, Section 6.1
+  PI-verified from Table 16 [Confirmed from PI, Section 6.1 Table 16]:
+  "The most common adverse reactions (all grades, ≥20%) in patients with
+  previously treated CLL/SLL who received VENCLEXTA monotherapy (N=352):
+  Neutropenia 50%, Diarrhea 43%, Nausea 42%, Upper respiratory tract infection
+  36%, Anemia 33%, Fatigue 32%, Thrombocytopenia 29%, Musculoskeletal pain 29%,
+  Edema 22%, Cough 22%, Pyrexia 18%, Headache 18%, Rash 18%, Vomiting 16%,
+  Constipation 16%, Abdominal pain 18%, Dizziness 14%."
+  Source: VENCLEXTA PI, Section 6.1 (Table 16)
+  MLR Status: [TO BE COMPLETED]
+  NOTE [Confirmed from PI, Section 6.1]: All percentages confirmed from Table 16.
+  Grade ≥3 neutropenia 45%; anemia 18%; thrombocytopenia 20%; diarrhea 3%;
+  fatigue 4%.
+
+VEN-SAF-004b: Most Common Adverse Events — CLL VEN+ACA (AMPLIFY)
+  PI-verified from Table 10 [Confirmed from PI, Section 6.1 Table 10]:
+  "Most common adverse reactions (≥15% any grade) in previously untreated CLL
+  receiving VENCLEXTA + acalabrutinib (N=291) in AMPLIFY:
+  Headache 35%, Diarrhea 33%, Musculoskeletal pain 25%, COVID-19 21%,
+  Fatigue 18%, Bruising 17%, Rash 16%, Nausea 15%.
+  Laboratory: Neutropenia 78% (Grade 3/4: 38%), Lymphopenia 56% (12%),
+  Thrombocytopenia 43% (5%), Anemia 35% (7%)."
+  Source: VENCLEXTA PI, Section 6.1 (Tables 10, 11)
+  MLR Status: [TO BE COMPLETED]
+
+VEN-SAF-004c: Most Common Adverse Events — CLL VEN+G (CLL14)
+  PI-verified from Table 12 [Confirmed from PI, Section 6.1 Table 12]:
+  "Most common adverse reactions (≥10% any grade) in previously untreated CLL
+  receiving VENCLEXTA + obinutuzumab (N=212) in CLL14:
+  Neutropenia 60% (Grade ≥3: 56%), Diarrhea 28% (4%), Nausea 19% (0%),
+  Fatigue 21% (2%), Upper respiratory tract infection 17% (1%),
+  Constipation 13% (0%), Vomiting 10% (1%), Anemia 17% (8%).
+  Key lab abnormalities: Leukopenia 90% (Grade 3/4: 46%), Lymphopenia 87%
+  (57%), Neutropenia 83% (63%), Thrombocytopenia 68% (28%), Anemia 53% (15%)."
+  Source: VENCLEXTA PI, Section 6.1 (Tables 12, 13)
+  MLR Status: [TO BE COMPLETED]
+
+VEN-SAF-004d: Most Common Adverse Events — CLL VEN+R (MURANO)
+  PI-verified from Table 14 [Confirmed from PI, Section 6.1 Table 14]:
+  "Most common adverse reactions (≥10% any grade) in R/R CLL receiving
+  VENCLEXTA + rituximab (N=194) in MURANO:
+  Neutropenia 65% (Grade ≥3: 62%), Upper respiratory tract infection 39% (2%),
+  Diarrhea 40% (3%), Fatigue 22% (2%), Nausea 21% (1%), Lower respiratory
+  tract infection 18% (2%), Anemia 16% (11%), Pneumonia 10% (7%),
+  Constipation 14% (<1%), Febrile neutropenia 4% (4%)."
+  Source: VENCLEXTA PI, Section 6.1 (Tables 14, 15)
   MLR Status: [TO BE COMPLETED]
 
 VEN-SAF-005: CYP3A Inhibitors Contraindication (CLL/SLL)
+  Verbatim from PI Section 4 [Confirmed from PI, Section 4]:
   "Concomitant use of VENCLEXTA with strong CYP3A inhibitors at initiation
-   and during the ramp-up phase in patients with CLL/SLL is CONTRAINDICATED
-   due to increased exposure and risk of TLS."
-  Source: VENCLEXTA PI, Sections 4 and 7.1
+  and during the ramp-up phase is contraindicated in patients with CLL/SLL
+  due to the potential for increased risk of tumor lysis syndrome."
+  Source: VENCLEXTA PI, Section 4 (Contraindications)
   MLR Status: [TO BE COMPLETED]
+  NOTE [Confirmed from PI, Section 4]: The contraindication applies during
+  "initiation and during the ramp-up phase" in CLL/SLL ONLY. After the ramp-up
+  phase in CLL/SLL, the PI recommends considering alternative medications or
+  dose adjustment (not an absolute contraindication). For AML, the PI specifies
+  dose reduction (not contraindication) during ramp-up. P-gp inhibitors are NOT
+  listed as a contraindication in Section 4; they are addressed as a dose
+  modification in Section 2.6 and Drug Interactions Section 7.1.
 
 VEN-SAF-006: No REMS Program
+  PI-verified [Confirmed from PI]:
   "VENCLEXTA does not have a REMS program. TLS risk is managed through the
-   dose ramp-up schedule, required prophylaxis measures, and monitoring as
-   outlined in the Prescribing Information."
-  Source: VENCLEXTA PI; FDA approval history
+  dose ramp-up schedule, required prophylaxis measures, and monitoring as
+  outlined in the Prescribing Information."
+  Source: VENCLEXTA PI (no REMS section in current PI)
   MLR Status: [TO BE COMPLETED]
 
 VEN-SAF-007: Most Common Adverse Events — AML (VIALE-A)
-  "In VIALE-A, the most frequent Grade 3 or 4 adverse reactions in patients
-   treated with VENCLEXTA + azacitidine were thrombocytopenia, neutropenia,
-   and febrile neutropenia. Grade 3-4 infections including pneumonia were
-   reported in approximately 33% of patients."
-  Source: VENCLEXTA PI, Section 6.1 (AML); VIALE-A publication
+  PI-verified from Table 18 [Confirmed from PI, Section 6.1 Table 18]:
+  "In VIALE-A (VEN+AZA, N=283), the most common adverse reactions (≥10%
+  any grade with ≥5% difference vs. PBO+AZA):
+  Febrile neutropenia 42% (Grade 3/4: 42%), Nausea 44% (2%), Diarrhea 43%
+  (5%), Musculoskeletal pain 36% (2%), Fatigue 31% (6%), Edema 27% (<1%),
+  Hemorrhage 27% (7%), Vomiting 30% (2%), Decreased appetite 25% (4%), Rash
+  25% (1%), Sepsis 22% (22%), Dyspnea 18% (4%), Dizziness 17% (<1%),
+  Stomatitis 18% (1%), Abdominal pain 18% (<1%), Hypotension 12% (5%),
+  Urinary tract infection 16% (6%).
+  Pneumonia 33% (reported separately as a common AE, not in primary table).
+  Top Grade 3/4 lab abnormalities: Neutrophils decreased 98%, Platelet
+  decreased 94%, Lymphocytes decreased 91%, Hemoglobin decreased 61%."
+  Source: VENCLEXTA PI, Section 6.1 (Tables 18, 19)
+  MLR Status: [TO BE COMPLETED]
+
+VEN-SAF-008: Embryo-Fetal Toxicity (Section 5 Warning — Not Boxed)
+  PI-verified [Confirmed from PI, Section 5.5]:
+  "Based on findings in animals and its mechanism of action, VENCLEXTA may
+  cause embryo-fetal harm when administered to a pregnant woman. Advise
+  pregnant women of the potential risk to a fetus. Advise females of
+  reproductive potential to use effective contraception during treatment with
+  VENCLEXTA and for 30 days after the last dose."
+  Source: VENCLEXTA PI, Section 5.5 (Warnings and Precautions)
+  MLR Status: [TO BE COMPLETED]
+  NOTE [Confirmed from PI]: This is a Section 5 Warning and Precaution, NOT a
+  Boxed Warning. The current PI has only 1 Boxed Warning (TLS).
+
+VEN-SAF-009: Multiple Myeloma — Increased Mortality Warning
+  PI-verified [Confirmed from PI, Section 5.6]:
+  "In the BELLINI trial (NCT02755597) in relapsed or refractory multiple
+  myeloma, the addition of VENCLEXTA to bortezomib plus dexamethasone
+  resulted in increased mortality. Treatment of patients with multiple myeloma
+  with VENCLEXTA in combination with bortezomib plus dexamethasone is not
+  recommended outside of controlled clinical trials."
+  Source: VENCLEXTA PI, Section 5.6
+  MLR Status: [TO BE COMPLETED]
+  NOTE [Confirmed from PI, Section 5.6]: This is a Section 5.6 Warning and
+  Precaution. The PI confirms multiple myeloma is NOT an approved indication
+  and use is explicitly discouraged outside clinical trials.
+
+VEN-SAF-010: Hepatic Impairment Dose Adjustment
+  PI-verified [Confirmed from PI, Section 2.7 and 8.7]:
+  "Reduce the VENCLEXTA once daily dose by 50% for patients with severe
+  hepatic impairment (Child-Pugh C). No dose adjustment for mild (Child-Pugh A)
+  or moderate (Child-Pugh B) impairment."
+  Source: VENCLEXTA PI, Sections 2.7, 8.7
   MLR Status: [TO BE COMPLETED]
 
 
@@ -231,36 +493,47 @@ NOTE: These claims may only be used if supported by data cited in the
 approved labeling. Obtain MLR approval for each before use in training.
 
 VEN-DIFF-001: Fixed Duration vs. Continuous Therapy
-  "All VENCLEXTA-based regimens approved for CLL/SLL (VEN+G, VEN+R, VEN+ACA)
-   are fixed-duration (12 months to 2 years), providing patients with
-   treatment-free intervals. BTK inhibitors (ibrutinib, zanubrutinib,
-   acalabrutinib) require continuous indefinite daily dosing."
-  Source: MURANO PI; CLL14 PI; AMPLIFY PI
+  PI-verified [Confirmed from PI, Sections 2.2 and 14]:
+  "All VENCLEXTA-based regimens approved for CLL/SLL are fixed-duration:
+  VEN+G (12 months venetoclax, 6 months obinutuzumab, CLL14),
+  VEN+R (24 months venetoclax, 6 months rituximab, MURANO),
+  VEN+ACA (12 cycles venetoclax + 14 cycles acalabrutinib, AMPLIFY).
+  BTK inhibitors (ibrutinib, zanubrutinib, acalabrutinib as monotherapy)
+  require continuous indefinite daily dosing until disease progression per
+  their respective PIs."
+  Source: VENCLEXTA PI, Sections 2.2; IMBRUVICA PI, Section 2.1; BRUKINSA PI,
+  Section 2.1; CALQUENCE PI, Section 2.1
   MLR Status: [TO BE COMPLETED]
 
 VEN-DIFF-002: Cardiovascular Profile vs. Ibrutinib
-  "VENCLEXTA-based regimens have not demonstrated the cardiovascular
-   toxicity profile (atrial fibrillation, hypertension) associated with
-   ibrutinib (IMBRUVICA), which carries a Boxed Warning for serious cardiac
-   arrhythmias and cardiac failure."
-  Source: VENCLEXTA PI; IMBRUVICA PI (Boxed Warning)
-  NOTE: This claim cites competitor PI. Confirm MLR approval required.
+  PI-verified [Confirmed from PI]:
+  "VENCLEXTA-based regimens have not demonstrated the cardiovascular toxicity
+  profile associated with ibrutinib. IMBRUVICA (ibrutinib) carries significant
+  cardiovascular safety items in Section 5 Warnings and Precautions (not Boxed
+  Warnings): Cardiac Arrhythmias, Cardiac Failure, and Sudden Death (5.3) with
+  Grade 3+ atrial fibrillation 3.7% and deaths due to cardiac causes 1% of 4,896
+  patients; Hypertension (5.4) occurring in 19% of patients (Grade 3+ in 8%)."
+  Source: VENCLEXTA PI; IMBRUVICA PI, Sections 5.3 and 5.4
   MLR Status: [TO BE COMPLETED]
+  NOTE [Confirmed from PI]: IMBRUVICA does NOT have Boxed Warnings for cardiac
+  arrhythmias or hypertension — these are Section 5 W&P items. Training must
+  not state "IMBRUVICA has a Boxed Warning for cardiac arrhythmias." Correct
+  language: "IMBRUVICA has a Section 5 Warning for cardiac arrhythmias."
 
 VEN-DIFF-003: Unique Mechanism — Complementary to BTK Inhibitors
   "VENCLEXTA acts on BCL-2 (anti-apoptotic pathway), a distinct and
-   complementary mechanism to BTK inhibitors which target the BCR signaling
-   pathway. This mechanistic difference provides the rationale for
-   venetoclax-based combination regimens with BTK inhibitors."
-  Source: VENCLEXTA PI; AMPLIFY trial rationale
+  complementary mechanism to BTK inhibitors which target the BCR signaling
+  pathway. This mechanistic difference provides the rationale for
+  venetoclax-based combination regimens with BTK inhibitors."
+  Source: VENCLEXTA PI, Section 12.1; AMPLIFY trial rationale
   MLR Status: [TO BE COMPLETED]
 
 VEN-DIFF-004: Only BCL-2 Inhibitor AND Only Agent Approved for Both CLL and AML
   "VENCLEXTA is the only FDA-approved BCL-2 inhibitor. Among all products
-   in the CLL competitive landscape (Imbruvica, Brukinsa, Calquence, Gazyva,
-   Jaypirca, Rituxan, Copiktra, Zydelig), VENCLEXTA is the only agent also
-   approved for AML."
-  Source: FDA product labeling for all listed products
+  in the CLL competitive landscape (Imbruvica, Brukinsa, Calquence, Gazyva,
+  Jaypirca, Rituxan, Copiktra, Zydelig), VENCLEXTA is the only agent also
+  approved for AML."
+  Source: Current FDA product labeling for all listed products
   MLR Status: [TO BE COMPLETED]
 
 
@@ -275,120 +548,321 @@ head-to-head data in the approved labeling.
 --- IMBRUVICA (ibrutinib) — Covalent BTK Inhibitor, 1st Generation ---
 
 COMP-IBR-001: Approved Indications
-  CLL/SLL (frontline and R/R); Waldenström's Macroglobulinemia;
-  cGVHD (adults and pediatric ≥1 year)
-  NOTE: MCL and MZL indications VOLUNTARILY WITHDRAWN May 2023.
+  [Confirmed from PI, Section 1, IMBRUVICA PI revised 10/2025]:
+  Current approved indications (verbatim from Section 1):
+  1.1 "CLL/SLL" — for treatment of adult patients
+  1.2 "CLL/SLL with 17p deletion" — for treatment of adult patients
+  1.3 "Waldenström's Macroglobulinemia (WM)" — for treatment of adult patients
+  1.4 "Chronic Graft versus Host Disease (cGVHD)" — for adult and pediatric
+      patients age 1 year and older after failure of ≥1 line of systemic therapy
+  NOTE: MCL and MZL indications VOLUNTARILY WITHDRAWN — confirmed NOT in
+  current PI. No MCL or MZL indication exists in the current IMBRUVICA label.
 
-COMP-IBR-002: Boxed Warnings (4 warnings)
-  (1) Serious hemorrhage including fatal hemorrhage
-  (2) Serious infections including fatal infections
-  (3) Cardiac arrhythmias and cardiac failure
-  (4) Hypertension
+COMP-IBR-002: WARNING STATUS — NO BOXED WARNINGS
+  [Confirmed from PI, IMBRUVICA PI revised 10/2025]:
+  IMPORTANT CORRECTION: IMBRUVICA has ZERO Boxed Warnings. All safety
+  information is in Section 5 (Warnings and Precautions):
+  - 5.1 Hemorrhage: Fatal bleeding events in patients; major hemorrhage ≥Grade 3
+    in 4.2% of 2,838 patients; bleeding any grade 39%; fatalities 0.4%.
+  - 5.2 Infections: Grade 3+ infections in 21% of 1,476 patients; cases of PML
+    and PJP have occurred.
+  - 5.3 Cardiac Arrhythmias, Cardiac Failure, and Sudden Death: Deaths due to
+    cardiac causes or sudden deaths in 1% of 4,896 patients. Grade 3+ atrial
+    fibrillation and flutter in 3.7%; Grade 3+ cardiac failure in 1.3%.
+  - 5.4 Hypertension: Occurred in 19% of 1,476 patients; Grade 3+ in 8%.
+  - 5.5 Cytopenias: Grade 3/4 neutropenia 23%, thrombocytopenia 8%, anemia 2.8%
+    (single-agent, 645 patients).
+  - 5.6 Second Primary Malignancies: 10% of patients; most frequent non-melanoma
+    skin cancer (6%).
+  - 5.7 Hepatotoxicity Including DILI: Severe, life-threatening, potentially
+    fatal cases reported.
+  - 5.8 Tumor Lysis Syndrome: Infrequently reported.
+  - 5.9 Embryo-Fetal Toxicity.
 
-COMP-IBR-003: Atrial Fibrillation Risk
-  Atrial fibrillation/flutter reported in approximately 9-17% of patients;
-  Grade >=3 AF in 3.7%; increases with duration of therapy.
-  Source: IMBRUVICA PI
+COMP-IBR-003: Most Common AEs in CLL/SLL
+  [Confirmed from PI, Section 6.1, IMBRUVICA PI]:
+  Most common adverse reactions (≥30%) in patients with B-cell malignancies:
+  thrombocytopenia, diarrhea, fatigue, musculoskeletal pain, neutropenia, rash,
+  anemia, bruising, and nausea. Specific CLL/SLL data from RESONATE-2 (vs.
+  chlorambucil): Musculoskeletal pain 36% (G3+: 4%), Diarrhea 42% (4%),
+  Fatigue 30% (1%), Rash 21% (4%), Bruising 19% (0%), Cough 22% (0%),
+  Upper respiratory tract infection 17% (2%), Pneumonia 14% (8%),
+  Hypertension 14% (4%).
 
 
 --- BRUKINSA (zanubrutinib) — Covalent BTK Inhibitor, 2nd Generation ---
 
 COMP-ZAN-001: ALPINE Head-to-Head vs. Ibrutinib (R/R CLL)
-  Zanubrutinib demonstrated superior PFS vs. ibrutinib (HR 0.68; 95% CI
-  0.54-0.84) and significantly lower atrial fibrillation rates (7.1% vs.
-  17.0%) in the ALPINE Phase 3 trial. Source: ALPINE Phase 3 Trial, Blood
+  [Confirmed from PI, Section 14.4, BRUKINSA PI revised 06/2025]:
+  SEQUOIA trial (previously untreated CLL/SLL without 17p deletion):
+  HR 0.42 (95% CI 0.28, 0.63); p<0.0001 vs. BR. ORR 93% BRUKINSA vs. 85% BR.
+  ALPINE trial data (zanubrutinib vs. ibrutinib) — "Published data - not in
+  PI" section of current BRUKINSA PI (06/2025): HR 0.68 for PFS per prior
+  ALPINE publication. Confirm whether ALPINE data appears in the current
+  BRUKINSA PI Section 14 before citing specific ALPINE HR.
+  Source: BRUKINSA PI, Section 14.4 (SEQUOIA data confirmed)
 
 COMP-ZAN-002: Approved Indications
-  CLL/SLL (frontline and R/R); MCL (≥1 prior therapy); WM; MZL (R/R);
-  FL (R/R, in combination with obinutuzumab, ≥2 prior lines)
+  [Confirmed from PI, Section 1, BRUKINSA PI revised 06/2025]:
+  Current approved indications (verbatim from Section 1):
+  1.1 MCL (≥1 prior therapy) — accelerated approval
+  1.2 Waldenström's Macroglobulinemia (WM)
+  1.3 R/R MZL (≥1 anti-CD20) — accelerated approval
+  1.4 CLL or SLL
+  1.5 R/R FL in combination with obinutuzumab (≥2 prior lines) — accelerated
+      approval
+
+COMP-ZAN-003: Boxed Warning Status
+  [Confirmed from PI, BRUKINSA PI revised 06/2025]:
+  BRUKINSA has NO Boxed Warnings. All safety items are Section 5 W&P:
+  - 5.1 Hemorrhage: Grade 3+ hemorrhage in 3.8%; fatalities 0.2%; any grade
+    excluding purpura/petechiae 32%.
+  - 5.2 Infections
+  - 5.3 Cytopenias
+  - 5.4 Second Primary Malignancies
+  - 5.5 Cardiac Arrhythmias
+  - 5.6 Hepatotoxicity Including DILI
+  - 5.7 Embryo-Fetal Toxicity
+  Most common AEs (≥30%) including lab abnormalities: neutrophil count decreased,
+  platelet count decreased, upper respiratory tract infection, hemorrhage, and
+  musculoskeletal pain.
 
 
 --- CALQUENCE (acalabrutinib) — Covalent BTK Inhibitor, 2nd Generation ---
 
 COMP-ACA-001: Approved Indications
-  CLL/SLL (frontline and R/R); previously untreated MCL (with BR, Jan 2025);
-  CLL/SLL (frontline, in combination with venetoclax, Feb 2026 — AMPLIFY)
+  [Confirmed from PI, Section 1, CALQUENCE PI]:
+  Current approved indications:
+  1.1 Previously untreated MCL (with BR, ineligible for auto-HSCT)
+  1.2 Previously treated MCL (≥1 prior therapy)
+  1.3 CLL or SLL (frontline and R/R)
+  NOTE: CLL/SLL in combination with venetoclax per AMPLIFY (Feb 2026) is
+  captured in the VENCLEXTA label, not necessarily a new standalone CALQUENCE
+  indication. Confirm with Medical Affairs whether CALQUENCE PI has been
+  separately updated for the AMPLIFY combination.
 
 COMP-ACA-002: Headache as Distinctive AE
-  Headache reported in 37-43% of patients treated with acalabrutinib —
-  the most distinctive adverse event profile vs. other BTK inhibitors.
-  Source: CALQUENCE PI
+  [Confirmed from PI, Section 5.1 pooled data, CALQUENCE PI]:
+  From pooled safety data (N=2,055): Most common AEs (≥30%) excluding lab
+  abnormalities: upper respiratory tract infection 37%, diarrhea 36%,
+  headache 35%, musculoskeletal pain 32%. Most common Grade 3/4 lab
+  abnormalities (≥10%): absolute neutrophil count decreased 32%, uric acid
+  increased 27%, absolute lymphocyte count decreased 21%, platelets decreased 10%.
+  Atrial fibrillation or flutter Grade 3/4: 2.2% (all grades: ~7%).
+
+COMP-ACA-003: Boxed Warning Status
+  [Confirmed from PI, CALQUENCE PI]:
+  CALQUENCE has NO Boxed Warnings. Safety items in Section 5 W&P include:
+  Serious and Opportunistic Infections (Grade 3+ 29%, pneumonia 14%);
+  Hemorrhage; Cardiac Arrhythmias (Grade 3/4 AF/flutter 2.2%); Second
+  Primary Malignancies (16%, including skin cancer 9%); Embryo-Fetal Toxicity.
 
 
 --- GAZYVA (obinutuzumab) — Type II Anti-CD20 Antibody ---
 
 COMP-GAZ-001: Role as Venetoclax Partner
-  Gazyva (obinutuzumab) is the anti-CD20 antibody partner in the CLL14
-  fixed-duration regimen (VEN+G). It is also FDA-approved for previously
-  untreated and relapsed/refractory follicular lymphoma.
-  Source: CLL14 PI; GAZYVA PI
+  [Confirmed from PI, Section 1, GAZYVA PI]:
+  GAZYVA (obinutuzumab) is the anti-CD20 antibody partner in the CLL14
+  fixed-duration regimen (VEN+G). Current GAZYVA indications (verbatim):
+  1.1 CLL: "GAZYVA, in combination with chlorambucil, is indicated for the
+      treatment of patients with previously untreated chronic lymphocytic
+      leukemia."
+  1.2 FL: In combination with bendamustine then GAZYVA monotherapy for
+      relapsed/refractory FL; and in combination with chemotherapy then
+      GAZYVA monotherapy for previously untreated stage II bulky, III, or IV FL.
+  1.3 Lupus Nephritis (LN): "GAZYVA is indicated for the treatment of adult
+      patients with active lupus nephritis who are receiving standard therapy."
+  (LN indication added 10/2025 — recent change to GAZYVA label)
 
-COMP-GAZ-002: Boxed Warnings
-  (1) HBV Reactivation (screen all patients before treatment)
-  (2) Progressive Multifocal Leukoencephalopathy (PML)
-  Infusion-related reactions (IRRs) in approximately 69% of patients
-  (mostly Cycle 1, Day 1). Source: GAZYVA PI
+COMP-GAZ-002: Boxed Warnings (2 warnings)
+  [Confirmed from PI, Boxed Warning section, GAZYVA PI]:
+  Verbatim from PI:
+  "WARNING: HEPATITIS B VIRUS REACTIVATION and PROGRESSIVE MULTIFOCAL
+  LEUKOENCEPHALOPATHY
+  - Hepatitis B Virus (HBV) reactivation, in some cases resulting in fulminant
+    hepatitis, hepatic failure, and death, can occur in patients receiving
+    CD20-directed cytolytic antibodies, including GAZYVA. Screen all patients
+    for HBV infection before treatment initiation. Monitor HBV-positive patients
+    during and after treatment with GAZYVA. Discontinue GAZYVA and concomitant
+    medications in the event of HBV reactivation.
+  - Progressive Multifocal Leukoencephalopathy (PML) including fatal PML, can
+    occur in patients receiving GAZYVA."
+  NOTE: The 69% IRR rate previously cited in training context applies to the
+  GALLIUM (NHL/FL) study: infusion-related reactions 72% (Grade 3-5: 12%) in
+  GAZYVA+chemotherapy vs. 60% rituximab+chemotherapy. For CLL (CLL11), IRR
+  rates are separately reported. The IRR rate of "69% Cycle 1 Day 1 predominant"
+  requires specific verification against the CLL11 AE tables in the current PI.
 
 
 --- JAYPIRCA (pirtobrutinib) — Non-Covalent BTK Inhibitor ---
 
 COMP-JAY-001: Unique Positioning — Post-BTK AND Post-Venetoclax
-  Jaypirca is FDA-approved for adult patients with CLL/SLL who have received
-  at least two prior lines including a BTK inhibitor AND a BCL-2 inhibitor
-  (venetoclax) — the only approved option in this late-line post-both-classes
-  setting (full approval December 2025).
-  Source: JAYPIRCA PI
+  [Confirmed from PI, Section 1, JAYPIRCA PI]:
+  Verbatim from Section 1:
+  1.1 MCL: "JAYPIRCA is indicated for the treatment of adult patients with
+      relapsed or refractory mantle cell lymphoma (MCL) after at least two
+      lines of systemic therapy, including a BTK inhibitor." (Accelerated
+      approval based on response rate)
+  1.2 CLL/SLL: "JAYPIRCA is indicated for the treatment of adult patients with
+      relapsed or refractory chronic lymphocytic leukemia or small lymphocytic
+      lymphoma (CLL/SLL) who have previously been treated with a covalent BTK
+      inhibitor." (Per BRUIN-CLL-321 data)
+  NOTE [Confirmed from PI]: The CLL/SLL indication requires prior covalent BTK
+  inhibitor. The BRUIN trial (which provided the ORR data) enrolled patients
+  who had received both a BTK inhibitor AND a BCL-2 inhibitor (venetoclax).
+  However, the indication language itself only specifies "previously treated with
+  a covalent BTK inhibitor" — it does NOT require prior venetoclax/BCL-2
+  inhibitor in the formal indication text.
 
 COMP-JAY-002: Non-Covalent Mechanism — Overcomes C481S Mutation
-  Unlike covalent BTK inhibitors (ibrutinib, zanubrutinib, acalabrutinib),
-  pirtobrutinib does not form a covalent bond with BTK, allowing it to retain
-  activity against the C481S resistance mutation that drives resistance to
-  covalent BTK inhibitors. Source: JAYPIRCA PI
+  [Confirmed from PI, Section 12.1, JAYPIRCA PI]:
+  Pirtobrutinib is a non-covalent (reversible) BTK inhibitor. Unlike covalent
+  BTK inhibitors, pirtobrutinib does not require the C481 residue for binding,
+  thus retaining activity against the C481S resistance mutation that drives
+  resistance to covalent BTK inhibitors. Confirmed in PI Section 12.1 context.
+
+COMP-JAY-003: Key Efficacy Data (BRUIN CLL study)
+  [Confirmed from PI, Section 14.2, JAYPIRCA PI]:
+  "In the BRUIN trial (N=108 CLL/SLL patients with prior BTK inhibitor AND
+  BCL-2 inhibitor therapy):
+    - ORR: 72% (95% CI 63, 80) — all partial responses (PR)
+    - Median DOR: 12.2 months (95% CI 9.3, 14.7)
+    - Median time to response: 3.7 months (range 1.7, 27.9 months)
+  Median 5 prior lines of therapy (range 2-11). Most common prior BTK inhibitor:
+  ibrutinib (97%)."
+  Source: JAYPIRCA PI, Section 14.2 (Table 9)
+
+COMP-JAY-004: Boxed Warning Status
+  [Confirmed from PI, JAYPIRCA PI]:
+  JAYPIRCA has NO Boxed Warnings. Safety information is in Section 5.
+
+COMP-JAY-005: Common AEs (pooled safety, BRUIN + BRUIN-CLL-321)
+  [Confirmed from PI, Section 6, JAYPIRCA PI]:
+  Pooled safety population (N=704): Most common AEs (≥30%) including lab
+  abnormalities: decreased neutrophil count 54%, decreased hemoglobin 43%,
+  decreased leukocytes 32%, fatigue 31%, decreased platelets 31%, decreased
+  lymphocyte count 31%, calcium decreased 30%.
 
 
 --- RITUXAN (rituximab) — Type I Anti-CD20 Antibody ---
 
 COMP-RIT-001: Role as Venetoclax Partner
+  [Confirmed from PI, Section 1, RITUXAN PI]:
   Rituximab is the anti-CD20 partner in the MURANO regimen (VEN+R) for
-  relapsed/refractory CLL/SLL. Also approved for DLBCL, FL, and other NHL
-  indications. Source: RITUXAN PI; MURANO Phase 3 Trial
+  relapsed/refractory CLL/SLL per the VENCLEXTA PI. The RITUXAN PI Section 1
+  includes numerous hematologic and autoimmune indications:
+  NHL (relapsed/refractory low-grade/follicular; previously untreated follicular;
+  non-progressing low-grade as maintenance; DLBCL); CLL (in combination with
+  fludarabine and cyclophosphamide for previously untreated and previously
+  treated CLL); RA; GPA/MPA; pemphigus vulgaris; pediatric NHL.
 
 COMP-RIT-002: Boxed Warnings (4 warnings)
-  (1) Fatal infusion-related reactions
-  (2) Severe mucocutaneous reactions
-  (3) Progressive Multifocal Leukoencephalopathy (PML)
-  (4) Hepatitis B Virus (HBV) Reactivation
-  Source: RITUXAN PI
+  [Confirmed from PI, Boxed Warning, RITUXAN PI]:
+  Verbatim from PI Boxed Warning heading:
+  "WARNING: FATAL INFUSION-RELATED REACTIONS, SEVERE MUCOCUTANEOUS REACTIONS,
+  HEPATITIS B VIRUS REACTIVATION and PROGRESSIVE MULTIFOCAL
+  LEUKOENCEPHALOPATHY"
+  (1) Fatal infusion-related reactions within 24 hours of RITUXAN infusion;
+      approximately 80% of fatal reactions occurred with the first infusion.
+      Monitor patients and discontinue RITUXAN infusion for severe reactions.
+  (2) Severe mucocutaneous reactions, some with fatal outcomes.
+  (3) Hepatitis B virus (HBV) reactivation, in some cases resulting in
+      fulminant hepatitis, hepatic failure, and death.
+  (4) Progressive multifocal leukoencephalopathy (PML) resulting in death.
 
 
 --- COPIKTRA (duvelisib) — PI3K-delta/gamma Inhibitor ---
 
 COMP-DUV-001: Approved Indication and Limitations
-  Approved for R/R CLL/SLL after >=2 prior therapies. IMPORTANT: 2022 updated
-  Boxed Warning added for possible increased risk of death vs. ofatumumab at
-  5-year follow-up (HR 1.09). Source: FDA Safety Communication June 2022
+  [Confirmed from PI, Section 1, COPIKTRA PI]:
+  Verbatim from Section 1:
+  "COPIKTRA is indicated for the treatment of adult patients with relapsed or
+  refractory chronic lymphocytic leukemia (CLL) or small lymphocytic lymphoma
+  (SLL) after at least two prior lines of systemic therapy.
+  Limitations of Use: COPIKTRA is not indicated or recommended for the
+  treatment of any patients with CLL or SLL as initial or second line treatment
+  due to an increased risk of treatment-related mortality."
+  NOTE [Confirmed from PI]: The "increased risk of death vs. ofatumumab HR 1.09"
+  that was previously referenced as a Boxed Warning item does NOT appear as a
+  separate Boxed Warning in the current PI. The mortality risk is addressed via
+  the "Treatment-Related Mortality" Boxed Warning component (15% treatment-
+  related deaths) and the Limitations of Use in Section 1.
 
-COMP-DUV-002: Boxed Warnings (5 warnings — heavily burdened)
-  (1) Fatal/serious infections  (2) Fatal/serious diarrhea or colitis
-  (3) Fatal/serious cutaneous reactions  (4) Fatal/serious pneumonitis
-  (5) Increased risk of death vs. ofatumumab (2022 addition)
-  Source: COPIKTRA PI (2022 update)
+COMP-DUV-002: Boxed Warnings (5 items — confirmed)
+  [Confirmed from PI, Boxed Warning, COPIKTRA PI]:
+  Verbatim from PI:
+  "WARNING: TREATMENT-RELATED MORTALITY AND SERIOUS TOXICITIES: INFECTIONS,
+  DIARRHEA OR COLITIS, CUTANEOUS REACTIONS, and PNEUMONITIS
+  - Treatment-related mortality occurred in 15% of COPIKTRA-treated patients.
+  - Fatal and/or serious infections occurred in 31% of COPIKTRA-treated patients.
+    Monitor for signs and symptoms of infection. Withhold COPIKTRA if infection
+    is suspected.
+  - Fatal and/or serious diarrhea or colitis occurred in 18% of COPIKTRA-
+    treated patients. Monitor for the development of severe diarrhea or colitis.
+    Withhold COPIKTRA.
+  - Fatal and/or serious cutaneous reactions occurred in 5% of COPIKTRA-treated
+    patients. Withhold COPIKTRA.
+  - Fatal and/or serious pneumonitis occurred in 5% of COPIKTRA-treated patients.
+    Monitor for pulmonary symptoms and interstitial infiltrates. Withhold COPIKTRA."
+  DUO Trial PFS data [Confirmed from PI, Section 14]:
+  In DUO study (≥2 prior lines, N=95 COPIKTRA vs. N=101 ofatumumab): Median
+  duration of COPIKTRA exposure 13 months. Most common AEs (≥20%): diarrhea
+  or colitis 57% (G3+: 25%), upper respiratory tract infection 28% (0%),
+  pneumonia 27% (22%), pyrexia 29% (3%), cough 23% (1%), rash 27% (11%),
+  fatigue 25% (4%), nausea 23% (0%).
+  SPECIAL REQUIREMENT [Confirmed from PI, Section 2.2]: PJP prophylaxis
+  REQUIRED during COPIKTRA treatment. CMV prophylaxis recommended.
+
+COMP-DUV-003: Mechanism of Action
+  [Confirmed from PI, Section 12.1, COPIKTRA PI]:
+  "Duvelisib is an inhibitor of PI3K with inhibitory activity predominantly
+  against PI3K-δ and PI3K-γ isoforms expressed in normal and malignant B-cells."
 
 
 --- ZYDELIG (idelalisib) — PI3K-delta Inhibitor ---
 
 COMP-ZYD-001: Approved Indication and Context
-  Approved for relapsed CLL in combination with rituximab (for patients where
-  rituximab alone would be appropriate due to comorbidities, ≥1 prior therapy);
-  relapsed FL monotherapy (≥2 prior lines); relapsed SLL monotherapy (≥2 lines).
-  Source: ZYDELIG PI
+  [Confirmed from PI, Section 1, ZYDELIG PI]:
+  Verbatim from Section 1:
+  "Zydelig is indicated, in combination with rituximab, for the treatment of
+  patients with relapsed chronic lymphocytic leukemia (CLL) for whom rituximab
+  alone would be considered appropriate therapy due to other co-morbidities.
+  Limitations of Use: Zydelig is not indicated and is not recommended for
+  first-line treatment of any patient, including patients with CLL, small
+  lymphocytic lymphoma (SLL), follicular lymphoma (FL), and other indolent
+  non-Hodgkin lymphomas. Zydelig is not indicated and is not recommended in
+  combination with bendamustine and rituximab, or in combination with rituximab
+  for the treatment of patients with FL, SLL, and other indolent non-Hodgkin
+  lymphomas."
+  Key efficacy [Confirmed from PI, Section 14 Table 7]:
+  Zydelig+rituximab: Median PFS 19.4 months (95% CI 12.3, NR) vs. 6.5 months
+  (95% CI 4.0, 7.3) placebo+rituximab; HR 0.15 (95% CI 0.09, 0.24); p<0.0001.
+  ORR 83.6% (all PR) vs. 15.5%.
 
-COMP-ZYD-002: Boxed Warnings and Clinical Context
-  Boxed Warnings: (1) Fatal/serious hepatotoxicity  (2) Severe diarrhea/colitis
-  (3) Fatal/serious pneumonitis  (4) Fatal/serious intestinal perforation.
-  NOTE: In 2016, FDA halted 6 idelalisib combination studies due to increased
-  adverse events and deaths. Use is limited to narrow approved indications
-  with intensive monitoring. Source: ZYDELIG PI; FDA safety communications
+COMP-ZYD-002: Boxed Warnings (5 items — corrected from prior count of 4)
+  [Confirmed from PI, Boxed Warning, ZYDELIG PI]:
+  Verbatim Boxed Warning heading:
+  "WARNING: FATAL AND SERIOUS TOXICITIES: HEPATIC, SEVERE DIARRHEA, COLITIS,
+  PNEUMONITIS, INFECTIONS, and INTESTINAL PERFORATION"
+  (1) "Fatal and/or serious hepatotoxicity occurred in 16% of Zydelig-treated
+      patients. Monitor hepatic function prior to and during treatment."
+  (2) "Fatal and/or serious and severe diarrhea or colitis occurred in 20% of
+      Zydelig-treated patients. Monitor for severe diarrhea or colitis."
+  (3) "Fatal and/or serious pneumonitis occurred in 4% of Zydelig-treated
+      patients."
+  (4) "Fatal and/or serious infections occurred in 48% of Zydelig-treated
+      patients."
+  (5) "Fatal and serious intestinal perforation can occur in Zydelig-treated
+      patients across clinical trials. Discontinue Zydelig for intestinal
+      perforation."
+  NOTE: ZYDELIG has 5 Boxed Warning items (not 4 as previously stated). The
+  5th item is intestinal perforation. CONTRAINDICATION [Confirmed from PI,
+  Section 4]: History of serious hypersensitivity to idelalisib (anaphylaxis)
+  or toxic epidermal necrolysis with any drug.
+  Key AE data in CLL [Confirmed from PI, Section 6 Table 2]:
+  Pyrexia 40% (G3+: 3%), Diarrhea 32% (G3+: 11%), Nausea 27% (1%), Pneumonia
+  30% (G3+: 21%), Rash 25% (4%), Chills 25% (2%), Decreased appetite 16% (2%),
+  Sepsis 9% (9%).
 
 
 ================================================================================
@@ -416,6 +890,12 @@ ITEMS TO BE COMPLETED BY CLIENT
 [ ] Set effective dates and expiry dates for all entries.
 [ ] Confirm whether VIALE-C (LDAC combination) claims should be included
     given the primary endpoint was not met (statistical significance).
+[ ] Update IMBRUVICA-related training materials to remove all references to
+    "Boxed Warnings" for IMBRUVICA — confirmed to have NO Boxed Warnings
+    per the current PI (10/2025).
+[ ] Verify GAZYVA CLL-specific IRR rate from CLL11 AE tables (separate from
+    the 72% rate in GALLIUM NHL study). Medical Affairs should specify which
+    rate to use when training on the VEN+G combination.
 
 
 ================================================================================

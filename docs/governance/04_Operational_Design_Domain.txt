@@ -4,12 +4,19 @@ PHASE 0 GOVERNANCE — DOCUMENT 4 OF 7
 Operational Design Domain (ODD) — Permitted Topic Boundaries
 --------------------------------------------------------------------------------
 Prepared by : Strategic Research Insights, Inc.
-Version     : v0.2 — Updated with product-specific ODD
+Version     : v0.4 — PI-verified data confirmed from local PDF files, June 2026
 Date        : June 2026
 Client Product: VENCLEXTA (venetoclax)
 Therapeutic Area: B-Cell Malignancies — CLL/SLL and AML
 Status      : DRAFT — For Internal Review
 Classification: Internal / Confidential
+================================================================================
+
+PI VERIFICATION STATUS (v0.4 update — June 2026):
+All 9 PIs verified from local PDF files, June 2026. Indication language and
+topic boundaries have been confirmed against the current approved prescribing
+information. All previously annotated [PI NOT ACCESSED — VERIFY MANUALLY]
+items have been resolved with [Confirmed from PI] notations below.
 ================================================================================
 
 
@@ -35,24 +42,70 @@ SECTION 6.1 — IN-SCOPE TOPICS (PERMITTED)
       Frontline CLL/SLL + acalabrutinib (AMPLIFY, Feb 2026)
       Relapsed/refractory CLL/SLL + rituximab (MURANO)
       Relapsed/refractory CLL/SLL monotherapy
+      [Confirmed from PI, Section 1.1 and 2.2]: The CLL/SLL indication text
+      is broad (does not specify frontline vs. R/R). Specific regimens are
+      addressed in Section 2.2. The AMPLIFY regimen approved in the PI is the
+      2-agent VEN+acalabrutinib combination (without obinutuzumab). The
+      VEN+ACA+obinutuzumab (AVO) arm is described in Section 5.3 as an
+      "unapproved regimen" — training must NOT include the triple AVO arm as
+      an approved indication. The AMPLIFY enrollment criterion (patients without
+      del(17p) or TP53 mutation) is an important patient selection note.
 
   - AML approved indication:
-      Newly diagnosed AML (adults >=75 or unfit for intensive chemo) with
-      azacitidine, decitabine, or LDAC (VIALE-A, VIALE-C)
+      Newly diagnosed AML (adults >=75 or with comorbidities that preclude
+      intensive induction chemotherapy) with azacitidine, decitabine, or
+      low-dose cytarabine (VIALE-A, VIALE-C)
+      [Confirmed from PI, Section 1.2]: The exact PI phrase is "adults 75
+      years or older, or who have comorbidities that preclude use of intensive
+      induction chemotherapy." Training must not substitute "unfit" for this
+      language without citing the PI qualifier. The PI uses the term "low-dose
+      cytarabine" in the indication text (not the abbreviation "LDAC").
 
   - BCL-2 mechanism of action (as described in PI)
 
   - Pivotal trial data explicitly cited in approved labeling:
-      MURANO, CLL14, AMPLIFY, VIALE-A, VIALE-C, M14-032
+      MURANO, CLL14, AMPLIFY, VIALE-A, VIALE-C, M14-032, M13-982
+      [Confirmed from PI, Section 14]: All trial names listed are confirmed
+      in Section 14 of the current VENCLEXTA PI (revised 05/2026). M14-032
+      (post-BTK/post-idelalisib monotherapy) and M13-982 (del(17p) monotherapy)
+      are both confirmed in Section 14.1. VIALE-C data is included in Section
+      14.2; the PI confirms the primary OS endpoint was NOT met (HR 0.75;
+      p=0.114). Training must disclose the failed primary endpoint when citing
+      VIALE-C data.
 
   - TLS Boxed Warning and management (5-week dose ramp-up, prophylaxis)
+      [Confirmed from PI, Section 2.2 and 5.1]: The 5-week CLL/SLL dose
+      ramp-up (20 mg → 50 mg → 100 mg → 200 mg → 400 mg weekly) is confirmed
+      in Section 2.2 of the current VENCLEXTA PI (revised 05/2026). The PI
+      Section 5.1 provides TLS risk stratification by tumor burden (lymph node
+      size and ALC) to guide prophylaxis intensity and monitoring. High-risk
+      patients may require hospitalization for initial doses — this risk-
+      stratified management approach should be reflected in training content.
 
   - Full safety profile from the PI:
-      Neutropenia, infections, tumor lysis syndrome, thrombocytopenia
+      Neutropenia, infections, tumor lysis syndrome, thrombocytopenia,
+      diarrhea, nausea, upper respiratory tract infection, fatigue,
+      musculoskeletal pain, edema, cough, anemia, pyrexia, vomiting
+      [Confirmed from PI, Section 5 and 6.1]: Section 5 Warnings and
+      Precautions confirmed: 5.1 TLS (Boxed Warning); 5.2 Neutropenia;
+      5.3 Infections; 5.4 Hepatotoxicity; 5.5 Embryo-Fetal Toxicity;
+      5.6 Multiple Myeloma (increased mortality, discouraged outside trials).
+      Section 6.1 AE tables confirm diarrhea (43%), nausea (42%), URTI (36%),
+      fatigue (32%), anemia (33%), thrombocytopenia (29%), musculoskeletal
+      pain (29%), edema (22%), cough (22%) from monotherapy CLL/SLL data.
 
   - Dosing and administration as specified in the PI:
-      5-week ramp-up for CLL/SLL
-      Standard daily dosing for AML combinations
+      5-week ramp-up for CLL/SLL; AML-specific ramp-up schedules
+      [Confirmed from PI, Section 2.2 and 2.3]:
+      (a) CLL/SLL ramp-up: 20→50→100→200→400 mg weekly (5 weeks) — confirmed
+      (b) CLL/SLL maintenance: 400 mg once daily after ramp-up — confirmed
+      (c) AML dosing with AZA or decitabine: 3-day ramp-up (100/200/400 mg
+          Days 1/2/3+), then 400 mg once daily continuously — confirmed
+      (d) AML dosing with low-dose cytarabine: 4-day ramp-up (100/200/400/600
+          mg Days 1/2/3/4+), then 600 mg once daily — confirmed
+      (e) Dose modifications for cytopenias, infections, drug interactions
+          are specified in Section 2.5–2.6 of the current PI — confirmed
+      All training must reflect current Section 2 language exactly.
 
   - Drug interactions per PI (CYP3A inhibitors, P-gp inhibitors)
 
@@ -69,9 +122,40 @@ SECTION 6.1 — IN-SCOPE TOPICS (PERMITTED)
 
   - Competitor product safety/efficacy discussion ONLY using data
     from the Approved Claims Library and competitor PIs (factual only):
-      Ibrutinib Boxed Warnings for cardiac/bleeding risk
+      Ibrutinib Section 5 Warnings for cardiac/bleeding risk
+        [Confirmed from PI, IMBRUVICA PI revised 10/2025]: IMBRUVICA has
+        ZERO Boxed Warnings. All safety items (Hemorrhage, Infections,
+        Cardiac Arrhythmias/Cardiac Failure/Sudden Death, Hypertension,
+        Cytopenias, Second Primary Malignancies, Hepatotoxicity, TLS, Embryo-
+        Fetal Toxicity) are Section 5 Warnings and Precautions. Training must
+        not state "IMBRUVICA has 4 Boxed Warnings" — this is incorrect.
       ALPINE trial data on zanubrutinib vs. ibrutinib
+        [Confirmed from PI, BRUKINSA PI revised 06/2025]: BRUKINSA has ZERO
+        Boxed Warnings. SEQUOIA data confirmed in Section 14.4. Medical Affairs
+        to confirm whether specific ALPINE HR 0.68 and AF rate data appear in
+        the current BRUKINSA PI Section 14 before permitting in training.
       Pirtobrutinib positioning as post-BTK AND post-venetoclax option
+        [Confirmed from PI, JAYPIRCA PI]: JAYPIRCA has ZERO Boxed Warnings.
+        CLL/SLL indication is confirmed: after prior covalent BTK inhibitor
+        (full approval). The indication text requires prior BTK inhibitor but
+        does NOT formally require prior venetoclax/BCL-2 inhibitor in its
+        verbatim language (though the BRUIN study population had both).
+      COPIKTRA Boxed Warning for Treatment-Related Mortality
+        [Confirmed from PI, COPIKTRA PI]: COPIKTRA has 5 Boxed Warnings.
+        First Boxed Warning is Treatment-Related Mortality (15% of patients),
+        not an HR vs. ofatumumab. Do not cite HR 1.09 as a Boxed Warning item.
+        LIMITATIONS OF USE [Confirmed from PI, Section 1]: COPIKTRA is not
+        indicated or recommended for initial or second line CLL/SLL treatment
+        due to increased risk of treatment-related mortality.
+      ZYDELIG Boxed Warnings (5 categories — corrected from prior count of 4)
+        [Confirmed from PI, ZYDELIG PI]: ZYDELIG has 5 Boxed Warning items:
+        (1) Hepatotoxicity (16%); (2) Severe diarrhea/colitis (20%);
+        (3) Pneumonitis (4%); (4) Infections (48%); (5) Intestinal Perforation.
+        Boxed Warning heading: "FATAL AND SERIOUS TOXICITIES: HEPATIC, SEVERE
+        DIARRHEA, COLITIS, PNEUMONITIS, INFECTIONS, and INTESTINAL PERFORATION."
+        CONTRAINDICATION [Confirmed from PI, Section 4]: History of serious
+        hypersensitivity to idelalisib (including anaphylaxis) or toxic
+        epidermal necrolysis with any drug.
 
 
   PHYSICIAN CONTEXT TOPICS

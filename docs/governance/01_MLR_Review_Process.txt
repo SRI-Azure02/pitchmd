@@ -4,12 +4,155 @@ PHASE 0 GOVERNANCE — DOCUMENT 1 OF 7
 Medical, Legal, and Regulatory (MLR) Content Approval Workflow
 --------------------------------------------------------------------------------
 Prepared by : Strategic Research Insights, Inc.
-Version     : v0.2 — Updated with product context
+Version     : v0.4 — PI-verified data confirmed from local PDF files, June 2026
 Date        : June 2026
 Client Product: VENCLEXTA (venetoclax)
 Therapeutic Area: B-Cell Malignancies (CLL/SLL, AML)
 Status      : DRAFT — For Internal Review
 Classification: Internal / Confidential
+================================================================================
+
+PI VERIFICATION STATUS (v0.3 update — June 2026)
+-------------------------------------------------
+PI VERIFICATION STATUS: All 9 PIs verified from local PDF files, June 2026.
+Text extracted directly from PDF prescribing information documents provided
+by client. All data below is [Confirmed from PI] unless otherwise noted.
+
+  VENCLEXTA (venetoclax)     [Confirmed from PI]
+    Source: venclexta.pdf — 55 pages, Revised 05/2026
+    Verified: Section 1 (Indications), Boxed Warning (TLS — 1 warning),
+    Sections 2, 4, 5, 6, 7, 8, 12.1, 14.
+    Key notes: Boxed Warning is for Tumor Lysis Syndrome ONLY (1 warning).
+    NO additional Boxed Warnings (no embryo-fetal toxicity boxed warning).
+    Embryo-fetal toxicity is a Section 5 Warning/Precaution (5.5), NOT a
+    Boxed Warning. RECENT MAJOR CHANGES: Dosage and Administration (2.2, 2.5)
+    02/2026; Dosage and Administration (2.8) 05/2026; Warnings and Precautions
+    (5.2, 5.3) 02/2026. AMPLIFY indication (acalabrutinib combination) added
+    to label as of February 2026.
+    REMS: NO REMS program in current PI.
+
+  IMBRUVICA (ibrutinib)      [Confirmed from PI]
+    Source: imbruvica_pi.pdf — 64 pages, Revised 10/2025
+    Verified: Section 1 (Indications), Sections 4, 5, 6, 12.1, 14.
+    KEY FINDING: IMBRUVICA has NO BOXED WARNING in the current PI (10/2025).
+    All safety items — Hemorrhage, Infections, Cardiac Arrhythmias/Cardiac
+    Failure/Sudden Death, Hypertension, Cytopenias, Second Primary Malignancies,
+    Hepatotoxicity, TLS, and Embryo-Fetal Toxicity — are listed as Warnings
+    and Precautions (Section 5), NOT Boxed Warnings. Prior governance
+    documents incorrectly stated IMBRUVICA had 4 Boxed Warnings. CORRECT:
+    IMBRUVICA has ZERO Boxed Warnings as of the current PI.
+    MCL and MZL indications: VOLUNTARILY WITHDRAWN (confirmed — not in current PI).
+    Current indications: CLL/SLL; CLL/SLL with 17p deletion; WM; cGVHD.
+    REMS: No REMS noted in PI.
+
+  GAZYVA (obinutuzumab)      [Confirmed from PI]
+    Source: gazyva_prescribing.pdf — 42 pages
+    Verified: Section 1 (Indications), Boxed Warning (2 warnings), Sections 5, 6.
+    Boxed Warnings CONFIRMED: (1) Hepatitis B Virus Reactivation; (2) Progressive
+    Multifocal Leukoencephalopathy (PML).
+    NOTE: Current PI (updated 10/2025) now includes Lupus Nephritis (LN) as a
+    third indication. GAZYVA now has 3 approved indications: CLL (with
+    chlorambucil for previously untreated CLL), FL (relapsed/refractory and
+    previously untreated), and Lupus Nephritis.
+    REMS: No REMS noted in PI.
+
+  JAYPIRCA (pirtobrutinib)   [Confirmed from PI]
+    Source: jaypirca PI — 26 pages
+    Verified: Section 1 (Indications), Sections 5, 6, 12.1, 14.
+    KEY FINDING: JAYPIRCA has NO BOXED WARNING in the current PI.
+    Current indications: (1) R/R MCL after ≥2 prior lines including BTK
+    inhibitor (accelerated approval); (2) R/R CLL/SLL after prior covalent
+    BTK inhibitor (full approval, requires prior BTK AND BCL-2 inhibitor per
+    BRUIN study population).
+    REMS: No REMS noted in PI.
+
+  RITUXAN (rituximab)        [Confirmed from PI]
+    Source: rituxan_prescribing.pdf — 57 pages
+    Verified: Section 1 (Indications), Boxed Warning (4 warnings), Sections 5, 12.1.
+    Boxed Warnings CONFIRMED (4): (1) Fatal Infusion-Related Reactions;
+    (2) Severe Mucocutaneous Reactions; (3) Hepatitis B Virus Reactivation;
+    (4) Progressive Multifocal Leukoencephalopathy (PML).
+    NOTE: Order in PI heading: "FATAL INFUSION-RELATED REACTIONS, SEVERE
+    MUCOCUTANEOUS REACTIONS, HEPATITIS B VIRUS REACTIVATION and PROGRESSIVE
+    MULTIFOCAL LEUKOENCEPHALOPATHY."
+    REMS: No REMS noted in PI.
+
+  COPIKTRA (duvelisib)       [Confirmed from PI]
+    Source: COPIKTRA-PI-USCPR250042-1.pdf — 28 pages
+    Verified: Section 1 (Indications), Boxed Warning (5 warnings), Sections 4, 5, 6, 14.
+    Boxed Warnings CONFIRMED (5): (1) Treatment-Related Mortality (15% of
+    COPIKTRA-treated patients); (2) Serious Infections (31%); (3) Diarrhea or
+    Colitis (18%); (4) Cutaneous Reactions (5%); (5) Pneumonitis (5%).
+    NOTE: The 5th Boxed Warning component is "PNEUMONITIS" (5% fatal/serious).
+    The LIMITATIONS OF USE in Section 1 states: "COPIKTRA is not indicated or
+    recommended for the treatment of any patients with CLL or SLL as initial
+    or second line treatment due to an increased risk of treatment-related
+    mortality." This is in the Indication/Limitations of Use — not a separate
+    Boxed Warning item about increased mortality vs. ofatumumab HR.
+    SPECIAL MONITORING REQUIREMENT: PJP prophylaxis required during treatment
+    and until CD4+ T cell count >200 cells/L post-treatment. CMV prophylaxis
+    recommended. (PI Section 2.2)
+    REMS: No REMS noted in PI.
+
+  ZYDELIG (idelalisib)       [Confirmed from PI]
+    Source: zydelig_pi.pdf — 27 pages
+    Verified: Section 1 (Indications), Boxed Warning (5 items), Sections 4, 5, 6, 14.
+    Boxed Warnings CONFIRMED (5 items): (1) Fatal/serious hepatotoxicity (16%);
+    (2) Fatal/serious severe diarrhea or colitis (20%); (3) Fatal/serious
+    pneumonitis (4%); (4) Fatal/serious infections (48%); (5) Fatal/serious
+    intestinal perforation.
+    NOTE: The current ZYDELIG PI Boxed Warning lists 5 categories, not 4 as
+    previously noted. The Boxed Warning heading is: "FATAL AND SERIOUS
+    TOXICITIES: HEPATIC, SEVERE DIARRHEA, COLITIS, PNEUMONITIS, INFECTIONS,
+    and INTESTINAL PERFORATION."
+    CONTRAINDICATION: History of serious hypersensitivity to idelalisib
+    (including anaphylaxis) or toxic epidermal necrolysis with any drug (PI
+    Section 4).
+    REMS: No REMS noted in PI.
+
+  CALQUENCE (acalabrutinib)  [Confirmed from PI]
+    Source: CALQUENCE Tablets Digital Prescribing Information.pdf — 12 pages
+    Verified: Section 1 (Indications), Sections 4, 5, 6, 12.1, 14.
+    KEY FINDING: CALQUENCE has NO BOXED WARNING in the current PI.
+    Safety items (Infections, Hemorrhage, Cardiac Arrhythmias, Second Primary
+    Malignancies, Embryo-Fetal Toxicity) are all Section 5 Warnings and
+    Precautions, NOT Boxed Warnings.
+    Current indications: (1) Previously untreated MCL (with BR, per prior
+    approval); (2) Previously treated MCL; (3) CLL/SLL (frontline and R/R);
+    also CLL/SLL in combination with venetoclax per AMPLIFY (Feb 2026).
+    REMS: No REMS noted in PI.
+
+  BRUKINSA (zanubrutinib)    [Confirmed from PI]
+    Source: brukinsa-prescribing-information.pdf — 39 pages, Revised 06/2025
+    Verified: Section 1 (Indications), Sections 4, 5, 6, 12.1, 14.
+    KEY FINDING: BRUKINSA has NO BOXED WARNING in the current PI (06/2025).
+    Safety items (Hemorrhage, Infections, Cytopenias, Second Primary
+    Malignancies, Cardiac Arrhythmias, Hepatotoxicity, Embryo-Fetal Toxicity)
+    are all Section 5 Warnings and Precautions, NOT Boxed Warnings.
+    Current indications: MCL (≥1 prior therapy, accelerated approval); WM;
+    MZL (R/R, ≥1 anti-CD20, accelerated approval); CLL/SLL; FL (R/R, ≥2 prior
+    lines, in combination with obinutuzumab, accelerated approval).
+    REMS: No REMS noted in PI.
+
+SUMMARY — BOXED WARNING COUNTS (PI-CONFIRMED, June 2026):
+  VENCLEXTA  : 1 Boxed Warning (Tumor Lysis Syndrome only)
+  IMBRUVICA  : 0 Boxed Warnings (all safety items are Section 5 W&P)
+  BRUKINSA   : 0 Boxed Warnings (all safety items are Section 5 W&P)
+  CALQUENCE  : 0 Boxed Warnings (all safety items are Section 5 W&P)
+  GAZYVA     : 2 Boxed Warnings (HBV Reactivation; PML)
+  JAYPIRCA   : 0 Boxed Warnings (all safety items are Section 5 W&P)
+  RITUXAN    : 4 Boxed Warnings (Fatal IRR; Mucocutaneous Rxns; HBV; PML)
+  COPIKTRA   : 5 Boxed Warning items (Mortality; Infections; Diarrhea/Colitis;
+               Cutaneous Reactions; Pneumonitis)
+  ZYDELIG    : 5 Boxed Warning items (Hepatotoxicity; Diarrhea/Colitis;
+               Pneumonitis; Infections; Intestinal Perforation)
+
+REMS STATUS (PI-CONFIRMED): None of the 9 products carry a REMS program
+per their current prescribing information.
+
+ACTION REQUIRED: Before platform go-live, a designated Medical Affairs
+reviewer must confirm these PI readings against the latest FDA-approved
+labeling, as PIs may be updated between this verification and go-live.
 ================================================================================
 
 
@@ -23,6 +166,14 @@ that govern all platform content for VENCLEXTA (venetoclax) training.
 Given VENCLEXTA's Boxed Warning for Tumor Lysis Syndrome (TLS), any content
 that relates to dosing, initiation, or TLS management requires particular
 scrutiny during the medical and regulatory review stages.
+NOTE [Confirmed from PI]: The VENCLEXTA PI Boxed Warning covers Tumor Lysis
+Syndrome only. Verbatim Boxed Warning text from the current PI (05/2026):
+"Tumor lysis syndrome (TLS), including fatal events and renal failure requiring
+dialysis, has occurred in patients treated with VENCLEXTA." The full Boxed
+Warning directs prescribers to assess all patients for TLS risk, provide
+prophylactic hydration and anti-hyperuricemics, and employ more intensive
+measures as risk increases. Embryo-fetal toxicity is covered under Section 5.5
+(Warnings and Precautions), NOT as a Boxed Warning.
 
 
 STANDARD REVIEW WORKFLOW
@@ -44,12 +195,22 @@ written approval from the Chief Compliance Officer.
                                           Confirms label alignment for CLL/SLL and
                                           AML indications. Special attention to TLS
                                           Boxed Warning accuracy and ramp-up dosing.
+                                          NOTE [Confirmed from PI]: AMPLIFY regimen
+                                          (VEN+acalabrutinib) is now approved and
+                                          in the VENCLEXTA label as of Feb 2026.
+                                          Confirm any AMPLIFY training content
+                                          matches Section 14 AMPLIFY data exactly.
 
   3      Legal                Days 3-5   Legal Review: Reviews for liability,
                                           IP, and promotional compliance. Confirms
                                           competitive claims (vs. Imbruvica, Brukinsa,
                                           Calquence, etc.) cite only approved labeling
                                           data. Validates differentiation claims.
+                                          NOTE [Confirmed from PI]: IMBRUVICA has
+                                          NO Boxed Warning; any training that states
+                                          "IMBRUVICA has 4 Boxed Warnings" must be
+                                          corrected — IMBRUVICA's safety profile
+                                          is addressed via Section 5 W&P only.
 
   4      Regulatory Affairs   Days 5-7   Regulatory Review: Validates all claims
                                           against the current FDA-approved VENCLEXTA
@@ -101,6 +262,33 @@ outside the standard SLA:
   Brukinsa, Calquence, Gazyva,         to assess if competitive
   Jaypirca, Rituxan, Copiktra,         claim content in platform
   Zydelig) PI update or label change    requires update
+
+  PI NOTES ON BOXED WARNING COUNTS (Confirmed from PI, June 2026):
+  - VENCLEXTA: 1 Boxed Warning (TLS only) [Confirmed from PI, revised 05/2026]
+  - IMBRUVICA: 0 Boxed Warnings — all safety items are Section 5 Warnings and
+    Precautions. Prior governance documents incorrectly listed 4 Boxed Warnings.
+    [Confirmed from PI, revised 10/2025]
+  - BRUKINSA: 0 Boxed Warnings — all safety items are Section 5 W&P.
+    [Confirmed from PI, revised 06/2025]
+  - CALQUENCE: 0 Boxed Warnings — all safety items are Section 5 W&P.
+    [Confirmed from PI]
+  - GAZYVA: 2 Boxed Warnings: (1) Hepatitis B Virus Reactivation; (2) Progressive
+    Multifocal Leukoencephalopathy (PML). [Confirmed from PI]
+  - RITUXAN: 4 Boxed Warnings: (1) Fatal Infusion-Related Reactions; (2) Severe
+    Mucocutaneous Reactions; (3) HBV Reactivation; (4) PML. [Confirmed from PI]
+  - COPIKTRA: 5 Boxed Warning items: (1) Treatment-Related Mortality (15%);
+    (2) Serious Infections (31%); (3) Diarrhea or Colitis (18%); (4) Cutaneous
+    Reactions (5%); (5) Pneumonitis (5%). [Confirmed from PI]
+    SPECIAL NOTE: PJP prophylaxis required (PI Section 2.2). CMV prophylaxis
+    recommended. [Confirmed from PI, Section 2.2]
+  - ZYDELIG: 5 Boxed Warning items: (1) Hepatotoxicity (16%); (2) Severe
+    Diarrhea/Colitis (20%); (3) Pneumonitis (4%); (4) Infections (48%);
+    (5) Intestinal Perforation. [Confirmed from PI]
+    Note: Prior governance listed 4 Boxed Warnings for ZYDELIG — correct count
+    is 5 (intestinal perforation is the 5th).
+  - JAYPIRCA: 0 Boxed Warnings. [Confirmed from PI]
+  NOTE: REMS Programs — None of the 9 products have a REMS program per their
+  current prescribing information. [Confirmed from PI for all 9 products]
 
 
 ESCALATION PATH
