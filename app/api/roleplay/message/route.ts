@@ -149,6 +149,10 @@ export async function POST(request: NextRequest) {
               const v = inputCheck.primaryViolation;
               console.log(`[compliance:input] BLOCKED by ${v.rule_code}`);
 
+              // Phase 6: escalation pattern upsert
+              sf.upsertCompliancePattern(session.userId, v.rule_code)
+                .catch(e => console.error('[escalation] upsert error:', e?.message));
+
               if (sessionId) {
                 repTurnLogged = true;
                 sf.logComplianceTurn({
@@ -191,12 +195,6 @@ export async function POST(request: NextRequest) {
           }
         } catch (inputFilterErr: any) {
           console.error('[compliance:input] filter error (fail open):', inputFilterErr?.message);
-        }
-
-        // ── Phase 6: upsert escalation pattern for blocked rep inputs ────────
-        if (inputCheck.status === 'blocked' && inputCheck.primaryViolation) {
-          sf.upsertCompliancePattern(session.userId, inputCheck.primaryViolation.rule_code)
-            .catch(e => console.error('[escalation] upsert error:', e?.message));
         }
 
         // Log clean rep turn only if not already logged above
