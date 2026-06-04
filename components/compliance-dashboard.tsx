@@ -150,8 +150,8 @@ export default function ComplianceDashboard({ onBack }: { onBack: () => void }) 
       const phases = [
         'Extracting text from PDF…',
         'Splitting into chunks…',
-        'Generating vector embeddings via Snowflake Cortex…',
-        'Storing chunks in Snowflake…',
+        'Generating vector embeddings…',
+        'Storing chunks in knowledge base…',
         'Almost done…',
       ];
       let phaseIdx = 0;
