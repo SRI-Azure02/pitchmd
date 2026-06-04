@@ -2064,6 +2064,11 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                 {[selectedPhysician.specialty, selectedPhysician.segment].filter(Boolean).join(' · ')}
               </p>
             )}
+            {physicianMindsets[physicianIdRef.current ?? ''] && (
+              <p className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-violet-300/80 bg-violet-900/30 border border-violet-700/40 px-2.5 py-0.5 rounded-full">
+                {physicianMindsets[physicianIdRef.current ?? '']}
+              </p>
+            )}
           </div>
         )}
 
