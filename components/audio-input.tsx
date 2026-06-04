@@ -1,5 +1,20 @@
 'use client';
 
+/**
+ * AudioInput — Vocabulary Enhancement (Phase 5)
+ *
+ * Uses MediaRecorder to capture audio in 3-second segments and sends each
+ * segment to /api/stt (Groq Whisper) with a pharmaceutical vocabulary prompt.
+ * Significantly more accurate than the Web Speech API for brand names like
+ * Venclexta, Imbruvica, Brukinsa, etc.
+ *
+ * Behaviour mirrors the previous Web Speech API implementation:
+ *  - Recording starts automatically when not disabled
+ *  - Each transcribed segment is appended to the input box
+ *  - 3-second silence (no new transcript) triggers auto-submit
+ *  - Recording pauses while disabled (avatar speaking) and resumes after
+ */
+
 import { useEffect, useRef, useState } from 'react';
 import { Mic } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -12,181 +27,211 @@ interface AudioInputProps {
   userTyping?: boolean;
 }
 
-const SILENCE_TIMEOUT = 3000; // 3 s — short pause after speech before auto-submit
-const RING_R = 20;
+const SEGMENT_MS    = 3000;  // MediaRecorder timeslice — collect data every 3 s
+const SUBMIT_WAIT   = 3000;  // ms of transcript silence before auto-submit
+const MIN_BLOB_SIZE = 500;   // bytes — smaller blobs are almost certainly silent
+const MIN_WORDS     = 1;     // minimum word count to accept a transcript
+const RING_R        = 20;
 const CIRCUMFERENCE = 2 * Math.PI * RING_R;
 
-export default function AudioInput({ onTranscript, onAutoSubmit, onCountdown, disabled, userTyping }: AudioInputProps) {
-  const [isRecording, setIsRecording] = useState(false);
-  const [supported, setSupported] = useState(false);
+/** Pick the best supported MIME type for the current browser */
+function pickMimeType(): string {
+  const candidates = [
+    'audio/webm;codecs=opus',
+    'audio/webm',
+    'audio/ogg;codecs=opus',
+    'audio/mp4',
+  ];
+  for (const t of candidates) {
+    if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(t)) return t;
+  }
+  return '';
+}
+
+export default function AudioInput({
+  onTranscript,
+  onAutoSubmit,
+  onCountdown,
+  disabled,
+  userTyping,
+}: AudioInputProps) {
+  const [isRecording, setIsRecording]   = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [supported, setSupported]       = useState(false);
   const [countdownPct, setCountdownPct] = useState<number | null>(null);
-  const recognitionRef = useRef<any>(null);
-  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const hasTranscriptRef = useRef(false);
-  // Synchronous guard — prevents a second SpeechRecognition instance from
-  // being created before React has flushed the isRecording state update.
-  const recordingActiveRef = useRef(false);
+
+  const recorderRef      = useRef<MediaRecorder | null>(null);
+  const streamRef        = useRef<MediaStream | null>(null);
+  const chunksRef        = useRef<Blob[]>([]);
+  const submitTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const progressRef      = useRef<ReturnType<typeof setInterval> | null>(null);
+  const submitStartRef   = useRef<number>(0);
+  const activeRef        = useRef(false);   // guards against double-start
+  const mimeTypeRef      = useRef('');
 
   useEffect(() => {
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (SR) setSupported(true);
+    setSupported(
+      typeof MediaRecorder !== 'undefined' &&
+      !!navigator.mediaDevices?.getUserMedia,
+    );
   }, []);
 
-  // Stop recording immediately when disabled (e.g. while message is sending)
-  useEffect(() => {
-    if (disabled && isRecording) {
-      clearTimers();
-      recognitionRef.current?.stop();
-      // recordingActiveRef is cleared in onend
-      setIsRecording(false);
-    }
-  }, [disabled]);
+  // ── Countdown ring helpers ───────────────────────────────────────────────
 
-  // Resume recording when no longer disabled (or when a previous recording session ends).
-  // Depends on both disabled and isRecording so the effect re-fires once the Web Speech API
-  // onend callback has settled isRecording to false after a stop() call.
-  // 50 ms gives React one render cycle to flush state; the recordingActiveRef guard
-  // inside startRecording() prevents a second instance from being created in any case.
-  useEffect(() => {
-    if (!disabled && supported && !isRecording) {
-      const t = setTimeout(() => startRecording(), 50);
-      return () => clearTimeout(t);
-    }
-  }, [disabled, isRecording]);
-
-  // Mute mic and cancel countdown when user starts typing
-  useEffect(() => {
-    if (userTyping && isRecording) {
-      clearTimers();
-      recognitionRef.current?.stop();
-      setIsRecording(false);
-    }
-  }, [userTyping]);
-
-  const clearTimers = () => {
-    if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-    if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
-    silenceTimerRef.current = null;
-    progressIntervalRef.current = null;
+  const clearSubmitTimer = () => {
+    if (submitTimerRef.current)  clearTimeout(submitTimerRef.current);
+    if (progressRef.current)     clearInterval(progressRef.current);
+    submitTimerRef.current = null;
+    progressRef.current    = null;
     setCountdownPct(null);
     onCountdown?.(null);
   };
 
-  const startSilenceTimer = () => {
-    clearTimers();
-    if (!hasTranscriptRef.current) return;
-
-    const start = Date.now();
+  const startSubmitTimer = () => {
+    clearSubmitTimer();
+    submitStartRef.current = Date.now();
     setCountdownPct(100);
     onCountdown?.(100);
 
-    progressIntervalRef.current = setInterval(() => {
-      const elapsed = Date.now() - start;
-      const remaining = Math.max(0, 100 - (elapsed / SILENCE_TIMEOUT) * 100);
+    progressRef.current = setInterval(() => {
+      const elapsed   = Date.now() - submitStartRef.current;
+      const remaining = Math.max(0, 100 - (elapsed / SUBMIT_WAIT) * 100);
       setCountdownPct(remaining);
       onCountdown?.(remaining);
     }, 50);
 
-    silenceTimerRef.current = setTimeout(() => {
-      clearTimers();
-      recognitionRef.current?.stop();
-      setIsRecording(false);
-      if (onAutoSubmit) onAutoSubmit();
-    }, SILENCE_TIMEOUT);
+    submitTimerRef.current = setTimeout(() => {
+      clearSubmitTimer();
+      stopRecording();
+      onAutoSubmit?.();
+    }, SUBMIT_WAIT);
   };
 
-  const startRecording = () => {
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    // Use the ref (not isRecording state) to prevent a second instance from being
-    // created before React has flushed the previous setIsRecording(true) call.
-    if (!SR || recordingActiveRef.current) return;
+  // ── Transcription ────────────────────────────────────────────────────────
 
-    recordingActiveRef.current = true;
-    const recognition = new SR();
-    recognition.lang = 'en-US';
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    hasTranscriptRef.current = false;
+  const transcribeBlob = async (blob: Blob) => {
+    if (blob.size < MIN_BLOB_SIZE) return; // almost certainly silent
+    setIsProcessing(true);
+    try {
+      const fd = new FormData();
+      fd.append('audio', blob, `audio.${mimeTypeRef.current.includes('mp4') ? 'mp4' : 'webm'}`);
+      const res  = await fetch('/api/stt', { method: 'POST', body: fd });
+      if (!res.ok) return;
+      const data = await res.json() as { transcript: string };
+      const text = (data.transcript ?? '').trim();
+      if (!text || text.split(/\s+/).length < MIN_WORDS) return;
+      onTranscript(text);
+      startSubmitTimer(); // reset 3-second silence window
+    } catch (err: any) {
+      console.error('[audio-input] STT error:', err?.message);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
-    recognition.onresult = (event: any) => {
-      let final = '';
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        if (event.results[i].isFinal) final += event.results[i][0].transcript;
-      }
-      if (final) {
-        hasTranscriptRef.current = true;
-        onTranscript(final);
-        startSilenceTimer();
-      }
-    };
+  // ── Recording lifecycle ──────────────────────────────────────────────────
 
-    recognition.onerror = () => {
-      recordingActiveRef.current = false;
-      clearTimers();
-      setIsRecording(false);
-    };
-    recognition.onend = () => {
-      recordingActiveRef.current = false;
-      clearTimers();
-      setIsRecording(false);
-    };
+  const startRecording = async () => {
+    if (activeRef.current) return;
+    activeRef.current = true;
+    try {
+      const stream   = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
 
-    recognitionRef.current = recognition;
-    recognition.start();
-    setIsRecording(true);
+      const mime = pickMimeType();
+      mimeTypeRef.current = mime;
+      const options: MediaRecorderOptions = mime ? { mimeType: mime } : {};
+      const recorder = new MediaRecorder(stream, options);
+      recorderRef.current = recorder;
+      chunksRef.current   = [];
+
+      // Collect audio in SEGMENT_MS windows
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          chunksRef.current.push(e.data);
+          const blob = new Blob(chunksRef.current, { type: mime || 'audio/webm' });
+          chunksRef.current = []; // reset for next window
+          transcribeBlob(blob);
+        }
+      };
+
+      recorder.onerror = () => { activeRef.current = false; setIsRecording(false); };
+      recorder.onstart = () => setIsRecording(true);
+
+      recorder.start(SEGMENT_MS);
+    } catch (err: any) {
+      console.error('[audio-input] getUserMedia error:', err?.message);
+      activeRef.current = false;
+    }
   };
 
   const stopRecording = () => {
-    clearTimers();
-    recognitionRef.current?.stop();
-    // recordingActiveRef will be cleared by onend; no need to reset here.
+    clearSubmitTimer();
+    if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+      recorderRef.current.stop();
+    }
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    recorderRef.current  = null;
+    streamRef.current    = null;
+    chunksRef.current    = [];
+    activeRef.current    = false;
     setIsRecording(false);
+    setIsProcessing(false);
   };
+
+  // ── Respond to disabled / userTyping changes ─────────────────────────────
+
+  useEffect(() => {
+    if (!supported) return;
+    if (disabled || userTyping) {
+      stopRecording();
+    } else {
+      // Brief delay — let the browser settle after the avatar stops speaking
+      const t = setTimeout(() => startRecording(), 150);
+      return () => clearTimeout(t);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [disabled, userTyping, supported]);
+
+  // Stop on unmount
+  useEffect(() => () => stopRecording(), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!supported) return null;
 
-  // Button background: solid red when recording
-  const buttonBg: React.CSSProperties = isRecording
-    ? { background: '#ef4444', border: 'none', color: 'white' }
-    : {};
+  // ── Render ────────────────────────────────────────────────────────────────
 
   const dashOffset = countdownPct !== null
     ? CIRCUMFERENCE * (1 - countdownPct / 100)
     : CIRCUMFERENCE;
+
+  const isActive = isRecording || isProcessing;
 
   return (
     <div className="relative shrink-0 w-9 h-9">
       <Button
         type="button"
         size="icon"
-        variant={isRecording ? 'default' : 'outline'}
-        onClick={isRecording ? stopRecording : startRecording}
+        variant={isActive ? 'default' : 'outline'}
+        onClick={isActive ? stopRecording : startRecording}
         disabled={disabled}
         className="absolute inset-0 rounded-full"
-        style={buttonBg}
-        title={isRecording ? 'Stop recording' : 'Speak your message'}
+        style={isActive ? { background: '#ef4444', border: 'none', color: 'white' } : {}}
+        title={isActive ? 'Stop recording' : 'Speak your message'}
       >
         <Mic className="w-4 h-4" />
       </Button>
 
-      {/* Countdown ring — only visible during silence countdown */}
+      {/* Countdown ring — visible during submit silence window */}
       {countdownPct !== null && (
         <svg
           className="absolute pointer-events-none"
           style={{ inset: '-4px', width: 'calc(100% + 8px)', height: 'calc(100% + 8px)' }}
           viewBox="0 0 44 44"
         >
-          {/* Track */}
           <circle cx="22" cy="22" r={RING_R} fill="none" stroke="#e2e8f0" strokeWidth="2" />
-          {/* Progress arc — starts at top (12 o'clock) via rotation */}
           <circle
-            cx="22"
-            cy="22"
-            r={RING_R}
-            fill="none"
-            stroke="#FF6B00"
-            strokeWidth="2.5"
+            cx="22" cy="22" r={RING_R}
+            fill="none" stroke="#FF6B00" strokeWidth="2.5"
             strokeDasharray={CIRCUMFERENCE}
             strokeDashoffset={dashOffset}
             strokeLinecap="round"

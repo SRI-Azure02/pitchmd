@@ -103,8 +103,8 @@ const ROADMAP_ITEMS = [
   {
     icon: <Languages className="w-5 h-5" />,
     title: 'Vocabulary Enhancement',
-    description: 'Upgrade to Whisper-based speech recognition with product vocabulary priming, eliminating transcription errors for brand names like Venclexta, Brukinsa, and Imbruvica.',
-    status: 'Planned',
+    description: 'Whisper-based speech recognition with pharmaceutical vocabulary priming for accurate transcription of brand names like Venclexta, Brukinsa, and Imbruvica.',
+    status: 'Live',
   },
   {
     icon: <Target className="w-5 h-5" />,
@@ -2233,8 +2233,8 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
           </Button>
           <AudioInput
             onTranscript={(text) => {
-                const corrected = correctorRef.current(text);
-                setInputValue((prev) => prev + (prev ? ' ' : '') + corrected);
+                // Whisper handles brand-name recognition natively via vocabulary prompt
+                setInputValue((prev) => prev + (prev ? ' ' : '') + text);
               }}
             onAutoSubmit={handleAutoSubmit}
             onCountdown={(pct) => setTranscriptCountdownActive(pct !== null)}
