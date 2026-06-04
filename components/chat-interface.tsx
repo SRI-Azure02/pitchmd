@@ -1975,178 +1975,119 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   return (
     <div className="relative flex flex-col h-full min-h-0">
 
-      {/* ── Video call area ───────────────────────────────────────────────────── */}
+      {/* ── Avatar area ────────────────────────────────────────────────────────── */}
       <div
-        className="flex-1 relative overflow-hidden"
-        style={!(avatarEnabled && tavusConvId) ? {
-          background: 'linear-gradient(120deg, #C47B42, #C49868, #45A8C8, #3A8FB5, #C47B42)',
-          backgroundSize: '400% 400%',
-          animation: 'gradientShift 10s ease infinite',
-        } : { background: '#111' }}
+        className="flex-1 flex flex-col items-center justify-center px-6 py-5 min-h-0"
+        style={{ background: '#0f0f0f' }}
       >
-        {/* Tavus avatar video */}
-        <video
-          ref={avatarVideoRef}
-          autoPlay
-          playsInline
-          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${avatarEnabled && tavusConvId ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-        />
-
-        {/* Gradient placeholder (no avatar) */}
-        {!avatarEnabled && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center select-none pointer-events-none">
-            <VideoOff className="w-14 h-14 text-gray-800/20 mb-3" />
-            <p className="text-gray-800/25 text-xs tracking-widest uppercase">Enable avatar to start video</p>
-          </div>
-        )}
-
-        {/* Avatar connecting overlay */}
-        {avatarConnecting && (
-          <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20">
-            <div className="bg-white/90 backdrop-blur-sm px-5 py-3 rounded-2xl flex items-center gap-3 shadow">
-              <Spinner className="w-4 h-4 text-gray-600" />
-              <span className="text-sm text-gray-700">Connecting avatar…</span>
-            </div>
-          </div>
-        )}
-
-        {/* Back button — top-right, returns to physician list without triggering eval */}
+        {/* Back button — top-right, outside the video frame */}
         <div className="absolute top-3 right-3 z-10">
           <button
             onClick={handleBackToPhysicianList}
-            className="flex items-center gap-1.5 bg-white/70 backdrop-blur-sm hover:bg-white/90 text-gray-700 text-sm font-medium px-3 py-1.5 rounded-full shadow transition-all"
+            className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white text-sm font-medium px-3 py-1.5 rounded-full transition-all backdrop-blur-sm"
           >
             Back
           </button>
         </div>
 
-        {/* Physician nameplate — bottom-left overlay */}
+        {/* Centered, contained avatar frame */}
+        <div className="relative w-full max-w-xl rounded-2xl overflow-hidden shadow-2xl"
+          style={{ aspectRatio: '16/9' }}
+        >
+          {/* Tavus avatar video */}
+          <video
+            ref={avatarVideoRef}
+            autoPlay
+            playsInline
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${avatarEnabled && tavusConvId ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+          />
+
+          {/* Gradient background when no avatar */}
+          {!avatarEnabled && (
+            <div
+              className="absolute inset-0 flex flex-col items-center justify-center select-none"
+              style={{
+                background: 'linear-gradient(120deg, #C47B42, #C49868, #45A8C8, #3A8FB5, #C47B42)',
+                backgroundSize: '400% 400%',
+                animation: 'gradientShift 10s ease infinite',
+              }}
+            >
+              <VideoOff className="w-10 h-10 text-white/20 mb-2" />
+              <p className="text-white/25 text-xs tracking-widest uppercase">Avatar disabled</p>
+            </div>
+          )}
+
+          {/* Connecting overlay */}
+          {avatarConnecting && (
+            <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20">
+              <div className="bg-white/90 backdrop-blur-sm px-5 py-3 rounded-2xl flex items-center gap-3 shadow">
+                <Spinner className="w-4 h-4 text-gray-600" />
+                <span className="text-sm text-gray-700">Connecting avatar…</span>
+              </div>
+            </div>
+          )}
+
+          {/* Session start loading */}
+          {messages.length === 0 && loading && (
+            <div className="absolute inset-0 flex items-center justify-center z-10">
+              <div className="bg-white/80 backdrop-blur-sm px-5 py-3 rounded-2xl flex items-center gap-3 shadow">
+                <Spinner className="w-4 h-4 text-gray-600" />
+                <span className="text-sm text-gray-700">{statusMessage || 'Starting session...'}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Compliance block notices only — transcript hidden during avatar session */}
+          {visibleMessages.filter(m => m.isComplianceBlock).slice(-1).map(m => (
+            <div key={m.id} className="absolute bottom-3 left-3 right-3 z-20">
+              <div className="px-3.5 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm shadow-lg">
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <ShieldAlert className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-amber-500">
+                    Compliance Notice{m.complianceRuleCode && ` · ${m.complianceRuleCode}`}
+                  </span>
+                </div>
+                {m.content}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Physician nameplate — BELOW the video frame, not overlaid */}
         {selectedPhysician && (
-          <div className="absolute bottom-4 left-4 z-10 bg-white/60 backdrop-blur-sm px-4 py-2 rounded-lg">
-            <p className="text-black font-semibold text-lg leading-tight">
+          <div className="mt-3 text-center">
+            <p className="text-white font-semibold text-base leading-tight">
               {selectedPhysician.name}
             </p>
             {(selectedPhysician.specialty || selectedPhysician.segment) && (
-              <p className="text-gray-700 text-sm mt-0.5">
+              <p className="text-white/50 text-sm mt-0.5">
                 {[selectedPhysician.specialty, selectedPhysician.segment].filter(Boolean).join(' · ')}
               </p>
             )}
           </div>
         )}
 
-        {/* Loading indicator (session start) */}
-        {messages.length === 0 && loading && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="bg-white/80 backdrop-blur-sm px-5 py-3 rounded-2xl flex items-center gap-3 shadow">
-              <Spinner className="w-4 h-4 text-gray-600" />
-              <span className="text-sm text-gray-700">{statusMessage || 'Starting session...'}</span>
-            </div>
-          </div>
-        )}
 
-        {/* Transcript overlay — centered column, comfortable reading width */}
-        {showTranscript && (
-          <div className="absolute inset-0 z-10 flex justify-center overflow-hidden">
-            <div
-              className="w-full max-w-2xl h-full bg-white/80 backdrop-blur-sm overflow-y-auto p-4 space-y-3 shadow-xl"
-              style={{
-                maskImage: 'linear-gradient(to right, transparent 0%, black 6%, black 94%, transparent 100%)',
-                WebkitMaskImage: 'linear-gradient(to right, transparent 0%, black 6%, black 94%, transparent 100%)',
-              }}
-            >
-              {visibleMessages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex items-end gap-2 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  {/* Compliance block notice — distinct amber treatment */}
-                  {message.isComplianceBlock ? (
-                    <div className="max-w-sm lg:max-w-xl px-3.5 py-2.5 rounded-2xl rounded-bl-sm bg-amber-50 border border-amber-200 text-amber-900 text-sm leading-relaxed shadow-sm">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <ShieldAlert className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                        <span className="text-[10px] font-semibold uppercase tracking-widest text-amber-500">
-                          Compliance Notice
-                          {message.complianceRuleCode && ` · ${message.complianceRuleCode}`}
-                        </span>
-                      </div>
-                      {message.content}
-                    </div>
-                  ) : (
-                    <>
-                      {message.role === 'assistant' && (
-                        <div className="w-2 h-2 rounded-full bg-gray-500 shrink-0 mb-1.5" />
-                      )}
-                      <div
-                        className={`max-w-sm lg:max-w-xl px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
-                          message.role === 'user'
-                            ? 'bg-gray-800 text-white rounded-br-sm'
-                            : 'bg-white text-slate-800 rounded-bl-sm shadow-sm'
-                        }`}
-                      >
-                        {message.content}
-                        {message.isEvaluation && (
-                          <button
-                            onClick={() => { setEvalPhysicianId(physicianIdRef.current); setEvalOpen(true); }}
-                            className="mt-2 flex items-center gap-1.5 text-gray-600 hover:text-gray-800 font-medium text-xs"
-                          >
-                            View Evaluation Report →
-                          </button>
-                        )}
-                      </div>
-                      {message.role === 'user' && (
-                        <div className="w-2 h-2 rounded-full bg-gray-500 shrink-0 mb-1.5" />
-                      )}
-                    </>
-                  )}
-                </div>
-              ))}
-              {/* Streaming bubble */}
-              {loading && streamingContent && (
-                <div className="flex items-end gap-2">
-                  <div className="w-2 h-2 rounded-full bg-gray-500 shrink-0 mb-1.5" />
-                  <div className="max-w-sm lg:max-w-xl px-3.5 py-2.5 rounded-2xl rounded-bl-sm bg-white text-slate-800 text-sm leading-relaxed whitespace-pre-wrap shadow-sm">
-                    {streamingContent.replace(/^\[EMOTION:[^\]]+\]\s*/i, '')}
-                    <span className="inline-block w-1.5 h-3.5 bg-gray-600 ml-0.5 align-middle animate-pulse" />
-                  </div>
-                </div>
-              )}
-              {loading && !streamingContent && messages.length > 0 && (
-                <div className="flex items-end gap-2">
-                  <div className="w-2 h-2 rounded-full bg-gray-400 shrink-0" />
-                  <div className="bg-white px-3.5 py-2.5 rounded-2xl rounded-bl-sm flex items-center gap-2 shadow-sm">
-                    <Spinner className="w-3.5 h-3.5 text-gray-500" />
-                    <span className="text-sm text-slate-600">{statusMessage || 'Thinking...'}</span>
-                  </div>
-                </div>
-              )}
-              <div ref={messagesEndRef} />
-            </div>
-          </div>
-        )}
-
-
-        {/* Eval-generating notification (shown when timer ends, until report is ready) */}
+        {/* Eval notifications — sit above the avatar area */}
         {evalGenerating && !evalReady && (
-          <div className="absolute top-4 left-0 right-0 flex justify-center px-4 z-20 pointer-events-none">
-            <div className="flex items-center gap-2.5 bg-white/90 backdrop-blur-sm text-gray-800 text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg border border-gray-200">
-              <Spinner className="w-3.5 h-3.5 text-gray-500 shrink-0" />
-              <span>Session complete · Generating your evaluation report…</span>
+          <div className="mt-3 flex justify-center px-4">
+            <div className="flex items-center gap-2.5 bg-white/10 backdrop-blur-sm text-white/80 text-sm font-medium px-4 py-2 rounded-xl border border-white/10">
+              <Spinner className="w-3.5 h-3.5 text-white/60 shrink-0" />
+              <span>Session complete · Generating evaluation report…</span>
             </div>
           </div>
         )}
-
-        {/* Eval-ready toast */}
         {evalReady && (
-          <div className="absolute top-4 left-0 right-0 flex justify-center px-4 z-20 pointer-events-none">
-            <div className="flex items-center gap-3 bg-green-600 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg pointer-events-auto">
-              <span>Your evaluation report is ready.</span>
+          <div className="mt-3 flex justify-center px-4">
+            <div className="flex items-center gap-3 bg-green-600 text-white text-sm font-medium px-4 py-2 rounded-xl shadow-lg">
+              <span>Evaluation report ready.</span>
               <button
                 onClick={() => { setEvalPhysicianId(physicianIdRef.current); setEvalOpen(true); }}
                 className="underline underline-offset-2 hover:no-underline font-bold"
               >
-                View Report
+                View
               </button>
-              <button onClick={() => setEvalReady(false)} className="ml-1 opacity-70 hover:opacity-100 text-base leading-none">×</button>
+              <button onClick={() => setEvalReady(false)} className="ml-1 opacity-70 hover:opacity-100">×</button>
             </div>
           </div>
         )}
