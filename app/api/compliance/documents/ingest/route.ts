@@ -11,18 +11,13 @@ function isAdmin(email?: string, username?: string, userId?: string): boolean {
       || adminList.includes(userId?.toLowerCase() ?? '__none__');
 }
 
-/**
- * POST /api/compliance/documents/ingest
- *
- * Accepts a multipart/form-data upload with:
- *   file     — the PDF file
- *   product  — product name (e.g. "Venclexta")
- *   doc_type — "pi" | "detail_aid" | "clinical_summary" | "claims_library"
- *
- * Pipeline: PDF → text extraction → chunking → Snowflake Cortex embedding → storage
- *
- * Returns: { docId, docName, chunkCount }
- */
+// Cortex embedding models to try in order (all 1024-dim)
+const EMBEDDING_MODELS = [
+  'voyage-lite-02-instruct',
+  'multilingual-e5-large',
+  'snowflake-arctic-embed-l',
+];
+
 export async function POST(request: NextRequest) {
   const session = await getSessionFromRequest(request);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -47,42 +42,94 @@ export async function POST(request: NextRequest) {
     const chunks = await pdfToChunks(buffer);
     console.log(`[rag:ingest] ${chunks.length} chunks extracted from ${docName}`);
 
-    // 2. Register document in SYNTHETIC_COMPLIANCE_DOCUMENTS
+    if (chunks.length === 0) {
+      return NextResponse.json({
+        error: 'No text could be extracted from this PDF. The file may be image-based or encrypted.',
+      }, { status: 400 });
+    }
+
+    // 2. Register document
     const sf = getSnowflakeClient();
     const docId = await sf.registerDocument({
-      docName,
-      docType,
+      docName, docType,
       product: product || null,
       approvedBy: session.email ?? session.username,
     });
-
     if (!docId) throw new Error('Failed to register document — no DOC_ID returned');
-    console.log(`[rag:ingest] Document registered: ${docId}`);
 
-    // 3. Ingest each chunk with Snowflake Cortex embedding
-    // Sequential to avoid overwhelming the Snowflake endpoint
-    let ingested = 0;
-    for (const chunk of chunks) {
+    // 3. Probe Cortex: try each model on the first chunk to find one that works
+    let workingModel: string | null = null;
+    let cortexError = '';
+    for (const model of EMBEDDING_MODELS) {
       try {
         await sf.ingestDocumentChunk({
-          docId,
-          chunkText:    chunk.chunkText,
-          chunkIndex:   chunk.chunkIndex,
-          pageNumber:   chunk.pageNumber,
-          sectionLabel: chunk.sectionLabel,
+          docId, model,
+          chunkText:    chunks[0].chunkText,
+          chunkIndex:   0,
+          pageNumber:   chunks[0].pageNumber,
+          sectionLabel: chunks[0].sectionLabel,
         });
-        ingested++;
-        if (ingested % 10 === 0) {
-          console.log(`[rag:ingest] ${ingested}/${chunks.length} chunks embedded`);
-        }
-      } catch (chunkErr: any) {
-        console.error(`[rag:ingest] chunk ${chunk.chunkIndex} failed:`, chunkErr?.message);
-        // Continue with remaining chunks — partial ingestion is better than none
+        workingModel = model;
+        console.log(`[rag:ingest] Cortex model confirmed: ${model}`);
+        break;
+      } catch (probeErr: any) {
+        cortexError = probeErr?.message ?? String(probeErr);
+        console.warn(`[rag:ingest] model ${model} failed: ${cortexError}`);
       }
     }
 
-    console.log(`[rag:ingest] Complete: ${ingested}/${chunks.length} chunks ingested for ${docName}`);
-    return NextResponse.json({ docId, docName, chunkCount: ingested, totalChunks: chunks.length });
+    // 4a. If Cortex works, embed remaining chunks with the confirmed model
+    let ingested = 0;
+    let mode: 'vector' | 'keyword' = 'keyword';
+
+    if (workingModel) {
+      mode = 'vector';
+      ingested = 1; // chunk 0 already done
+      for (const chunk of chunks.slice(1)) {
+        try {
+          await sf.ingestDocumentChunk({
+            docId, model: workingModel,
+            chunkText:    chunk.chunkText,
+            chunkIndex:   chunk.chunkIndex,
+            pageNumber:   chunk.pageNumber,
+            sectionLabel: chunk.sectionLabel,
+          });
+          ingested++;
+          if (ingested % 20 === 0)
+            console.log(`[rag:ingest] ${ingested}/${chunks.length} chunks embedded`);
+        } catch (chunkErr: any) {
+          console.error(`[rag:ingest] chunk ${chunk.chunkIndex} failed:`, chunkErr?.message);
+        }
+      }
+    } else {
+      // 4b. Cortex unavailable — store chunks without embeddings (keyword-only mode)
+      console.warn(`[rag:ingest] Cortex unavailable — falling back to keyword mode. Last error: ${cortexError}`);
+      for (const chunk of chunks) {
+        try {
+          await sf.ingestDocumentChunkNoEmbedding({
+            docId,
+            chunkText:    chunk.chunkText,
+            chunkIndex:   chunk.chunkIndex,
+            pageNumber:   chunk.pageNumber,
+            sectionLabel: chunk.sectionLabel,
+          });
+          ingested++;
+        } catch (chunkErr: any) {
+          console.error(`[rag:ingest] keyword chunk ${chunk.chunkIndex} failed:`, chunkErr?.message);
+        }
+      }
+    }
+
+    console.log(`[rag:ingest] Complete: ${ingested}/${chunks.length} chunks (${mode} mode) for ${docName}`);
+    return NextResponse.json({
+      docId, docName,
+      chunkCount:  ingested,
+      totalChunks: chunks.length,
+      mode,
+      warning: mode === 'keyword'
+        ? `Snowflake Cortex embedding unavailable (${cortexError?.slice(0, 200)}). Chunks stored in keyword-search mode — retrieval quality will be lower.`
+        : undefined,
+    });
 
   } catch (err: any) {
     console.error('[rag:ingest] error:', err?.message);
@@ -90,7 +137,4 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Increase body size limit for PDF uploads (default 4MB in Next.js)
-export const config = {
-  api: { bodyParser: false },
-};
+export const config = { api: { bodyParser: false } };

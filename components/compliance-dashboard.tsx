@@ -134,7 +134,9 @@ export default function ComplianceDashboard({ onBack }: { onBack: () => void }) 
       const res = await fetch('/api/compliance/documents/ingest', { method: 'POST', body: fd });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Ingestion failed');
-      setUploadResult(`✓ ${data.docName} — ${data.chunkCount} chunks ingested`);
+      const modeNote = data.mode === 'keyword' ? ' (keyword mode — Cortex unavailable)' : ' (vector embeddings)';
+      const warningNote = data.warning ? `\n⚠ ${data.warning}` : '';
+      setUploadResult(`✓ ${data.docName} — ${data.chunkCount}/${data.totalChunks} chunks ingested${modeNote}${warningNote}`);
       loadDocuments();
     } catch (e: any) {
       setUploadResult(`✗ ${e.message}`);
