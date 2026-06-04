@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Shield, ChevronDown, ChevronUp, Check, Clock, AlertTriangle, Search, X, Upload, FileText, Database, Bell } from 'lucide-react';
+import { Shield, ChevronDown, ChevronUp, Check, Clock, AlertTriangle, Search, X, Upload, FileText, Database, Bell, Trash2 } from 'lucide-react';
 
 interface EscalationAlert {
   PATTERN_ID: string;
@@ -107,6 +107,8 @@ export default function ComplianceDashboard({ onBack }: { onBack: () => void }) 
   const [uploadProduct, setUploadProduct] = useState('');
   const [uploadDocType, setUploadDocType] = useState('pi');
   const [uploadResult, setUploadResult] = useState<string | null>(null);
+  const [deletingDoc, setDeletingDoc] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadDocuments = useCallback(async () => {
@@ -122,6 +124,19 @@ export default function ComplianceDashboard({ onBack }: { onBack: () => void }) 
   useEffect(() => {
     if (activeTab === 'documents') loadDocuments();
   }, [activeTab, loadDocuments]);
+
+  const handleDelete = async (docId: string) => {
+    if (deleteConfirm !== docId) { setDeleteConfirm(docId); return; }
+    setDeletingDoc(docId);
+    setDeleteConfirm(null);
+    try {
+      const res = await fetch(`/api/compliance/documents/${encodeURIComponent(docId)}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error((await res.json()).error ?? 'Delete failed');
+      setDocuments(prev => prev.filter(d => d.DOC_ID !== docId));
+    } catch (e: any) {
+      setUploadResult(`✗ Delete failed: ${e.message}`);
+    } finally { setDeletingDoc(null); }
+  };
 
   const handleUpload = async (file: File) => {
     setUploading(true);
@@ -383,6 +398,18 @@ export default function ComplianceDashboard({ onBack }: { onBack: () => void }) 
                   }`}>
                     {doc.MLR_STATUS}
                   </span>
+                  <button
+                    onClick={() => handleDelete(doc.DOC_ID)}
+                    disabled={deletingDoc === doc.DOC_ID}
+                    title={deleteConfirm === doc.DOC_ID ? 'Click again to confirm delete' : 'Delete document'}
+                    className={`ml-1 p-1.5 rounded-md transition-colors disabled:opacity-40 ${
+                      deleteConfirm === doc.DOC_ID
+                        ? 'bg-red-100 text-red-600 hover:bg-red-200'
+                        : 'text-slate-300 hover:text-red-500 hover:bg-red-50'
+                    }`}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               ))}
             </div>

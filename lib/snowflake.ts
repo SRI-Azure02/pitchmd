@@ -1315,6 +1315,19 @@ export class SnowflakeClient {
     `, bindings);
   }
 
+  /** Delete a document and all its chunks. */
+  async deleteDocument(docId: string): Promise<void> {
+    // Delete chunks first (no FK constraint, but logical order)
+    await this.executeQuery(
+      `DELETE FROM CORTEX_TESTING.PUBLIC.SYNTHETIC_DOCUMENT_CHUNKS WHERE DOC_ID = :1`,
+      { '1': { type: 'TEXT', value: docId } },
+    );
+    await this.executeQuery(
+      `DELETE FROM CORTEX_TESTING.PUBLIC.SYNTHETIC_COMPLIANCE_DOCUMENTS WHERE DOC_ID = :1`,
+      { '1': { type: 'TEXT', value: docId } },
+    );
+  }
+
   /** List all documents in SYNTHETIC_COMPLIANCE_DOCUMENTS. */
   async getComplianceDocuments(): Promise<any[]> {
     return await this.executeQuery(`
