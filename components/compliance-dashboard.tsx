@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Shield, ChevronDown, ChevronUp, Check, Clock, AlertTriangle, Search, X, Upload, FileText, Database, Bell, Trash2 } from 'lucide-react';
+import { Shield, ChevronDown, ChevronUp, Check, Clock, AlertTriangle, Search, X, Upload, FileText, Database, Bell, Trash2, Loader2 } from 'lucide-react';
 
 interface EscalationAlert {
   PATTERN_ID: string;
@@ -104,11 +104,11 @@ export default function ComplianceDashboard({ onBack }: { onBack: () => void }) 
   const [documents, setDocuments] = useState<ComplianceDocument[]>([]);
   const [docsLoading, setDocsLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadPhase, setUploadPhase] = useState<string>('');
   const [uploadProduct, setUploadProduct] = useState('');
   const [uploadDocType, setUploadDocType] = useState('pi');
   const [uploadResult, setUploadResult] = useState<string | null>(null);
   const [deletingDoc, setDeletingDoc] = useState<string | null>(null);
-  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadDocuments = useCallback(async () => {
@@ -126,9 +126,7 @@ export default function ComplianceDashboard({ onBack }: { onBack: () => void }) 
   }, [activeTab, loadDocuments]);
 
   const handleDelete = async (docId: string) => {
-    if (deleteConfirm !== docId) { setDeleteConfirm(docId); return; }
     setDeletingDoc(docId);
-    setDeleteConfirm(null);
     try {
       const res = await fetch(`/api/compliance/documents/${encodeURIComponent(docId)}`, { method: 'DELETE' });
       if (!res.ok) throw new Error((await res.json()).error ?? 'Delete failed');
@@ -141,12 +139,32 @@ export default function ComplianceDashboard({ onBack }: { onBack: () => void }) 
   const handleUpload = async (file: File) => {
     setUploading(true);
     setUploadResult(null);
+    setUploadPhase('Reading PDF…');
     try {
       const fd = new FormData();
       fd.append('file', file);
       fd.append('product', uploadProduct);
       fd.append('doc_type', uploadDocType);
+
+      // Phase indicator cycles while fetch is in progress
+      const phases = [
+        'Extracting text from PDF…',
+        'Splitting into chunks…',
+        'Generating vector embeddings via Snowflake Cortex…',
+        'Storing chunks in Snowflake…',
+        'Almost done…',
+      ];
+      let phaseIdx = 0;
+      setUploadPhase(phases[0]);
+      const phaseTimer = setInterval(() => {
+        phaseIdx = Math.min(phaseIdx + 1, phases.length - 1);
+        setUploadPhase(phases[phaseIdx]);
+      }, 8000); // advance every 8 s — embedding takes ~1-3 min total
+
       const res = await fetch('/api/compliance/documents/ingest', { method: 'POST', body: fd });
+      clearInterval(phaseTimer);
+      setUploadPhase('');
+
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Ingestion failed');
       const modeNote = data.mode === 'keyword' ? ' (keyword mode — Cortex unavailable)' : ' (vector embeddings)';
@@ -155,6 +173,7 @@ export default function ComplianceDashboard({ onBack }: { onBack: () => void }) 
       loadDocuments();
     } catch (e: any) {
       setUploadResult(`✗ ${e.message}`);
+      setUploadPhase('');
     } finally { setUploading(false); }
   };
 
@@ -352,14 +371,19 @@ export default function ComplianceDashboard({ onBack }: { onBack: () => void }) 
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
-              className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
             >
-              {uploading ? 'Processing…' : 'Select PDF to Upload'}
+              {uploading
+                ? <><Loader2 className="w-4 h-4 animate-spin" />Processing…</>
+                : <><Upload className="w-4 h-4" />Select PDF to Upload</>}
             </button>
-            {uploading && (
-              <p className="mt-2 text-xs text-slate-500 animate-pulse">
-                Extracting text, generating embeddings via Snowflake Cortex… this may take 1-3 minutes for large PDFs.
-              </p>
+
+            {/* Upload progress feedback */}
+            {uploading && uploadPhase && (
+              <div className="mt-3 flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-blue-50 border border-blue-100">
+                <Loader2 className="w-4 h-4 text-blue-500 animate-spin shrink-0" />
+                <span className="text-sm text-blue-700 font-medium animate-pulse">{uploadPhase}</span>
+              </div>
             )}
             {uploadResult && (
               <p className={`mt-2 text-sm font-medium ${uploadResult.startsWith('✓') ? 'text-emerald-600' : 'text-red-600'}`}>
@@ -401,14 +425,12 @@ export default function ComplianceDashboard({ onBack }: { onBack: () => void }) 
                   <button
                     onClick={() => handleDelete(doc.DOC_ID)}
                     disabled={deletingDoc === doc.DOC_ID}
-                    title={deleteConfirm === doc.DOC_ID ? 'Click again to confirm delete' : 'Delete document'}
-                    className={`ml-1 p-1.5 rounded-md transition-colors disabled:opacity-40 ${
-                      deleteConfirm === doc.DOC_ID
-                        ? 'bg-red-100 text-red-600 hover:bg-red-200'
-                        : 'text-slate-300 hover:text-red-500 hover:bg-red-50'
-                    }`}
+                    title="Delete document and all chunks"
+                    className="ml-1 p-1.5 rounded-md text-slate-300 hover:text-red-500 hover:bg-red-50 disabled:opacity-40 transition-colors"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    {deletingDoc === doc.DOC_ID
+                      ? <Loader2 className="w-3.5 h-3.5 animate-spin text-red-400" />
+                      : <Trash2 className="w-3.5 h-3.5" />}
                   </button>
                 </div>
               ))}
