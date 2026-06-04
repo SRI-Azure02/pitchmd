@@ -1205,7 +1205,7 @@ export class SnowflakeClient {
         (DOC_ID, CHUNK_TEXT, CHUNK_INDEX, PAGE_NUMBER, SECTION_LABEL, EMBEDDING)
       SELECT
         :1, :2, :3, :4, :5,
-        SNOWFLAKE.CORTEX.EMBED_TEXT_1024('${safeModel}', :2)
+        SNOWFLAKE.CORTEX.EMBED_TEXT_768('${safeModel}', :2)
     `, {
       '1': { type: 'TEXT', value: params.docId },
       '2': { type: 'TEXT', value: params.chunkText },
@@ -1270,7 +1270,7 @@ export class SnowflakeClient {
               c.CHUNK_TEXT, c.SECTION_LABEL, c.PAGE_NUMBER, d.PRODUCT, d.DOC_NAME,
               VECTOR_COSINE_SIMILARITY(
                 c.EMBEDDING,
-                SNOWFLAKE.CORTEX.EMBED_TEXT_1024('${safeModel}', :1)
+                SNOWFLAKE.CORTEX.EMBED_TEXT_768('${safeModel}', :1)
               ) AS SIMILARITY
             FROM CORTEX_TESTING.PUBLIC.SYNTHETIC_DOCUMENT_CHUNKS c
             JOIN CORTEX_TESTING.PUBLIC.SYNTHETIC_COMPLIANCE_DOCUMENTS d

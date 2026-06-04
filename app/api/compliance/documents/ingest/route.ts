@@ -11,11 +11,11 @@ function isAdmin(email?: string, username?: string, userId?: string): boolean {
       || adminList.includes(userId?.toLowerCase() ?? '__none__');
 }
 
-// Cortex embedding models to try in order (all 1024-dim)
+// Cortex embedding models to try in order (all 768-dim — matches VECTOR(FLOAT, 768))
 const EMBEDDING_MODELS = [
-  'voyage-lite-02-instruct',
-  'multilingual-e5-large',
-  'snowflake-arctic-embed-l',
+  'e5-base-v2',
+  'snowflake-arctic-embed-m',
+  'multilingual-e5-small',
 ];
 
 export async function POST(request: NextRequest) {
