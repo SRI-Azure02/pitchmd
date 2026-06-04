@@ -11,7 +11,7 @@ import PerformancePanel from './performance-panel';
 import CallJournal from './call-journal';
 import LoopBack from './loop-back';
 import EngagementPlaybook from './engagement-playbook';
-import { Send, RotateCcw, Square, Volume2, VolumeX, Video, VideoOff, MessageSquare, Search, ChevronDown, X, Check, BarChart2, ArrowUp, ArrowDown, ArrowUpDown, Hash, Mic, BookOpen, NotebookPen, Map, Camera, Monitor, Sparkles, Database, ShieldAlert } from 'lucide-react';
+import { Send, RotateCcw, Square, Volume2, VolumeX, Video, VideoOff, MessageSquare, Search, ChevronDown, X, Check, BarChart2, ArrowUp, ArrowDown, ArrowUpDown, Hash, Mic, BookOpen, NotebookPen, Map, Camera, Monitor, Sparkles, Database, ShieldAlert, Languages } from 'lucide-react';
 import { parseEmotion, speakText, stopCurrentAudio } from '@/lib/elevenlabs';
 import { buildCorrector, type Corrector } from '@/lib/product-name-corrector';
 import { getMindsetDescription } from '@/lib/mindset-descriptions';
@@ -98,6 +98,12 @@ const ROADMAP_ITEMS = [
     icon: <Database className="w-5 h-5" />,
     title: 'Cross-Session Mindset Persistence',
     description: 'Assigned HCP mindsets persist across training sessions so the physician persona remembers your history and adapts over time.',
+    status: 'Planned',
+  },
+  {
+    icon: <Languages className="w-5 h-5" />,
+    title: 'Vocabulary Enhancement',
+    description: 'Upgrade to Whisper-based speech recognition with product vocabulary priming, eliminating transcription errors for brand names like Venclexta, Brukinsa, and Imbruvica.',
     status: 'Planned',
   },
 ];

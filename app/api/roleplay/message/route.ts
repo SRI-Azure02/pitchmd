@@ -9,6 +9,7 @@ import {
   type ComplianceRule,
   type ComplianceViolation,
 } from '@/lib/compliance-filter';
+import { retrieveRelevantChunks, buildRagSystemBlock } from '@/lib/rag-retrieval';
 
 const FLUSH_PAD = ' '.repeat(1024);
 
@@ -130,7 +131,7 @@ export async function POST(request: NextRequest) {
 
         const anthropic = new Anthropic({ apiKey });
         const sf = getSnowflakeClient();
-        const systemPrompt = buildSystemPrompt(physician, username, mindsetDescription);
+        const baseSystemPrompt = buildSystemPrompt(physician, username, mindsetDescription);
 
         // ── Phase 3: Input Firewall ────────────────────────────────────────────
         // Check the rep's message BEFORE calling Claude.
@@ -204,6 +205,25 @@ export async function POST(request: NextRequest) {
             overallStatus: 'clean',
           }).catch(err => console.error('[compliance] rep log error:', err?.message));
         }
+
+        // ── Phase 4: RAG context retrieval ───────────────────────────────────
+        // Retrieve the most relevant approved document chunks for this turn
+        // and inject them into the system prompt (strict RAG mode).
+        let ragSystemBlock = '';
+        try {
+          const ragChunks = await retrieveRelevantChunks(repText || 'CLL treatment venetoclax', sf);
+          ragSystemBlock = buildRagSystemBlock(ragChunks);
+          if (ragChunks.length > 0) {
+            console.log(`[rag] ${ragChunks.length} chunks retrieved (top similarity: ${ragChunks[0]?.similarity?.toFixed(3) ?? 'n/a'})`);
+          }
+        } catch (ragErr: any) {
+          console.error('[rag] retrieval error (fail open):', ragErr?.message);
+        }
+
+        // Final system prompt = base + RAG context (if any documents ingested)
+        const systemPrompt = ragSystemBlock
+          ? baseSystemPrompt + ragSystemBlock
+          : baseSystemPrompt;
 
         // Map to Anthropic format.
         const anthropicMessages = messages
