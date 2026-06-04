@@ -193,6 +193,12 @@ export async function POST(request: NextRequest) {
           console.error('[compliance:input] filter error (fail open):', inputFilterErr?.message);
         }
 
+        // ── Phase 6: upsert escalation pattern for blocked rep inputs ────────
+        if (inputCheck.status === 'blocked' && inputCheck.primaryViolation) {
+          sf.upsertCompliancePattern(session.userId, inputCheck.primaryViolation.rule_code)
+            .catch(e => console.error('[escalation] upsert error:', e?.message));
+        }
+
         // Log clean rep turn only if not already logged above
         if (sessionId && repText && !repTurnLogged) {
           sf.logComplianceTurn({
@@ -276,6 +282,8 @@ export async function POST(request: NextRequest) {
               output = /^\[EMOTION:/i.test(redirect) ? redirect : `[EMOTION:neutral] ${redirect}`;
               complianceStatus = 'blocked';
               console.log(`[compliance] BLOCKED by ${filterResult.primaryViolation.rule_code}`);
+              sf.upsertCompliancePattern(session.userId, filterResult.primaryViolation.rule_code)
+                .catch(e => console.error('[escalation] upsert error:', e?.message));
 
             } else if (filterResult.status === 'rewrite_needed') {
               // ── REWRITE: re-generate with balance injection (up to 2 attempts)

@@ -1,7 +1,18 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Shield, ChevronDown, ChevronUp, Check, Clock, AlertTriangle, Search, X, Upload, FileText, Database } from 'lucide-react';
+import { Shield, ChevronDown, ChevronUp, Check, Clock, AlertTriangle, Search, X, Upload, FileText, Database, Bell } from 'lucide-react';
+
+interface EscalationAlert {
+  PATTERN_ID: string;
+  APP_USER_ID: string;
+  RULE_CODE: string;
+  OCCURRENCE_COUNT: number;
+  FIRST_SEEN: string;
+  LAST_SEEN: string;
+  ESCALATED_TO: string | null;
+  ESCALATED_AT: string | null;
+}
 
 interface ComplianceDocument {
   DOC_ID: string;
@@ -40,7 +51,42 @@ interface ComplianceTurn {
 }
 
 export default function ComplianceDashboard({ onBack }: { onBack: () => void }) {
-  const [activeTab, setActiveTab] = useState<'sessions' | 'documents'>('sessions');
+  const [activeTab, setActiveTab] = useState<'sessions' | 'escalations' | 'documents'>('sessions');
+
+  // ── Escalation state ────────────────────────────────────────────────────
+  const [escalations, setEscalations] = useState<EscalationAlert[]>([]);
+  const [escalationsLoading, setEscalationsLoading] = useState(false);
+  const [acknowledging, setAcknowledging] = useState<string | null>(null);
+
+  const loadEscalations = useCallback(async () => {
+    setEscalationsLoading(true);
+    try {
+      const res = await fetch('/api/compliance/escalations');
+      if (!res.ok) return;
+      const data = await res.json();
+      setEscalations(data.alerts ?? []);
+    } catch { /* silently fail */ } finally { setEscalationsLoading(false); }
+  }, []);
+
+  const acknowledgeEscalation = async (patternId: string) => {
+    setAcknowledging(patternId);
+    try {
+      await fetch('/api/compliance/escalations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ patternId }),
+      });
+      setEscalations(prev => prev.map(e =>
+        e.PATTERN_ID === patternId ? { ...e, ESCALATED_AT: new Date().toISOString() } : e
+      ));
+    } catch { /* silently fail */ } finally { setAcknowledging(null); }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'escalations') loadEscalations();
+  }, [activeTab, loadEscalations]);
+
+  const pendingEscalations = escalations.filter(e => !e.ESCALATED_AT).length;
 
   // ── Session audit state ─────────────────────────────────────────────────
   const [sessions, setSessions] = useState<ComplianceSession[]>([]);
@@ -184,7 +230,7 @@ export default function ComplianceDashboard({ onBack }: { onBack: () => void }) 
 
       {/* Tab bar */}
       <div className="flex shrink-0 border-b border-slate-100 px-6">
-        {([['sessions', 'Session Audit', Shield], ['documents', 'Documents', Database]] as const).map(([key, label, Icon]) => (
+        {([['sessions', 'Session Audit', Shield], ['escalations', 'Escalations', Bell], ['documents', 'Documents', Database]] as const).map(([key, label, Icon]) => (
           <button
             key={key}
             onClick={() => setActiveTab(key)}
@@ -196,9 +242,59 @@ export default function ComplianceDashboard({ onBack }: { onBack: () => void }) 
           >
             <Icon className="w-3.5 h-3.5" />
             {label}
+            {key === 'escalations' && pendingEscalations > 0 && (
+              <span className="ml-1 text-[10px] font-semibold bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center">{pendingEscalations}</span>
+            )}
           </button>
         ))}
       </div>
+
+      {/* ── Escalations tab ───────────────────────────────────────────────── */}
+      {activeTab === 'escalations' && (
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          <p className="text-xs text-slate-400 mb-4">
+            Reps with 3+ violations of the same rule type within 7 days. Threshold: <strong>3 / 7 days</strong>.
+          </p>
+          {escalationsLoading && <p className="text-sm text-slate-400">Loading…</p>}
+          {!escalationsLoading && escalations.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+              <Bell className="w-8 h-8 mb-2 opacity-30" />
+              <p className="text-sm">No escalations — all reps within threshold</p>
+            </div>
+          )}
+          <div className="space-y-3">
+            {escalations.map(e => {
+              const isPending = !e.ESCALATED_AT;
+              return (
+                <div key={e.PATTERN_ID} className={`rounded-xl border px-4 py-3 ${isPending ? 'border-red-200 bg-red-50' : 'border-slate-100 bg-white'}`}>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        {isPending && <span className="text-[10px] font-bold uppercase tracking-wider text-red-600 bg-red-100 px-1.5 py-0.5 rounded-full">Action Required</span>}
+                        {!isPending && <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">Acknowledged</span>}
+                        <span className="text-xs font-mono text-slate-500">{e.RULE_CODE}</span>
+                      </div>
+                      <p className="text-sm font-semibold text-slate-800">{e.APP_USER_ID}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        <span className="font-medium text-red-600">{e.OCCURRENCE_COUNT} violations</span> · first {new Date(e.FIRST_SEEN).toLocaleDateString()} · last {new Date(e.LAST_SEEN).toLocaleDateString()}
+                      </p>
+                    </div>
+                    {isPending && (
+                      <button
+                        onClick={() => acknowledgeEscalation(e.PATTERN_ID)}
+                        disabled={acknowledging === e.PATTERN_ID}
+                        className="px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-50 transition-colors shrink-0"
+                      >
+                        {acknowledging === e.PATTERN_ID ? 'Saving…' : 'Acknowledge'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── Documents tab ──────────────────────────────────────────────────── */}
       {activeTab === 'documents' && (

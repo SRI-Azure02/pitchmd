@@ -1254,6 +1254,81 @@ export class SnowflakeClient {
     `, {});
   }
 
+  // ─── Phase 6: Escalation + Completion Methods ─────────────────────────────
+
+  /**
+   * Upsert a violation pattern.
+   * Increments occurrence count if the same (user, rule_code) pair already
+   * exists within the rolling 7-day window; otherwise inserts a new record.
+   */
+  async upsertCompliancePattern(appUserId: string, ruleCode: string): Promise<void> {
+    await this.executeQuery(`
+      MERGE INTO CORTEX_TESTING.PUBLIC.SYNTHETIC_COMPLIANCE_PATTERNS AS t
+      USING (SELECT :1 AS APP_USER_ID, :2 AS RULE_CODE) AS s
+        ON  t.APP_USER_ID = s.APP_USER_ID
+        AND t.RULE_CODE   = s.RULE_CODE
+        AND DATEDIFF('day', t.FIRST_SEEN, CURRENT_TIMESTAMP()) <= 7
+      WHEN MATCHED THEN
+        UPDATE SET OCCURRENCE_COUNT = t.OCCURRENCE_COUNT + 1,
+                   LAST_SEEN        = CURRENT_TIMESTAMP()
+      WHEN NOT MATCHED THEN
+        INSERT (APP_USER_ID, RULE_CODE, OCCURRENCE_COUNT, FIRST_SEEN, LAST_SEEN)
+        VALUES (s.APP_USER_ID, s.RULE_CODE, 1, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP())
+    `, {
+      '1': { type: 'TEXT', value: appUserId },
+      '2': { type: 'TEXT', value: ruleCode },
+    });
+  }
+
+  /**
+   * Return all patterns that have hit the escalation threshold
+   * (>= 3 occurrences in the last 7 days).
+   * Includes both un-escalated (pending) and already-escalated rows.
+   */
+  async getEscalationAlerts(): Promise<any[]> {
+    return await this.executeQuery(`
+      SELECT PATTERN_ID, APP_USER_ID, RULE_CODE, OCCURRENCE_COUNT,
+             FIRST_SEEN, LAST_SEEN, ESCALATED_TO, ESCALATED_AT
+      FROM CORTEX_TESTING.PUBLIC.SYNTHETIC_COMPLIANCE_PATTERNS
+      WHERE OCCURRENCE_COUNT >= 3
+        AND DATEDIFF('day', FIRST_SEEN, CURRENT_TIMESTAMP()) <= 7
+      ORDER BY LAST_SEEN DESC
+      LIMIT 50
+    `, {});
+  }
+
+  /** Mark a pattern as acknowledged/escalated in the compliance dashboard. */
+  async acknowledgeEscalation(patternId: string): Promise<void> {
+    await this.executeQuery(`
+      UPDATE CORTEX_TESTING.PUBLIC.SYNTHETIC_COMPLIANCE_PATTERNS
+      SET ESCALATED_TO = 'compliance_dashboard',
+          ESCALATED_AT = CURRENT_TIMESTAMP()
+      WHERE PATTERN_ID = :1
+    `, { '1': { type: 'TEXT', value: patternId } });
+  }
+
+  /**
+   * Log a training session completion acknowledgment.
+   * Table name: SYNTHETIC_TRAINING_COMPLETION (no trailing S).
+   */
+  async logTrainingCompletion(params: {
+    sessionId: string;
+    appUserId: string;
+    physicianId: string | null;
+    acknowledgedBy: string;
+  }): Promise<void> {
+    await this.executeQuery(`
+      INSERT INTO CORTEX_TESTING.PUBLIC.SYNTHETIC_TRAINING_COMPLETION
+        (SESSION_ID, APP_USER_ID, PHYSICIAN_ID, ACKNOWLEDGED_BY)
+      VALUES (:1, :2, :3, :4)
+    `, {
+      '1': { type: 'TEXT', value: params.sessionId },
+      '2': { type: 'TEXT', value: params.appUserId },
+      '3': { type: 'TEXT', value: params.physicianId ?? '' },
+      '4': { type: 'TEXT', value: params.acknowledgedBy },
+    });
+  }
+
   /** All distinct brand names from SYNTHETIC_RX — used to seed the STT product-name corrector. */
   async getAllBrands(): Promise<string[]> {
     const rows = await this.executeQuery(

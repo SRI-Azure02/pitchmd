@@ -11,12 +11,13 @@
  *  - Detect section labels (numbered headings) for metadata
  */
 
-// pdf-parse is a CommonJS module; use require to avoid ESM/CJS mismatch
+// unpdf is designed for Node.js serverless (no DOM dependency)
 async function parsePdf(buffer: Buffer): Promise<string> {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const pdfParse = require('pdf-parse') as (buf: Buffer) => Promise<{ text: string }>;
-  const result = await pdfParse(buffer);
-  return result.text ?? '';
+  const { getDocumentProxy, extractText } = await import('unpdf');
+  const uint8 = new Uint8Array(buffer);
+  const doc   = await getDocumentProxy(uint8);
+  const { text } = await extractText(doc, { mergePages: true });
+  return text ?? '';
 }
 
 export interface DocumentChunk {

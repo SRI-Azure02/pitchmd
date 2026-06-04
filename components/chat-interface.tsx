@@ -11,7 +11,7 @@ import PerformancePanel from './performance-panel';
 import CallJournal from './call-journal';
 import LoopBack from './loop-back';
 import EngagementPlaybook from './engagement-playbook';
-import { Send, RotateCcw, Square, Volume2, VolumeX, Video, VideoOff, MessageSquare, Search, ChevronDown, X, Check, BarChart2, ArrowUp, ArrowDown, ArrowUpDown, Hash, Mic, BookOpen, NotebookPen, Map, Camera, Monitor, Sparkles, Database, ShieldAlert, Languages } from 'lucide-react';
+import { Send, RotateCcw, Square, Volume2, VolumeX, Video, VideoOff, MessageSquare, Search, ChevronDown, X, Check, BarChart2, ArrowUp, ArrowDown, ArrowUpDown, Hash, Mic, BookOpen, NotebookPen, Map, Camera, Monitor, Sparkles, Database, ShieldAlert, Languages, Target, Bell } from 'lucide-react';
 import { parseEmotion, speakText, stopCurrentAudio } from '@/lib/elevenlabs';
 import { buildCorrector, type Corrector } from '@/lib/product-name-corrector';
 import { getMindsetDescription } from '@/lib/mindset-descriptions';
@@ -104,6 +104,18 @@ const ROADMAP_ITEMS = [
     icon: <Languages className="w-5 h-5" />,
     title: 'Vocabulary Enhancement',
     description: 'Upgrade to Whisper-based speech recognition with product vocabulary priming, eliminating transcription errors for brand names like Venclexta, Brukinsa, and Imbruvica.',
+    status: 'Planned',
+  },
+  {
+    icon: <Target className="w-5 h-5" />,
+    title: 'Adversarial Red-Team Testing',
+    description: 'Automated daily test suite that fires adversarial prompts at the compliance stack — off-label requests, jailbreaks, TLS minimization — and fails the build if any bypass.',
+    status: 'Planned',
+  },
+  {
+    icon: <Bell className="w-5 h-5" />,
+    title: 'Label Update Monitoring',
+    description: 'Detects when a product Prescribing Information is revised and automatically flags affected training content for MLR re-review before the next session.',
     status: 'Planned',
   },
 ];
@@ -289,6 +301,9 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   // ── Roadmap state ─────────────────────────────────────────────────────────
   const [roadmapOpen, setRoadmapOpen] = useState(false);
   const roadmapRef = useRef<HTMLDivElement>(null);
+
+  // ── Training completion state ─────────────────────────────────────────────
+  const [completionLogged, setCompletionLogged] = useState(false);
 
   // ── HCP Mindset state ─────────────────────────────────────────────────────
   // physicianMindsets: session-scoped assignment per physician
@@ -2273,6 +2288,35 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
           )}
         </form>
       </div>
+
+      {/* Complete Session banner — shown after session ends */}
+      {sessionEnded && !completionLogged && sessionIdRef.current && (
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 bg-white border border-emerald-200 rounded-2xl px-5 py-3 shadow-lg">
+          <Check className="w-4 h-4 text-emerald-500 shrink-0" />
+          <span className="text-sm text-slate-700">Session ended. Acknowledge completion for training records?</span>
+          <button
+            onClick={async () => {
+              try {
+                await fetch('/api/sessions/complete', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ sessionId: sessionIdRef.current, physicianId: physicianIdRef.current }),
+                });
+                setCompletionLogged(true);
+              } catch { /* silently fail */ }
+            }}
+            className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition-colors shrink-0"
+          >
+            Acknowledge &amp; Complete
+          </button>
+          <button onClick={() => setCompletionLogged(true)} className="text-slate-400 hover:text-slate-600 text-xs">Dismiss</button>
+        </div>
+      )}
+      {sessionEnded && completionLogged && (
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-2 shadow text-sm text-emerald-700">
+          <Check className="w-3.5 h-3.5" /> Training completion recorded
+        </div>
+      )}
 
       <EvaluationPanel
         open={evalOpen}
