@@ -11,10 +11,10 @@
  *  - Detect section labels (numbered headings) for metadata
  */
 
-// pdf-parse is a CommonJS module; dynamic import for ESM compatibility
+// pdf-parse is a CommonJS module; use require to avoid ESM/CJS mismatch
 async function parsePdf(buffer: Buffer): Promise<string> {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const pdfParse = (await import('pdf-parse')).default;
+  const pdfParse = require('pdf-parse') as (buf: Buffer) => Promise<{ text: string }>;
   const result = await pdfParse(buffer);
   return result.text ?? '';
 }
