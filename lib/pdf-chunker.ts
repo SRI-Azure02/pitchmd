@@ -4,11 +4,9 @@
  * Extracts text from a PDF buffer and splits it into overlapping chunks
  * suitable for vector embedding and RAG retrieval.
  *
- * Strategy:
- *  - Parse PDF → extract full text
- *  - Split on natural paragraph/section boundaries
- *  - Target ~500 words per chunk, 80-word overlap between consecutive chunks
- *  - Detect section labels (numbered headings) for metadata
+ * Strategy: sliding word-window (not paragraph-based).
+ * PDFs extracted via unpdf often lack paragraph separators, so we split
+ * purely by word count with a fixed overlap window.
  */
 
 // unpdf is designed for Node.js serverless (no DOM dependency)
@@ -21,96 +19,58 @@ async function parsePdf(buffer: Buffer): Promise<string> {
 }
 
 export interface DocumentChunk {
-  chunkText: string;
-  chunkIndex: number;
-  /** Rough page estimate (actual page numbers not reliably extracted) */
-  pageNumber: number | null;
-  /** Section heading detected above this chunk, if any */
+  chunkText:    string;
+  chunkIndex:   number;
+  pageNumber:   number | null;
   sectionLabel: string | null;
 }
 
-const TARGET_WORDS   = 500;
-const OVERLAP_WORDS  = 80;
+const TARGET_WORDS   = 400;   // words per chunk
+const OVERLAP_WORDS  = 60;    // words carried over between chunks
+const WORDS_PER_PAGE = 350;   // rough estimate for page number calculation
+const MIN_CHUNK_WORDS = 30;   // discard tail chunks smaller than this
 
-/** Simple section heading patterns (numbered sections, all-caps headings) */
-const SECTION_RE = /^(?:\d+[\.\s]+[A-Z][^a-z]{5,}|[A-Z][A-Z\s]{8,}:?\s*$)/m;
-
-function wordCount(text: string): number {
-  return text.split(/\s+/).filter(Boolean).length;
-}
-
-function detectSection(paragraph: string): string | null {
-  const m = paragraph.match(SECTION_RE);
-  return m ? m[0].trim().slice(0, 200) : null;
+/** Detect a section label from the first 200 chars of a chunk. */
+function detectSection(text: string): string | null {
+  const head = text.slice(0, 300);
+  // Numbered section headers: "1 INDICATIONS AND USAGE", "5.3 Cytopenias"
+  const numbered = head.match(/^\s*(\d+(?:\.\d+)?)\s+([A-Z][A-Z\s,()/-]{4,60})/m);
+  if (numbered) return numbered[0].trim().slice(0, 200);
+  // ALL-CAPS headings
+  const allCaps = head.match(/^[A-Z][A-Z\s]{8,60}[A-Z](\s*[-–]\s*[A-Z][A-Z\s]{4,40})?/m);
+  if (allCaps) return allCaps[0].trim().slice(0, 200);
+  return null;
 }
 
 /**
- * Splits plain text into overlapping chunks.
- * Paragraph boundaries are preferred split points.
+ * Split plain text into overlapping fixed-size word windows.
+ * This approach is robust to PDFs that lack paragraph separators.
  */
-function chunkText(text: string): DocumentChunk[] {
-  // Normalise whitespace and split into paragraphs
-  const paragraphs = text
-    .replace(/\r\n/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .split(/\n\n+/)
-    .map(p => p.trim())
-    .filter(p => p.length > 20); // discard very short fragments
+function chunkBySlidingWindow(text: string): DocumentChunk[] {
+  // Normalise whitespace (collapse runs of spaces/newlines to single space)
+  const words = text.replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+  if (words.length === 0) return [];
 
   const chunks: DocumentChunk[] = [];
-  let currentWords: string[] = [];
-  let currentSection: string | null = null;
-  let chunkIndex = 0;
+  const step   = TARGET_WORDS - OVERLAP_WORDS; // advance per chunk
+  let   start  = 0;
 
-  for (const para of paragraphs) {
-    // Track section labels
-    const section = detectSection(para);
-    if (section) currentSection = section;
+  while (start < words.length) {
+    const end        = Math.min(start + TARGET_WORDS, words.length);
+    const chunkWords = words.slice(start, end);
 
-    const paraWords = para.split(/\s+/).filter(Boolean);
-
-    // If adding this paragraph exceeds target, flush current chunk first
-    if (currentWords.length > 0 && currentWords.length + paraWords.length > TARGET_WORDS) {
+    if (chunkWords.length >= MIN_CHUNK_WORDS) {
+      const chunkText = chunkWords.join(' ');
       chunks.push({
-        chunkText:    currentWords.join(' '),
-        chunkIndex:   chunkIndex++,
-        pageNumber:   null, // estimated below
-        sectionLabel: currentSection,
+        chunkText,
+        chunkIndex:   chunks.length,
+        pageNumber:   Math.floor(start / WORDS_PER_PAGE) + 1,
+        sectionLabel: detectSection(chunkText),
       });
-      // Keep trailing overlap words for context continuity
-      currentWords = currentWords.slice(-OVERLAP_WORDS);
     }
 
-    currentWords.push(...paraWords);
-
-    // Flush very large single paragraphs immediately
-    if (currentWords.length >= TARGET_WORDS * 1.5) {
-      chunks.push({
-        chunkText:    currentWords.join(' '),
-        chunkIndex:   chunkIndex++,
-        pageNumber:   null,
-        sectionLabel: currentSection,
-      });
-      currentWords = currentWords.slice(-OVERLAP_WORDS);
-    }
-  }
-
-  // Flush remainder
-  if (wordCount(currentWords.join(' ')) > 30) {
-    chunks.push({
-      chunkText:    currentWords.join(' '),
-      chunkIndex:   chunkIndex++,
-      pageNumber:   null,
-      sectionLabel: currentSection,
-    });
-  }
-
-  // Assign rough page estimates (assume ~400 words per page)
-  const WORDS_PER_PAGE = 400;
-  let wordsSoFar = 0;
-  for (const chunk of chunks) {
-    chunk.pageNumber = Math.floor(wordsSoFar / WORDS_PER_PAGE) + 1;
-    wordsSoFar += wordCount(chunk.chunkText);
+    if (end >= words.length) break;
+    start += step;
   }
 
   return chunks;
@@ -122,7 +82,15 @@ function chunkText(text: string): DocumentChunk[] {
 export async function pdfToChunks(buffer: Buffer): Promise<DocumentChunk[]> {
   const text = await parsePdf(buffer);
   if (!text || text.trim().length < 100) {
-    throw new Error('PDF text extraction returned no usable content. The file may be image-based or encrypted.');
+    throw new Error(
+      'PDF text extraction returned no usable content. ' +
+      'The file may be image-based or password-protected.',
+    );
   }
-  return chunkText(text);
+  const chunks = chunkBySlidingWindow(text);
+  console.log(
+    `[pdf-chunker] ${chunks.length} chunks from ${text.length} chars / ` +
+    `~${Math.round(text.split(/\s+/).length)} words`,
+  );
+  return chunks;
 }
