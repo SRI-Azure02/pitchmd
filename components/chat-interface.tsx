@@ -16,6 +16,9 @@ import { parseEmotion, speakText, stopCurrentAudio } from '@/lib/elevenlabs';
 import { buildCorrector, type Corrector } from '@/lib/product-name-corrector';
 import { getMindsetDescription } from '@/lib/mindset-descriptions';
 import { PRESET_MINDSETS, MINDSET_DIMENSIONS, type MindsetDimension, type CustomMindset, type PresetMindset } from '@/lib/mindset-types';
+import { useAvatarProvider } from '@/lib/hooks/use-avatar-provider';
+import { AvatarProvider } from '@/lib/avatar/types';
+import type { AnamController } from '@/lib/avatar/anam-controller';
 
 interface Message {
   id: string;
@@ -327,8 +330,16 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   // it can't get stuck when the user clicks through to a session while hovering.
   const [hoveredBtnKey, setHoveredBtnKey] = useState<string | null>(null);
 
+  // ── Avatar provider (Tavus | Anam) ──────────────────────────────────────────
+  // Persisted to localStorage; affects NEW sessions only.
+  const { avatarProvider, setAvatarProvider } = useAvatarProvider();
+  const avatarProviderRef = useRef<AvatarProvider>(avatarProvider);
+
   // ── Tavus avatar state ─────────────────────────────────────────────────────
   const [tavusConvId, setTavusConvId] = useState<string | null>(null);
+  // True once EITHER provider's avatar video is rendering — drives the video
+  // frame opacity and the echo-dispatch gate (provider-agnostic).
+  const [avatarStreamActive, setAvatarStreamActive] = useState(false);
   const [avatarConnecting, setAvatarConnecting] = useState(false);
   // True while the avatar is speaking — used to mute AudioInput so the Web
   // Speech API doesn't hear the avatar's own audio output and auto-submit it.
@@ -374,6 +385,10 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   const avatarSpeakingRef = useRef(false);
   const avatarEnabledRef = useRef(false);
   const tavusConvIdRef = useRef<string | null>(null);
+  // ── Anam refs ───────────────────────────────────────────────────────────────
+  const anamControllerRef = useRef<AnamController | null>(null);
+  // True while any provider's avatar stream is live (sync mirror of state).
+  const avatarStreamActiveRef = useRef(false);
   const utteranceDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Fallback timer for clearing avatarSpeaking if replica.stopped_speaking never fires
   const avatarSpeakFallbackRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -392,6 +407,8 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   useEffect(() => { voiceEnabledRef.current = voiceEnabled; }, [voiceEnabled]);
   useEffect(() => { avatarEnabledRef.current = avatarEnabled; }, [avatarEnabled]);
   useEffect(() => { tavusConvIdRef.current = tavusConvId; }, [tavusConvId]);
+  useEffect(() => { avatarProviderRef.current = avatarProvider; }, [avatarProvider]);
+  useEffect(() => { avatarStreamActiveRef.current = avatarStreamActive; }, [avatarStreamActive]);
   useEffect(() => { loadingRef.current = loading; }, [loading]);
 
   // Fetch brand names once on mount and build the STT product-name corrector.
@@ -409,7 +426,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
       .catch((err) => console.warn('[corrector] failed to load brands:', err));
   }, []);
 
-  // Cleanup Daily call on unmount
+  // Cleanup avatar streams (Tavus Daily call + Anam client) on unmount
   useEffect(() => {
     return () => {
       if (dailyCallRef.current) {
@@ -419,6 +436,10 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
       if (avatarAudioRef.current) {
         avatarAudioRef.current.pause();
         avatarAudioRef.current.srcObject = null;
+      }
+      if (anamControllerRef.current) {
+        anamControllerRef.current.cleanup().catch(() => {});
+        anamControllerRef.current = null;
       }
       if (utteranceDebounceRef.current) clearTimeout(utteranceDebounceRef.current);
     };
@@ -800,11 +821,12 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                   },
                 ]);
 
-                // Speak the physician response — via Tavus avatar or ElevenLabs TTS.
+                // Speak the physician response — via the active avatar provider
+                // (Tavus or Anam, both in echo mode) or fall back to ElevenLabs TTS.
                 if (roleplayingRef.current) {
-                  if (avatarEnabledRef.current && dailyCallRef.current && tavusConvIdRef.current) {
-                    // Avatar mode: echo text to Tavus replica
-                    speakViaTavus(emotionStripped);
+                  if (avatarEnabledRef.current && avatarStreamActiveRef.current) {
+                    // Avatar mode: echo text to the active provider
+                    speakViaAvatar(emotionStripped);
                   } else if (voiceEnabledRef.current) {
                     // Audio-only mode: ElevenLabs if available, otherwise browser TTS.
                     // Mute AudioInput for the duration so the Web Speech API doesn't
@@ -907,11 +929,11 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     setSessionStarted(true);
     hasStarted.current = true;
 
-    // If avatar is enabled, try to connect Tavus first.
+    // If avatar is enabled, try to connect the active provider (Tavus or Anam).
     // On failure (e.g. quota exhausted, network error) the avatar is disabled
-    // automatically inside initTavusAvatar and we continue in text-only mode.
+    // automatically inside the provider init and we continue in text-only mode.
     if (avatarEnabledRef.current) {
-      await initTavusAvatar(physician);
+      await initAvatar(physician);
     }
 
     // Kick off roleplay with a silent internal seed message.
@@ -932,7 +954,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
 
   const handleNewSession = () => {
     stopCurrentAudio();
-    cleanupTavus();
+    cleanupAvatar();
 
     sessionEndedRef.current = false;
     autoEndedRef.current = false;
@@ -990,7 +1012,37 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     }
     setTavusConvId(null);
     tavusConvIdRef.current = null;
+    setAvatarStreamActive(false);
+    avatarStreamActiveRef.current = false;
     setAvatarConnecting(false);
+  };
+
+  // ── Anam avatar helpers ─────────────────────────────────────────────────────
+
+  const cleanupAnam = async () => {
+    if (anamControllerRef.current) {
+      try { await anamControllerRef.current.cleanup(); } catch {}
+      anamControllerRef.current = null;
+    }
+    if (avatarVideoRef.current) {
+      avatarVideoRef.current.srcObject = null;
+    }
+    avatarSpeakingRef.current = false;
+    setAvatarSpeaking(false);
+    if (avatarSpeakFallbackRef.current) {
+      clearTimeout(avatarSpeakFallbackRef.current);
+      avatarSpeakFallbackRef.current = null;
+    }
+    setAvatarStreamActive(false);
+    avatarStreamActiveRef.current = false;
+    setAvatarConnecting(false);
+  };
+
+  // Provider-agnostic teardown — safe to call regardless of which (if any)
+  // provider is connected; each helper no-ops when there's nothing to clean.
+  const cleanupAvatar = async () => {
+    await cleanupTavus();
+    await cleanupAnam();
   };
 
   // Clears the avatar-speaking lock, opens the mic, and discards any phantom
@@ -1003,7 +1055,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     avatarSpeakingRef.current = false;
     setAvatarSpeaking(false); // re-enable AudioInput for user's turn
     setInputValue('');        // discard any phantom text captured while avatar spoke
-    if (sessionEndedRef.current) cleanupTavus();
+    if (sessionEndedRef.current) cleanupAvatar();
   };
 
   const speakViaTavus = (text: string) => {
@@ -1039,6 +1091,32 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
       clearAvatarSpeakingLock,
       Math.max(2000, wordCount * 200 + 1200),
     );
+  };
+
+  // Anam echo mode: client.talk() makes the persona speak the exact text using
+  // its pre-configured voice model. Anam exposes no public "talk finished"
+  // event, so the mic re-opens via a word-count estimate (a touch more generous
+  // than Tavus's, which also has the replica.stopped_speaking signal as primary).
+  // ~320 ms/word ≈ 185 WPM; +1 500 ms covers synthesis + WebRTC startup.
+  const speakViaAnam = (text: string) => {
+    const ctrl = anamControllerRef.current;
+    if (!ctrl) return;
+    avatarSpeakingRef.current = true;
+    setAvatarSpeaking(true); // mute AudioInput while avatar speaks
+    ctrl.talk(text).catch((err) => console.error('[anam] talk failed:', err));
+    const wordCount = text.split(/\s+/).length;
+    if (avatarSpeakFallbackRef.current) clearTimeout(avatarSpeakFallbackRef.current);
+    avatarSpeakFallbackRef.current = setTimeout(
+      clearAvatarSpeakingLock,
+      Math.max(2500, wordCount * 320 + 1500),
+    );
+  };
+
+  // Provider-agnostic echo: speak the given text through whichever avatar
+  // provider is active for this session.
+  const speakViaAvatar = (text: string) => {
+    if (avatarProviderRef.current === AvatarProvider.ANAM) speakViaAnam(text);
+    else speakViaTavus(text);
   };
 
   const initTavusAvatar = async (physician: any): Promise<boolean> => {
@@ -1155,6 +1233,8 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
 
       setTavusConvId(conversationId);
       tavusConvIdRef.current = conversationId;
+      setAvatarStreamActive(true);
+      avatarStreamActiveRef.current = true;
 
       // Wait until the remote video track is actually rendering (or 10 s timeout).
       // This keeps "Connecting avatar…" visible and blocks sendMessage('__begin_roleplay__')
@@ -1177,10 +1257,91 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     }
   };
 
+  const initAnamAvatar = async (physician: any): Promise<boolean> => {
+    setAvatarConnecting(true);
+    try {
+      // ── Step 1: server picks a gender-matched persona + mints a session token
+      const res = await fetch('/api/anam/session-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          physicianName: `${physician.FIRST_NAME} ${physician.LAST_NAME}`,
+          gender: physician.GENDER,
+        }),
+      });
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        const msg = (errBody as any)?.error ?? `HTTP ${res.status}`;
+        console.error('[anam] API error:', msg, (errBody as any)?.details ?? '');
+        throw new Error(msg);
+      }
+      const { sessionToken, personaId } = await res.json();
+      console.log('[anam] session token acquired — persona:', personaId);
+
+      // ── Step 2: init the Anam SDK client and stream into the shared <video>
+      const { AnamController } = await import('@/lib/avatar/anam-controller');
+      const ctrl = new AnamController();
+      anamControllerRef.current = ctrl;
+
+      // Gate session start on the avatar actually appearing (or a 12 s timeout).
+      let resolveVideoReady!: () => void;
+      const videoReadyPromise = new Promise<void>((r) => { resolveVideoReady = r; });
+      let videoReadyTimeout: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+        console.warn('[anam] video-play timeout — proceeding without confirmed video');
+        resolveVideoReady();
+      }, 12_000);
+
+      await ctrl.init({
+        sessionToken,
+        videoElementId: 'avatar-video',
+        onVideoReady: () => {
+          if (videoReadyTimeout !== null) { clearTimeout(videoReadyTimeout); videoReadyTimeout = null; }
+          resolveVideoReady();
+        },
+        onConnectionClosed: (reason) => {
+          console.warn('[anam] connection closed:', reason);
+        },
+      });
+
+      await videoReadyPromise;
+
+      // Ensure the Tavus opacity gate is off; flip on the generic stream flag.
+      setTavusConvId(null);
+      tavusConvIdRef.current = null;
+      setAvatarStreamActive(true);
+      avatarStreamActiveRef.current = true;
+      setAvatarConnecting(false);
+      return true;
+    } catch (err) {
+      console.error('[anam] init failed:', err);
+      await cleanupAnam();
+      setAvatarConnecting(false);
+      setAvatarEnabled(false);
+      avatarEnabledRef.current = false;
+      // Avatar unavailable — fall back to audio-only mode automatically.
+      setVoiceEnabled(true);
+      voiceEnabledRef.current = true;
+      return false;
+    }
+  };
+
+  // Provider-agnostic init — dispatches to the active provider's SDK setup.
+  const initAvatar = async (physician: any): Promise<boolean> => {
+    return avatarProviderRef.current === AvatarProvider.ANAM
+      ? initAnamAvatar(physician)
+      : initTavusAvatar(physician);
+  };
+
+  // True when the active provider currently has a live avatar connection.
+  const isAvatarConnected = (): boolean =>
+    avatarProviderRef.current === AvatarProvider.ANAM
+      ? anamControllerRef.current !== null
+      : dailyCallRef.current !== null;
+
   // ── Back to physician list (no eval triggered) ────────────────────────────
   const handleBackToPhysicianList = () => {
     stopCurrentAudio();
-    cleanupTavus();
+    cleanupAvatar();
     setHoveredBtnKey(null); // reset any stuck hover style on action buttons
 
     // Prevent timer and any in-flight message from triggering eval
@@ -1343,9 +1504,34 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
               <p className="text-lg font-semibold text-slate-900">Select a Physician</p>
               <p className="text-sm text-slate-400">Choose who you'd like to practice with today</p>
             </div>
-            <button onClick={() => setPhysicianSelectionMode(false)} className="text-sm text-slate-400 hover:text-slate-700 px-3 py-1 rounded-full hover:bg-slate-100 transition-colors">
-              Back
-            </button>
+            <div className="flex items-center gap-3">
+              {/* Avatar provider toggle — applies to the next session you start */}
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-medium text-slate-400 flex items-center gap-1">
+                  <Video className="w-3.5 h-3.5" />
+                  Avatar
+                </span>
+                <div className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 p-0.5">
+                  {([AvatarProvider.TAVUS, AvatarProvider.ANAM] as const).map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => setAvatarProvider(p)}
+                      className={`px-3 py-1 rounded-full text-xs font-semibold capitalize transition-colors ${
+                        avatarProvider === p
+                          ? 'bg-white text-blue-600 shadow-sm'
+                          : 'text-slate-400 hover:text-slate-600'
+                      }`}
+                      title={`Use ${p === AvatarProvider.TAVUS ? 'Tavus' : 'Anam'} avatars for new sessions`}
+                    >
+                      {p === AvatarProvider.TAVUS ? 'Tavus' : 'Anam'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <button onClick={() => setPhysicianSelectionMode(false)} className="text-sm text-slate-400 hover:text-slate-700 px-3 py-1 rounded-full hover:bg-slate-100 transition-colors">
+                Back
+              </button>
+            </div>
           </div>
 
           {/* ── Filter ribbon ───────────────────────────────────────────── */}
@@ -1994,12 +2180,14 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
         <div className="relative w-full max-w-xl rounded-2xl overflow-hidden shadow-2xl"
           style={{ aspectRatio: '16/9' }}
         >
-          {/* Tavus avatar video */}
+          {/* Avatar video — shared by both providers. Tavus attaches tracks via
+              srcObject; Anam's SDK targets it by id (streamToVideoElement). */}
           <video
+            id="avatar-video"
             ref={avatarVideoRef}
             autoPlay
             playsInline
-            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${avatarEnabled && tavusConvId ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${avatarEnabled && avatarStreamActive ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
           />
 
           {/* Gradient background when no avatar */}
@@ -2151,11 +2339,11 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                 const next = !avatarEnabled;
                 setAvatarEnabled(next);
                 avatarEnabledRef.current = next;
-                if (next && sessionStarted && selectedPhysicianDataRef.current && !dailyCallRef.current) {
-                  // Connect Tavus mid-session
-                  await initTavusAvatar(selectedPhysicianDataRef.current);
+                if (next && sessionStarted && selectedPhysicianDataRef.current && !isAvatarConnected()) {
+                  // Connect the active provider mid-session
+                  await initAvatar(selectedPhysicianDataRef.current);
                 } else if (!next) {
-                  cleanupTavus();
+                  cleanupAvatar();
                 }
               }}
               className={`h-7 w-7 rounded-full hover:bg-gray-100 ${avatarEnabled ? 'text-blue-500' : 'text-gray-400'}`}
