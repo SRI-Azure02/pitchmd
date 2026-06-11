@@ -28,9 +28,14 @@ interface AudioInputProps {
 }
 
 const SEGMENT_MS    = 3000;  // MediaRecorder timeslice — collect data every 3 s
-const SUBMIT_WAIT   = 45_000; // ms of transcript silence before auto-submit
-const MIN_BLOB_SIZE = 500;   // bytes — smaller blobs are almost certainly silent
-const MIN_WORDS     = 1;     // minimum word count to accept a transcript
+const SUBMIT_WAIT   = 10_000; // ms of transcript silence before auto-submit
+const MIN_BLOB_SIZE  = 500;  // bytes — smaller blobs are almost certainly silent
+const MIN_WORDS      = 1;   // minimum word count to accept a transcript
+// Minimum peak RMS amplitude (0–127 scale) to accept a segment as speech.
+// Below this value the window is treated as silence / background noise and
+// skipped without calling the STT API.  ~8 ≈ –24 dBFS; normal speech
+// sits at –20 to –6 dBFS, typical ambient noise at –50 to –35 dBFS.
+const SPEECH_MIN_RMS = 8;
 const RING_R        = 20;
 const CIRCUMFERENCE = 2 * Math.PI * RING_R;
 
@@ -68,6 +73,12 @@ export default function AudioInput({
   const submitStartRef   = useRef<number>(0);
   const activeRef        = useRef(false);   // guards against double-start
   const mimeTypeRef      = useRef('');
+  // Amplitude tracking — Web Audio API analyser for background-noise gating
+  const audioCtxRef       = useRef<AudioContext | null>(null);
+  const analyserRef       = useRef<AnalyserNode | null>(null);
+  const dataArrayRef      = useRef<Uint8Array | null>(null);
+  const peakVolumeRef     = useRef<number>(0);
+  const volumeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     setSupported(
@@ -138,6 +149,28 @@ export default function AudioInput({
       const stream   = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
 
+      // Wire up amplitude analyser so each 3-second segment can be checked
+      // against SPEECH_MIN_RMS before sending to the STT API.
+      try {
+        const audioCtx = new AudioContext();
+        audioCtxRef.current = audioCtx;
+        const analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 256;
+        analyserRef.current = analyser;
+        dataArrayRef.current = new Uint8Array(analyser.frequencyBinCount);
+        audioCtx.createMediaStreamSource(stream).connect(analyser);
+        // Sample every 80 ms and record the peak RMS over each window.
+        volumeIntervalRef.current = setInterval(() => {
+          if (!analyserRef.current || !dataArrayRef.current) return;
+          analyserRef.current.getByteTimeDomainData(dataArrayRef.current);
+          const sum = dataArrayRef.current.reduce((acc, v) => acc + (v - 128) ** 2, 0);
+          const rms = Math.sqrt(sum / dataArrayRef.current.length);
+          if (rms > peakVolumeRef.current) peakVolumeRef.current = rms;
+        }, 80);
+      } catch {
+        // AudioContext unavailable (e.g. jsdom in tests) — proceed without gating
+      }
+
       const mime = pickMimeType();
       mimeTypeRef.current = mime;
       const options: MediaRecorderOptions = mime ? { mimeType: mime } : {};
@@ -151,6 +184,13 @@ export default function AudioInput({
           chunksRef.current.push(e.data);
           const blob = new Blob(chunksRef.current, { type: mime || 'audio/webm' });
           chunksRef.current = []; // reset for next window
+          // Amplitude gate — skip silent / background-noise windows
+          const peak = peakVolumeRef.current;
+          peakVolumeRef.current = 0; // reset for next window
+          if (peak < SPEECH_MIN_RMS) {
+            console.log(`[audio-input] quiet segment skipped (peak RMS ${peak.toFixed(1)} < ${SPEECH_MIN_RMS})`);
+            return;
+          }
           transcribeBlob(blob);
         }
       };
@@ -167,6 +207,13 @@ export default function AudioInput({
 
   const stopRecording = () => {
     clearSubmitTimer();
+    // Tear down amplitude tracker
+    if (volumeIntervalRef.current) { clearInterval(volumeIntervalRef.current); volumeIntervalRef.current = null; }
+    audioCtxRef.current?.close().catch(() => {});
+    audioCtxRef.current  = null;
+    analyserRef.current  = null;
+    dataArrayRef.current = null;
+    peakVolumeRef.current = 0;
     if (recorderRef.current && recorderRef.current.state !== 'inactive') {
       recorderRef.current.stop();
     }

@@ -277,6 +277,12 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   const [userTyping, setUserTyping] = useState(false);
   const [sessionDuration, setSessionDuration] = useState<number | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
+  // True once the physician's opening greeting has finished speaking.
+  // The session countdown only starts ticking after this point so the
+  // rep's allotted time is not eaten up by the greeting itself.
+  const [greetingDelivered, setGreetingDelivered] = useState(false);
+  const greetingDeliveredRef = useRef(false); // sync mirror for async callbacks
+  const greetingStartedRef   = useRef(false); // true once avatar first speaks
   const [ttsAvailable, setTtsAvailable] = useState(true);
   const [voiceEnabled, setVoiceEnabled] = useState(false); // muted by default; toggle to enable
   const [evalReady, setEvalReady] = useState(false); // true once REPEVAL finishes — drives persistent toast
@@ -462,7 +468,8 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
 
   // ── Countdown timer ───────────────────────────────────────────────────────
   // Pauses automatically when loading=true (waiting for agent response).
-  // Resumes when loading flips back to false.
+  // Does NOT start until greetingDelivered=true so the physician's opening
+  // statement doesn't eat into the rep's allotted time.
   useEffect(() => {
     if (
       !roleplaying ||
@@ -470,7 +477,8 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
       loading ||
       transcriptCountdownActive ||
       timeRemaining === null ||
-      timeRemaining <= 0
+      timeRemaining <= 0 ||
+      !greetingDelivered
     ) {
       return;
     }
@@ -482,7 +490,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     }, 1000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roleplaying, sessionEnded, loading, transcriptCountdownActive]);
+  }, [roleplaying, sessionEnded, loading, transcriptCountdownActive, greetingDelivered]);
 
   // ── Timer expiry → auto-end session ──────────────────────────────────────
   useEffect(() => {
@@ -498,6 +506,47 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeRemaining, sessionDuration, loading]);
+
+  // ── Greeting detection ────────────────────────────────────────────────────
+  // Watch avatarSpeaking: once it transitions true → false for the first time
+  // during a session, the physician's opening greeting is done and the session
+  // countdown starts.  greetingStartedRef prevents a false-positive when the
+  // effect first runs with avatarSpeaking=false before speaking has begun.
+  useEffect(() => {
+    if (!roleplaying || greetingDeliveredRef.current) return;
+    if (avatarSpeaking) {
+      greetingStartedRef.current = true;        // greeting is now playing
+    } else if (greetingStartedRef.current) {
+      // Avatar was speaking and just stopped — opening greeting delivered.
+      greetingDeliveredRef.current = true;
+      setGreetingDelivered(true);
+      console.log('[timer] greeting delivered — starting session countdown');
+    }
+  }, [avatarSpeaking, roleplaying]);
+
+  // Text-only mode fallback: no avatar or TTS, so greeting never "plays".
+  // Mark it delivered immediately so the timer starts when roleplaying does.
+  useEffect(() => {
+    if (!roleplaying || greetingDeliveredRef.current) return;
+    if (!avatarEnabled && !ttsAvailable) {
+      greetingDeliveredRef.current = true;
+      setGreetingDelivered(true);
+    }
+  }, [roleplaying, avatarEnabled, ttsAvailable]);
+
+  // Safety net: if the avatar never speaks within 25 s (connection failure,
+  // silent error, etc.) start the timer anyway so the rep isn't frozen.
+  useEffect(() => {
+    if (!roleplaying || greetingDeliveredRef.current) return;
+    const t = setTimeout(() => {
+      if (!greetingDeliveredRef.current) {
+        console.warn('[timer] greeting detection timed out (25 s) — starting timer');
+        greetingDeliveredRef.current = true;
+        setGreetingDelivered(true);
+      }
+    }, 25_000);
+    return () => clearTimeout(t);
+  }, [roleplaying]);
 
   // ── triggerEvaluation ─────────────────────────────────────────────────────
   // Two-phase approach:
@@ -982,6 +1031,8 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
 
     sessionEndedRef.current = false;
     autoEndedRef.current = false;
+    greetingDeliveredRef.current = false;
+    greetingStartedRef.current = false;
     hasStarted.current = false;
     roleplayingRef.current = false;
     currentVoiceRef.current = null;
@@ -1002,6 +1053,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     setRoleplaying(false);
     setSessionDuration(null);
     setTimeRemaining(null);
+    setGreetingDelivered(false);
     setLoading(false);
     setSessionStarted(false);
     setTtsAvailable(true);
@@ -1405,6 +1457,8 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     // Reset refs
     hasStarted.current = false;
     roleplayingRef.current = false;
+    greetingDeliveredRef.current = false;
+    greetingStartedRef.current = false;
     currentVoiceRef.current = null;
     physicianIdRef.current = null;
     selectedPhysicianDataRef.current = null;
@@ -1421,6 +1475,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     setRoleplaying(false);
     setSessionDuration(null);
     setTimeRemaining(null);
+    setGreetingDelivered(false);
     setLoading(false);
     setSessionStarted(false);
     setTtsAvailable(true);
@@ -2521,7 +2576,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
             <Button
               type="button" variant="ghost" size="icon"
               onClick={() => sendMessage('done', messagesRef.current)}
-              disabled={loading || sessionEnded}
+              disabled={sessionEnded}
               className="rounded-full shrink-0 text-slate-400 hover:text-red-500 hover:bg-red-50"
               title="End session"
             >
