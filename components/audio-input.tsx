@@ -76,7 +76,7 @@ export default function AudioInput({
   // Amplitude tracking — Web Audio API analyser for background-noise gating
   const audioCtxRef       = useRef<AudioContext | null>(null);
   const analyserRef       = useRef<AnalyserNode | null>(null);
-  const dataArrayRef      = useRef<Uint8Array | null>(null);
+  const dataArrayRef      = useRef<Uint8Array<ArrayBuffer> | null>(null);
   const peakVolumeRef     = useRef<number>(0);
   const volumeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -157,7 +157,7 @@ export default function AudioInput({
         const analyser = audioCtx.createAnalyser();
         analyser.fftSize = 256;
         analyserRef.current = analyser;
-        dataArrayRef.current = new Uint8Array(analyser.frequencyBinCount);
+        dataArrayRef.current = new Uint8Array(analyser.frequencyBinCount) as Uint8Array<ArrayBuffer>;
         audioCtx.createMediaStreamSource(stream).connect(analyser);
         // Sample every 80 ms and record the peak RMS over each window.
         volumeIntervalRef.current = setInterval(() => {
