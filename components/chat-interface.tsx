@@ -1407,9 +1407,16 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
       setAvatarStreamActive(true);
       avatarStreamActiveRef.current = true;
 
+      // Always interrupt the persona immediately on stream activation.
+      // The Anam SDK's skipGreeting flag is not honoured by this SDK version,
+      // so the persona plays a pre-recorded Spanish greeting on connect.
+      // interruptPersona() silences it instantly; the English physician opening
+      // line will be spoken either from pendingSpeechRef (if the LLM already
+      // responded) or directly via speakViaAvatar when the done event fires.
+      ctrl.interrupt();
+      console.log('[anam] interrupted pre-recorded greeting on stream activation');
+
       // Drain any physician speech buffered while Anam was connecting.
-      // Calling talk() immediately also interrupts whatever pre-recorded
-      // greeting the Anam avatar started playing on connect.
       if (pendingSpeechRef.current) {
         const pending = pendingSpeechRef.current;
         pendingSpeechRef.current = null;

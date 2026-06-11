@@ -80,6 +80,16 @@ export class AnamController {
     await this.client.talk(text);
   }
 
+  /**
+   * Immediately interrupt whatever the persona is currently saying.
+   * Use this to cut off the pre-recorded greeting before speaking the
+   * LLM-generated physician opening line.
+   */
+  interrupt(): void {
+    if (!this.client) return;
+    try { this.client.interruptPersona(); } catch { /* ignore if not streaming */ }
+  }
+
   isActive(): boolean {
     return this.client !== null;
   }

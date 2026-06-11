@@ -144,7 +144,11 @@ export class SnowflakeClient {
 
     console.log(`[snowflake] callRepEval initial response — code=${response.data?.code}, statementHandle=${response.data?.statementHandle}`);
 
-    if (response.data?.code === '090001') {
+    // code=090001 means the statement was submitted.  If the response also
+    // contains `data`, the proc completed synchronously within the timeout —
+    // return early.  If `data` is absent the proc is still executing and we
+    // must poll with the statementHandle (same pattern as executeQuery).
+    if (response.data?.code === '090001' && response.data?.data) {
       console.log('[snowflake] callRepEval completed synchronously');
       return;
     }
