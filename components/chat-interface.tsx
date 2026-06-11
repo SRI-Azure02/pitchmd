@@ -1513,15 +1513,25 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                   <Video className="w-3.5 h-3.5" />
                   Avatar
                 </span>
-                <div className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 p-0.5">
+                {/* Segmented control: fixed-width segments + sliding white pill */}
+                <div className="relative inline-flex items-center rounded-full bg-slate-300 p-0.5">
+                  {/* Sliding pill — translates one segment-width (w-14 = 3.5rem) on toggle */}
+                  <div
+                    className="absolute top-0.5 bottom-0.5 left-0.5 w-14 rounded-full bg-white shadow-sm"
+                    style={{
+                      transition: 'transform 200ms cubic-bezier(0.34, 1.2, 0.64, 1)',
+                      transform: avatarProvider === AvatarProvider.ANAM
+                        ? 'translateX(3.5rem)'
+                        : 'translateX(0)',
+                    }}
+                  />
+                  {/* Option labels — sit on top of the pill via z-10 */}
                   {([AvatarProvider.TAVUS, AvatarProvider.ANAM] as const).map((p) => (
                     <button
                       key={p}
                       onClick={() => setAvatarProvider(p)}
-                      className={`px-3 py-1 rounded-full text-xs font-semibold capitalize transition-colors ${
-                        avatarProvider === p
-                          ? 'bg-white text-blue-600 shadow-sm'
-                          : 'text-slate-400 hover:text-slate-600'
+                      className={`relative z-10 w-14 py-1 rounded-full text-xs font-semibold select-none transition-colors duration-150 ${
+                        avatarProvider === p ? 'text-blue-600' : 'text-slate-500 hover:text-slate-700'
                       }`}
                       title={`Use ${p === AvatarProvider.TAVUS ? 'Tavus' : 'Anam'} avatars for new sessions`}
                     >
