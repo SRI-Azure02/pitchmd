@@ -2280,15 +2280,15 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   return (
     <div className="relative flex flex-col h-full min-h-0">
 
-      {/* ── Avatar area — centered square video ─────────────────────────────── */}
-      {/* The video is constrained to a square (aspect-ratio 1:1, height-driven)
-          and centered in the dark surround. This prevents the full-bleed
-          stretching that crops the avatar's head, and gives a higher-density
-          render since the video no longer fills dead horizontal space. */}
+      {/* ── Avatar area — dark stage with centered square window ───────────── */}
+      {/* The outer div fills remaining vertical space and acts as a dark stage.
+          Inside it, an inner square div (max 520 px, aspect-ratio 1:1) contains
+          the video and all avatar UI.  This prevents the video from stretching
+          across the full screen width while keeping the dark "room" feel. */}
       <div className="flex-1 relative min-h-0 flex items-center justify-center" style={{ background: '#0f0f0f' }}>
 
-        {/* Back button — top-right */}
-        <div className="absolute top-3 right-3 z-10">
+        {/* Back button — pinned to the top-right corner of the dark stage */}
+        <div className="absolute top-3 right-3 z-40">
           <button
             onClick={handleBackToPhysicianList}
             className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white text-sm font-medium px-3 py-1.5 rounded-full transition-all backdrop-blur-sm"
@@ -2297,85 +2297,100 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
           </button>
         </div>
 
-        {/* ── Avatar video ── Tavus uses srcObject; Anam targets by id ───── */}
-        <video
-          id="avatar-video"
-          ref={avatarVideoRef}
-          autoPlay
-          playsInline
-          className={`h-full max-w-full aspect-square object-contain rounded-2xl transition-opacity duration-500 ${avatarEnabled && avatarStreamActive ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-        />
+        {/* ── Square avatar window ─────────────────────────────────────────
+            All avatar content (video, overlays, nameplate) lives inside this
+            constrained square so it never stretches wall-to-wall.
+            max-w-[520px]  → caps width at 520 px on wide screens
+            aspect-square  → height always equals width (1:1)
+            max-h-[calc(100%-1rem)] → prevents overflow on short screens;
+              browser reduces both dimensions to satisfy aspect-ratio       */}
+        <div
+          className="relative aspect-square w-full max-w-[520px] overflow-hidden rounded-2xl border border-white/5"
+          style={{ maxHeight: 'calc(100% - 1rem)' }}
+        >
 
-        {/* Gradient fill when avatar is disabled */}
-        {!avatarEnabled && (
-          <div
-            className="absolute inset-0 flex flex-col items-center justify-center select-none pointer-events-none"
-            style={{
-              background: 'linear-gradient(120deg, #C47B42, #C49868, #45A8C8, #3A8FB5, #C47B42)',
-              backgroundSize: '400% 400%',
-              animation: 'gradientShift 10s ease infinite',
-            }}
-          >
-            <VideoOff className="w-10 h-10 text-white/20 mb-2" />
-            <p className="text-white/25 text-xs tracking-widest uppercase">Avatar disabled</p>
-          </div>
-        )}
+          {/* ── Avatar video ── Tavus uses srcObject; Anam targets by id ─── */}
+          <video
+            id="avatar-video"
+            ref={avatarVideoRef}
+            autoPlay
+            playsInline
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${avatarEnabled && avatarStreamActive ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+          />
 
-        {/* Connecting overlay */}
-        {avatarConnecting && (
-          <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20">
-            <div className="bg-white/90 backdrop-blur-sm px-5 py-3 rounded-2xl flex items-center gap-3 shadow">
-              <Spinner className="w-4 h-4 text-gray-600" />
-              <span className="text-sm text-gray-700">Connecting avatar…</span>
+          {/* Gradient fill when avatar is disabled */}
+          {!avatarEnabled && (
+            <div
+              className="absolute inset-0 flex flex-col items-center justify-center select-none pointer-events-none"
+              style={{
+                background: 'linear-gradient(120deg, #C47B42, #C49868, #45A8C8, #3A8FB5, #C47B42)',
+                backgroundSize: '400% 400%',
+                animation: 'gradientShift 10s ease infinite',
+              }}
+            >
+              <VideoOff className="w-10 h-10 text-white/20 mb-2" />
+              <p className="text-white/25 text-xs tracking-widest uppercase">Avatar disabled</p>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Session start loading */}
-        {messages.length === 0 && loading && (
-          <div className="absolute inset-0 flex items-center justify-center z-10">
-            <div className="bg-white/80 backdrop-blur-sm px-5 py-3 rounded-2xl flex items-center gap-3 shadow">
-              <Spinner className="w-4 h-4 text-gray-600" />
-              <span className="text-sm text-gray-700">{statusMessage || 'Starting session...'}</span>
-            </div>
-          </div>
-        )}
-
-        {/* Physician nameplate — glass pill at bottom-center */}
-        {selectedPhysician && (
-          <div className="absolute bottom-4 left-0 right-0 flex justify-center z-10 pointer-events-none">
-            <div className="bg-black/55 backdrop-blur-md rounded-2xl px-5 py-2 text-center max-w-xs">
-              <p className="text-white font-semibold text-sm leading-tight">
-                {selectedPhysician.name}
-              </p>
-              {(selectedPhysician.specialty || selectedPhysician.segment) && (
-                <p className="text-white/55 text-xs mt-0.5">
-                  {[selectedPhysician.specialty, selectedPhysician.segment].filter(Boolean).join(' · ')}
-                </p>
-              )}
-              {physicianMindsets[physicianIdRef.current ?? ''] && (
-                <p className="mt-1 inline-flex items-center gap-1 text-[10px] font-medium text-violet-200/80 bg-violet-900/40 border border-violet-700/40 px-2 py-0.5 rounded-full">
-                  {physicianMindsets[physicianIdRef.current ?? '']}
-                </p>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Compliance block notices — higher z so they overlay the nameplate */}
-        {visibleMessages.filter(m => m.isComplianceBlock).slice(-1).map(m => (
-          <div key={m.id} className="absolute bottom-3 left-3 right-3 z-20">
-            <div className="px-3.5 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm shadow-lg">
-              <div className="flex items-center gap-1.5 mb-0.5">
-                <ShieldAlert className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                <span className="text-[10px] font-semibold uppercase tracking-widest text-amber-500">
-                  Compliance Notice{m.complianceRuleCode && ` · ${m.complianceRuleCode}`}
-                </span>
+          {/* Connecting overlay */}
+          {avatarConnecting && (
+            <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20">
+              <div className="bg-white/90 backdrop-blur-sm px-5 py-3 rounded-2xl flex items-center gap-3 shadow">
+                <Spinner className="w-4 h-4 text-gray-600" />
+                <span className="text-sm text-gray-700">Connecting avatar…</span>
               </div>
-              {m.content}
             </div>
-          </div>
-        ))}
+          )}
+
+          {/* Session start loading */}
+          {messages.length === 0 && loading && (
+            <div className="absolute inset-0 flex items-center justify-center z-10">
+              <div className="bg-white/80 backdrop-blur-sm px-5 py-3 rounded-2xl flex items-center gap-3 shadow">
+                <Spinner className="w-4 h-4 text-gray-600" />
+                <span className="text-sm text-gray-700">{statusMessage || 'Starting session...'}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Physician nameplate — glass pill at bottom-center */}
+          {selectedPhysician && (
+            <div className="absolute bottom-4 left-0 right-0 flex justify-center z-10 pointer-events-none">
+              <div className="bg-black/55 backdrop-blur-md rounded-2xl px-5 py-2 text-center max-w-xs">
+                <p className="text-white font-semibold text-sm leading-tight">
+                  {selectedPhysician.name}
+                </p>
+                {(selectedPhysician.specialty || selectedPhysician.segment) && (
+                  <p className="text-white/55 text-xs mt-0.5">
+                    {[selectedPhysician.specialty, selectedPhysician.segment].filter(Boolean).join(' · ')}
+                  </p>
+                )}
+                {physicianMindsets[physicianIdRef.current ?? ''] && (
+                  <p className="mt-1 inline-flex items-center gap-1 text-[10px] font-medium text-violet-200/80 bg-violet-900/40 border border-violet-700/40 px-2 py-0.5 rounded-full">
+                    {physicianMindsets[physicianIdRef.current ?? '']}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Compliance block notices — higher z so they overlay the nameplate */}
+          {visibleMessages.filter(m => m.isComplianceBlock).slice(-1).map(m => (
+            <div key={m.id} className="absolute bottom-3 left-3 right-3 z-20">
+              <div className="px-3.5 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm shadow-lg">
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <ShieldAlert className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-amber-500">
+                    Compliance Notice{m.complianceRuleCode && ` · ${m.complianceRuleCode}`}
+                  </span>
+                </div>
+                {m.content}
+              </div>
+            </div>
+          ))}
+
+        </div>
+        {/* END square avatar window */}
 
         {/* ── Transcript overlay — slides over avatar when showTranscript=true ── */}
         {showTranscript && (
