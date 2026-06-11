@@ -343,7 +343,12 @@ export async function POST(request: NextRequest) {
         safeEnqueue({
           type: 'done',
           text: output,
-          sessionDuration: null,
+          // 120 s = the "up to two minutes" scenario window.  Must be non-null so
+          // that the client's roleplayingRef gate opens regardless of whether the
+          // physician has a VOICE_MODEL in the DB.  Without a non-null value here
+          // *and* a null VOICE_MODEL, roleplayingRef.current never becomes true,
+          // which silences the avatar and keeps the mic permanently disabled.
+          sessionDuration: 120,
           voiceModel: physician.VOICE_MODEL ?? null,
           physicianId: physician.PHYSICIAN_ID ?? null,
           isEvaluation: false,

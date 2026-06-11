@@ -2433,8 +2433,14 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
           </Button>
           <AudioInput
             onTranscript={(text) => {
-                // Whisper handles brand-name recognition natively via vocabulary prompt
-                setInputValue((prev) => prev + (prev ? ' ' : '') + text);
+                // Apply the same brand-name corrector used for Tavus STT so that
+                // Whisper transcripts also get pharmaceutical spelling fixed
+                // (e.g. "venclexta" → "VENCLEXTA", "im-bruvica" → "Imbruvica").
+                const corrected = correctorRef.current(text);
+                if (corrected !== text) {
+                  console.log(`[corrector] Whisper: "${text}" → "${corrected}"`);
+                }
+                setInputValue((prev) => prev + (prev ? ' ' : '') + corrected);
               }}
             onAutoSubmit={handleAutoSubmit}
             onCountdown={(pct) => setTranscriptCountdownActive(pct !== null)}

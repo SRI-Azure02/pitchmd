@@ -58,7 +58,11 @@ export async function POST(request: NextRequest) {
     const vocab  = await getVocabPrompt();
     const groqFd = new FormData();
     groqFd.append('file', audioFile, `audio.${ext}`);
-    groqFd.append('model', 'whisper-large-v3-turbo');
+    // whisper-large-v3 (full model) — significantly better at rare vocabulary
+    // such as pharmaceutical brand names (Venclexta, Imbruvica, Brukinsa …).
+    // whisper-large-v3-turbo sacrifices accuracy for speed; for this use-case
+    // correct recognition of drug names matters more than latency.
+    groqFd.append('model', 'whisper-large-v3');
     groqFd.append('language', 'en');
     groqFd.append('response_format', 'json');
     groqFd.append('prompt', vocab);
