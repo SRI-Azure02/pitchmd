@@ -1,15 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionFromRequest } from '@/lib/auth';
+import { normalizeGender } from '@/lib/avatar/types';
 
 // ── Replica pools ─────────────────────────────────────────────────────────────
 const MALE_REPLICAS   = ['r92debe21318', 're6220ec0195'];
 const FEMALE_REPLICAS = ['r291e545fd67', 'r9c55f9312fb'];
 
-function pickReplica(gender: string | null | undefined): string {
-  const pool =
-    typeof gender === 'string' && gender.toLowerCase().startsWith('f')
-      ? FEMALE_REPLICAS
-      : MALE_REPLICAS;
+/**
+ * Pick a Tavus replica matching the physician's gender.
+ * Uses the same normalizeGender logic as the Anam session-token route so that
+ * both providers always select the same gender from the same DB signals:
+ *   primary  → PHYSICIAN_GENDER ('M' | 'F')
+ *   fallback → physician first name
+ */
+function pickReplica(
+  gender: string | null | undefined,
+  firstName?: string | null,
+): string {
+  const pool = normalizeGender(gender, firstName) === 'female'
+    ? FEMALE_REPLICAS
+    : MALE_REPLICAS;
+  console.log(`[tavus] PHYSICIAN_GENDER="${gender ?? 'null'}" firstName="${firstName ?? ''}" → ${pool === FEMALE_REPLICAS ? 'female' : 'male'} replica pool`);
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
@@ -89,10 +100,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Tavus not configured — set TAVUS_API_KEY' }, { status: 500 });
   }
 
-  const { physicianName, gender } =
-    await request.json() as { physicianName: string; gender: string | null };
+  const { physicianName, gender, firstName } =
+    await request.json() as { physicianName: string; gender: string | null; firstName?: string | null };
 
-  const replicaId = pickReplica(gender);
+  const replicaId = pickReplica(gender, firstName);
   const convName = `${physicianName} — ${new Date().toISOString()}`;
 
   // ── Step 1: Get or create persona ─────────────────────────────────────────

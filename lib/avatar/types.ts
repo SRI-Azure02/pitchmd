@@ -62,50 +62,54 @@ const FEMALE_NAMES = new Set([
 /**
  * Normalise a raw gender string (from the DB) to our canonical Gender type.
  *
- * First-name inference takes PRIORITY over the DB field because the synthetic
- * Snowflake dataset contains incorrect PHYSICIAN_GENDER values for some records
- * (e.g. Dr. John Byrd is labelled "Female").  A known first name is far more
- * reliable than a potentially-wrong DB column.
+ * Snowflake PHYSICIAN_GENDER is coded as single characters: 'M' = male,
+ * 'F' = female.  The DB field is the authoritative primary signal.
+ * First-name inference is a fallback for rows where PHYSICIAN_GENDER is
+ * absent / NULL (no override of reliable DB data).
  *
  * Strategy:
- *   1. firstName lookup in curated Sets  → used when name is recognisable
- *   2. PHYSICIAN_GENDER DB field          → used when name is unknown
- *   3. Default: 'male'                    → preserves existing Tavus behaviour
+ *   1. PHYSICIAN_GENDER DB field (M/F)    → primary — most reliable signal
+ *   2. firstName lookup in curated Sets   → fallback when DB value is absent
+ *   3. Default: 'male'
  *
- * @param dbGender  Value of PHYSICIAN_GENDER from Snowflake (may be null/undefined)
- * @param firstName Physician first name — primary signal when present in lookup
+ * @param dbGender  Value of PHYSICIAN_GENDER from Snowflake ('M' | 'F' | null)
+ * @param firstName Physician first name — fallback when DB value is absent
  */
 export function normalizeGender(
   dbGender: string | null | undefined,
   firstName?: string | null,
 ): Gender {
-  // ── Signal 1 (PRIMARY): first-name inference ──────────────────────────────
-  // The curated name Sets cover all common American given names used in the
-  // synthetic dataset.  When a match is found it takes precedence over the DB
-  // field, which can contain incorrect data.
+  // ── Signal 1 (PRIMARY): PHYSICIAN_GENDER DB field ─────────────────────────
+  // Snowflake returns 'M' or 'F'. We also accept the spelled-out forms to be
+  // defensive against schema changes.
+  if (typeof dbGender === 'string' && dbGender.trim() !== '') {
+    const g = dbGender.trim().toUpperCase();
+    if (g === 'F' || g === 'FEMALE' || g === 'WOMAN') {
+      console.log(`[avatar] PHYSICIAN_GENDER="${dbGender}" → female`);
+      return 'female';
+    }
+    if (g === 'M' || g === 'MALE' || g === 'MAN') {
+      console.log(`[avatar] PHYSICIAN_GENDER="${dbGender}" → male`);
+      return 'male';
+    }
+    // Unrecognised value — warn and fall through to name inference
+    console.warn(`[avatar] unrecognised PHYSICIAN_GENDER value: "${dbGender}" — falling back to name`);
+  }
+
+  // ── Signal 2 (FALLBACK): first-name inference ─────────────────────────────
+  // Used only when PHYSICIAN_GENDER is NULL / empty / unrecognised.
+  // The curated Sets cover all common American given names in the dataset.
   if (typeof firstName === 'string' && firstName.trim() !== '') {
     const name = firstName.trim().toLowerCase();
     if (FEMALE_NAMES.has(name)) {
-      console.log(`[avatar] gender by name "${firstName}" → female`);
+      console.log(`[avatar] name fallback "${firstName}" → female`);
       return 'female';
     }
     if (MALE_NAMES.has(name)) {
-      console.log(`[avatar] gender by name "${firstName}" → male`);
+      console.log(`[avatar] name fallback "${firstName}" → male`);
       return 'male';
     }
-    // Name not in either Set — fall through to DB field
-    console.warn(`[avatar] first name "${firstName}" not in gender lookup — trying DB field`);
-  }
-
-  // ── Signal 2 (FALLBACK): explicit DB gender field ─────────────────────────
-  // Only reached when the first name is unknown / absent.
-  if (typeof dbGender === 'string' && dbGender.trim() !== '') {
-    const g = dbGender.trim().toLowerCase();
-    if (g === 'female' || g === 'f' || g === 'woman' || g === 'w') return 'female';
-    if (g === 'male'   || g === 'm' || g === 'man')                 return 'male';
-    if (g.startsWith('f')) return 'female';
-    if (g.startsWith('m')) return 'male';
-    console.warn(`[avatar] unrecognised PHYSICIAN_GENDER value: "${dbGender}" — defaulting to male`);
+    console.warn(`[avatar] name "${firstName}" not in lookup Sets — defaulting to male`);
   }
 
   // ── Default ───────────────────────────────────────────────────────────────

@@ -1135,7 +1135,8 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           physicianName: `${physician.FIRST_NAME} ${physician.LAST_NAME}`,
-          gender: physician.GENDER,
+          gender:    physician.GENDER    ?? null,   // 'M' | 'F' from Snowflake
+          firstName: physician.FIRST_NAME ?? null,  // fallback when gender is absent
         }),
       });
       if (!res.ok) {
