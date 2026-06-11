@@ -392,6 +392,10 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   const utteranceDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Fallback timer for clearing avatarSpeaking if replica.stopped_speaking never fires
   const avatarSpeakFallbackRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Physician speech buffered while the avatar is still connecting (parallel-init
+  // mode: the LLM may respond before daily.join / Anam stream finishes).
+  // Drained by initTavusAvatar / initAnamAvatar when the stream activates.
+  const pendingSpeechRef = useRef<string | null>(null);
   // STT product-name corrector — built once from brand list fetched on mount
   const correctorRef = useRef<Corrector>((t) => t);
   // Mindset description — set at session start from the assigned mindset for this physician
@@ -824,16 +828,25 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                 // Speak the physician response — via the active avatar provider
                 // (Tavus or Anam, both in echo mode) or fall back to ElevenLabs TTS.
                 if (roleplayingRef.current) {
+                  // Apply brand-name corrector so TTS reads "Venclexta" rather
+                  // than spelling out "V-E-N-C-L-E-X-T-A" (DB stores all-caps).
+                  const speechText = correctorRef.current(emotionStripped);
                   if (avatarEnabledRef.current && avatarStreamActiveRef.current) {
                     // Avatar mode: echo text to the active provider
-                    speakViaAvatar(emotionStripped);
+                    speakViaAvatar(speechText);
+                  } else if (avatarEnabledRef.current) {
+                    // Avatar is enabled but still connecting (parallel-init) —
+                    // buffer until ready. initTavusAvatar / initAnamAvatar will
+                    // drain this the moment the stream activates.
+                    console.log('[avatar] buffering physician speech — stream not yet active');
+                    pendingSpeechRef.current = speechText;
                   } else if (voiceEnabledRef.current) {
                     // Audio-only mode: ElevenLabs if available, otherwise browser TTS.
                     // Mute AudioInput for the duration so the Web Speech API doesn't
                     // pick up TTS audio from the speakers and auto-submit it as user speech.
                     console.log('[tts] speaking | voice:', currentVoiceRef.current ?? 'browser', '| emotion:', emotion);
                     setAvatarSpeaking(true);
-                    speakText(emotionStripped, currentVoiceRef.current, emotion)
+                    speakText(speechText, currentVoiceRef.current, emotion)
                       .then(() => {
                         setAvatarSpeaking(false);
                         setInputValue(''); // discard any phantom text captured while physician spoke
@@ -937,15 +950,18 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     setSessionStarted(true);
     hasStarted.current = true;
 
-    // If avatar is enabled, try to connect the active provider (Tavus or Anam).
-    // On failure (e.g. quota exhausted, network error) the avatar is disabled
-    // automatically inside the provider init and we continue in text-only mode.
-    if (avatarEnabledRef.current) {
-      await initAvatar(physician);
-    }
-
-    // Kick off roleplay with a silent internal seed message.
+    // Fire avatar init and the LLM opening message concurrently.
+    // Avatar setup (Daily.co join / Anam connect) takes 5–10 s; the LLM
+    // responds in 2–5 s.  Running both at once halves perceived startup
+    // latency.  If the LLM responds before the avatar stream is active,
+    // physician speech is buffered in pendingSpeechRef and drained inside
+    // initTavusAvatar / initAnamAvatar the moment the stream activates.
+    const avatarInit = avatarEnabledRef.current
+      ? initAvatar(physician)
+      : Promise.resolve(true);
+    // Kick off roleplay with a silent internal seed message — concurrently.
     sendMessage('__begin_roleplay__', []);
+    await avatarInit;
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -1245,6 +1261,15 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
       setAvatarStreamActive(true);
       avatarStreamActiveRef.current = true;
 
+      // Drain any physician speech that arrived while Daily.co was still
+      // connecting (happens in parallel-init mode when the LLM responds in
+      // < 3 s and daily.join takes 3–5 s).
+      if (pendingSpeechRef.current) {
+        const pending = pendingSpeechRef.current;
+        pendingSpeechRef.current = null;
+        speakViaTavus(pending);
+      }
+
       // Wait until the remote video track is actually rendering (or 10 s timeout).
       // This keeps "Connecting avatar…" visible and blocks sendMessage('__begin_roleplay__')
       // from firing until the avatar is on screen — so the timer and first greeting
@@ -1329,6 +1354,16 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
       tavusConvIdRef.current = null;
       setAvatarStreamActive(true);
       avatarStreamActiveRef.current = true;
+
+      // Drain any physician speech buffered while Anam was connecting.
+      // Calling talk() immediately also interrupts whatever pre-recorded
+      // greeting the Anam avatar started playing on connect.
+      if (pendingSpeechRef.current) {
+        const pending = pendingSpeechRef.current;
+        pendingSpeechRef.current = null;
+        speakViaAnam(pending);
+      }
+
       setAvatarConnecting(false);
       return true;
     } catch (err) {
@@ -2190,11 +2225,12 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   return (
     <div className="relative flex flex-col h-full min-h-0">
 
-      {/* ── Avatar area — full-bleed video fills all flex-1 space ───────────── */}
-      {/* The video element (shared by Tavus + Anam) expands to cover the entire
-          flex-1 region so no space is wasted by padding or centering.
-          All UI chrome (nameplate, notices, status) is absolute-positioned. */}
-      <div className="flex-1 relative min-h-0" style={{ background: '#0f0f0f' }}>
+      {/* ── Avatar area — centered square video ─────────────────────────────── */}
+      {/* The video is constrained to a square (aspect-ratio 1:1, height-driven)
+          and centered in the dark surround. This prevents the full-bleed
+          stretching that crops the avatar's head, and gives a higher-density
+          render since the video no longer fills dead horizontal space. */}
+      <div className="flex-1 relative min-h-0 flex items-center justify-center" style={{ background: '#0f0f0f' }}>
 
         {/* Back button — top-right */}
         <div className="absolute top-3 right-3 z-10">
@@ -2212,7 +2248,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
           ref={avatarVideoRef}
           autoPlay
           playsInline
-          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${avatarEnabled && avatarStreamActive ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+          className={`h-full max-w-full aspect-square object-contain rounded-2xl transition-opacity duration-500 ${avatarEnabled && avatarStreamActive ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
         />
 
         {/* Gradient fill when avatar is disabled */}
@@ -2445,7 +2481,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
             onAutoSubmit={handleAutoSubmit}
             onCountdown={(pct) => setTranscriptCountdownActive(pct !== null)}
             userTyping={userTyping}
-            disabled={loading || sessionEnded || avatarSpeaking || !roleplaying}
+            disabled={sessionEnded || !roleplaying}
           />
           <textarea
             ref={textareaRef}

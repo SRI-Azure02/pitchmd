@@ -28,7 +28,7 @@ interface AudioInputProps {
 }
 
 const SEGMENT_MS    = 3000;  // MediaRecorder timeslice — collect data every 3 s
-const SUBMIT_WAIT   = 3000;  // ms of transcript silence before auto-submit
+const SUBMIT_WAIT   = 45_000; // ms of transcript silence before auto-submit
 const MIN_BLOB_SIZE = 500;   // bytes — smaller blobs are almost certainly silent
 const MIN_WORDS     = 1;     // minimum word count to accept a transcript
 const RING_R        = 20;

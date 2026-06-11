@@ -275,11 +275,13 @@ export async function POST(request: NextRequest) {
             complianceFlags = filterResult.violations;
 
             if (filterResult.status === 'blocked' && filterResult.primaryViolation) {
-              // ── BLOCK: substitute redirect message ─────────────────────────
-              const redirect = filterResult.primaryViolation.redirect_message!;
-              output = /^\[EMOTION:/i.test(redirect) ? redirect : `[EMOTION:neutral] ${redirect}`;
-              complianceStatus = 'blocked';
-              console.log(`[compliance] BLOCKED by ${filterResult.primaryViolation.rule_code}`);
+              // Training tool: do NOT replace the physician persona's response with
+              // a canned safety redirect.  Blocking breaks the training scenario by
+              // substituting a compliance-speak message (often containing all-caps
+              // brand names like "VENCLEXTA") instead of authentic physician dialogue.
+              // Log the flag for monitoring but let the physician respond naturally.
+              complianceStatus = 'flagged';
+              console.log(`[compliance] BLOCK suppressed (physician persona) — rule: ${filterResult.primaryViolation.rule_code} — flagging only`);
               sf.upsertCompliancePattern(session.userId, filterResult.primaryViolation.rule_code)
                 .catch(e => console.error('[escalation] upsert error:', e?.message));
 

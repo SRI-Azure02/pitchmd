@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
     // Pre-created persona: only the UUID is needed — Anam resolves the attached
     // avatar face and voice model server-side.
-    body: JSON.stringify({ personaConfig: { personaId } }),
+    body: JSON.stringify({ personaConfig: { personaId, skipGreeting: true } }),
   });
 
   const rawText = await res.text();

@@ -21,14 +21,14 @@ export async function POST(request: NextRequest) {
   const { physicianId, transcript } = data;
 
   const client = getSnowflakeClient();
-  console.log(`[repeval] START — physician=${physicianId}, user=${session.username}, transcriptLen=${transcript.length}`);
+  console.log(`[repeval] START — physician=${physicianId}, user=${session.userId}, transcriptLen=${transcript.length}`);
 
   try {
     // Await REPEVAL directly — the HTTP connection stays open until
     // the stored proc finishes (60–240 s typical). The client shows a
     // "generating" message and awaits this response; no DB polling needed.
-    await client.callRepEval(physicianId, transcript, session.username);
-    console.log(`[repeval] COMPLETE — physician=${physicianId}, user=${session.username}`);
+    await client.callRepEval(physicianId, transcript, session.userId);
+    console.log(`[repeval] COMPLETE — physician=${physicianId}, user=${session.userId}`);
     return NextResponse.json({ success: true });
   } catch (err: any) {
     const msg = err?.response?.data?.message || err?.message || 'REPEVAL failed';
