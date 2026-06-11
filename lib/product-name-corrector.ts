@@ -2,8 +2,18 @@
  * product-name-corrector.ts
  *
  * Client-side post-processing for STT transcripts.  Fixes common speech
- * recognition errors on pharmaceutical brand names (space insertion, minor
- * phonetic drift) without any additional API call or latency.
+ * recognition errors on pharmaceutical brand names without any additional
+ * API call or latency.
+ *
+ * Two correction layers applied in order:
+ *
+ *   1. Phonetic misinterpretation map — exact known ASR errors sourced from
+ *      empirical Whisper output analysis (e.g. "ben clexta" → "Venclexta",
+ *      "vibrance" → "Ibrance").  These are specific enough to run first and
+ *      catch the largest class of errors with zero false-positive risk.
+ *
+ *   2. Fuzzy regex patterns — catches capitalisation errors and space/hyphen
+ *      insertion not already handled by the static map.
  *
  * Usage:
  *   const correct = buildCorrector(['Ibrance', 'Keytruda', 'Entresto']);
@@ -28,6 +38,73 @@ function canonicalForm(brand: string): string {
   return brand.charAt(0).toUpperCase() + brand.slice(1).toLowerCase();
 }
 
+// ── Static phonetic misinterpretation map ────────────────────────────────────
+//
+// Keys:   canonical brand name in lowercase (matched via brand.toLowerCase())
+// Values: common ASR / Whisper misinterpretations, all lowercase
+//
+// Source: empirical analysis of standard ASR output on oncology vocabulary.
+// Whisper Mini / Turbo lack these words in their training corpora and try
+// to fit the acoustic signal to common dictionary words instead.
+//
+// Patterns derived from each variant:
+//   - Multi-word / hyphenated → literal phrase match (phrase specificity
+//     makes word-boundaries redundant)
+//   - Single-word             → \b word-boundary anchors to avoid
+//     false positives inside longer tokens
+
+const PHONETIC_VARIANTS: Record<string, string[]> = {
+  venclexta: [
+    'ben clexta', 'then clexta', 'vent texta', 'van clexta', 'then flex ta',
+  ],
+  imbruvica: [
+    'in brew vica', 'improvica', 'ambrewvica', 'in bruvica',
+    'm brew vica', 'embryo vica',
+  ],
+  brukinsa: [
+    'blue kinsa', 'brew kinsa', 'broo kinsa', 'brookings uh',
+    'rude kinsa', 'brook invsa',
+  ],
+  ibrance: [
+    'i brands', 'eye brance', 'high brance', 'vibrance',
+    'hybridance', 'i-prance',
+  ],
+  calquence: [
+    'cow quench', 'cal quench', 'calcwench', 'call quench',
+    'calquents', 'cow quents',
+  ],
+  // Jaypirca note: the 'i' before 'r' causes a double-layer of confusion
+  // for speech engines — both syllable-split and vowel-swap errors are common.
+  jaypirca: [
+    'jay prica', 'jay perka', 'j pirca', 'jay parca',
+    'jade perka', 'j prick uh',
+  ],
+  zydelig: [
+    'side elig', 'zi delig', 'zykelig', 'high delig', 'sci-delig', 'vitalig',
+  ],
+  rituxan: [
+    're tuxan', 'right tuxan', 'retuxin', 'red tuxan', 'ritoxan', 'writuxan',
+  ],
+  gazyva: [
+    'god ziva', 'ga ziva', 'goes eva', 'gaze eva', 'gaziva', 'got zeva',
+  ],
+  copiktra: [
+    'co picktra', 'cope iktra', 'go picktra', 'co pictra',
+    'cold pictra', 'capiktra',
+  ],
+};
+
+/** Build a case-insensitive RegExp for a single phonetic variant string. */
+function buildPhoneticPattern(variant: string): RegExp {
+  const escaped = escapeRegex(variant);
+  // Phrases (contains space or hyphen) are specific enough without anchors.
+  // Single tokens use word boundaries to avoid firing inside longer words.
+  const isPhrase = /[\s\-]/.test(variant);
+  return isPhrase
+    ? new RegExp(escaped, 'gi')
+    : new RegExp(`\\b${escaped}\\b`, 'gi');
+}
+
 /**
  * Build two RegExp patterns for a brand name:
  *
@@ -43,7 +120,7 @@ function canonicalForm(brand: string): string {
  * Both patterns are anchored with word-boundaries so they don't fire
  * inside a longer word.
  */
-function buildPatterns(brand: string): RegExp[] {
+function buildFuzzyPatterns(brand: string): RegExp[] {
   const patterns: RegExp[] = [];
 
   // 1. Exact word match (handles capitalisation only)
@@ -67,6 +144,10 @@ export type Corrector = (transcript: string) => string;
 /**
  * Build a corrector function from a list of brand names.
  *
+ * Each brand gets two pattern layers:
+ *   1. Static phonetic misinterpretation patterns (known Whisper errors) — run first.
+ *   2. Dynamic exact + fuzzy regex patterns (capitalisation / spaced letters).
+ *
  * Rules are sorted longest-brand-first so that a match for "Ibrance" does
  * not prevent a longer brand like "Ibrance CDK" from matching.
  *
@@ -82,10 +163,19 @@ export function buildCorrector(brands: string[]): Corrector {
   );
 
   const rules: Array<{ patterns: RegExp[]; replacement: string }> = unique.map(
-    (brand) => ({
-      patterns: buildPatterns(brand),
-      replacement: canonicalForm(brand),
-    }),
+    (brand) => {
+      // Layer 1: phonetic misinterpretation patterns (most specific — run first)
+      const variants = PHONETIC_VARIANTS[brand.toLowerCase()] ?? [];
+      const phoneticPatterns = variants.map(buildPhoneticPattern);
+
+      // Layer 2: exact-match and spaced/hyphenated fuzzy patterns
+      const fuzzyPatterns = buildFuzzyPatterns(brand);
+
+      return {
+        patterns: [...phoneticPatterns, ...fuzzyPatterns],
+        replacement: canonicalForm(brand),
+      };
+    },
   );
 
   return (text: string): string => {

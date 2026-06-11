@@ -5,11 +5,34 @@
  * vocabulary prompt. The prompt biases Whisper toward correct recognition
  * of brand names (Venclexta, Imbruvica, Brukinsa, etc.) from SYNTHETIC_RX.
  *
- * Model: whisper-large-v3-turbo  (~150 ms on Groq free tier)
+ * Model: whisper-large-v3 (full model — better accuracy for rare vocabulary)
+ *
+ * Prompt strategy (per Gemini's recommendation):
+ *   Pass each brand name alongside its generic INN — e.g.
+ *   "Venclexta (venetoclax), Imbruvica (ibrutinib)".  Whisper uses the
+ *   prompt string as a "frequently used words" baseline so including both
+ *   forms biases its internal weights toward the correct brand spelling when
+ *   it hears the acoustic signal of either name.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionFromRequest } from '@/lib/auth';
 import { getSnowflakeClient } from '@/lib/snowflake';
+
+// ── Brand → generic INN map ──────────────────────────────────────────────────
+// Pairing brand + INN in the Whisper prompt doubles the acoustic anchoring:
+// if the rep says the generic name the engine still lands on the right token.
+const BRAND_TO_GENERIC: Record<string, string> = {
+  venclexta:  'venetoclax',
+  imbruvica:  'ibrutinib',
+  brukinsa:   'zanubrutinib',
+  ibrance:    'palbociclib',
+  calquence:  'acalabrutinib',
+  jaypirca:   'pirtobrutinib',
+  zydelig:    'idelalisib',
+  rituxan:    'rituximab',
+  gazyva:     'obinutuzumab',
+  copiktra:   'duvelisib',
+};
 
 // Module-level brand vocabulary cache (10-min TTL)
 let _vocabCache: string | null = null;
@@ -22,9 +45,20 @@ async function getVocabPrompt(): Promise<string> {
   try {
     const sf = getSnowflakeClient();
     const brands = await sf.getAllBrands();
-    _vocabCache = brands.length > 0
-      ? `Pharmaceutical sales training session. Drug brand names include: ${brands.join(', ')}.`
-      : 'Pharmaceutical sales training session.';
+    if (brands.length > 0) {
+      // For known drugs, append the generic INN in parentheses.
+      // This biases Whisper's weights toward the correct brand spelling when
+      // it hears either the brand name or the INN acoustically.
+      const terms = brands.map((b) => {
+        const generic = BRAND_TO_GENERIC[b.toLowerCase()];
+        return generic ? `${b} (${generic})` : b;
+      });
+      _vocabCache =
+        `Pharmaceutical sales training session. ` +
+        `Drug brand names: ${terms.join(', ')}.`;
+    } else {
+      _vocabCache = 'Pharmaceutical sales training session.';
+    }
     _vocabCacheTime = now;
   } catch {
     _vocabCache = _vocabCache ?? 'Pharmaceutical sales training session.';
