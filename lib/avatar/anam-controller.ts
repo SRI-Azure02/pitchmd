@@ -22,6 +22,13 @@ export interface AnamInitOptions {
   onVideoReady?: () => void;
   /** Fires if the Anam WebRTC connection drops. */
   onConnectionClosed?: (reason?: unknown) => void;
+  /**
+   * Fires when the current talk stream ends or is interrupted.
+   * Use this to unlock the microphone early rather than waiting for the
+   * word-count fallback timer — Anam has no dedicated "stopped speaking" event,
+   * but TALK_STREAM_INTERRUPTED fires reliably when the avatar finishes a turn.
+   */
+  onTalkStreamInterrupted?: () => void;
 }
 
 /** Resolve once the target element exists in the DOM (or reject after ~1s). */
@@ -54,6 +61,12 @@ export class AnamController {
     }
     if (opts.onConnectionClosed) {
       client.addListener(AnamEvent.CONNECTION_CLOSED, opts.onConnectionClosed);
+    }
+    if (opts.onTalkStreamInterrupted) {
+      // TALK_STREAM_INTERRUPTED fires when the avatar finishes (or is cut short)
+      // speaking a turn — use it to unlock the microphone early instead of
+      // waiting for the word-count fallback timer.
+      client.addListener(AnamEvent.TALK_STREAM_INTERRUPTED, opts.onTalkStreamInterrupted);
     }
 
     // Ensure the <video> is mounted before the SDK looks it up by id.

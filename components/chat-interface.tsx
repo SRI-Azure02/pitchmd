@@ -877,6 +877,14 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
           }
         }
       }
+      // Safety-net: if the stream closed without a 'done'/'input_blocked' event
+      // (e.g. Vercel function timeout, network drop) loading would stay true
+      // forever — reset it so the user isn't permanently locked out.
+      if (loadingRef.current) {
+        console.warn('[sendMessage] stream ended without a done event — resetting loading');
+        setLoading(false);
+        setStatusMessage('');
+      }
     } catch (error: any) {
       setMessages((prev) => [
         ...prev,
@@ -1302,6 +1310,14 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
         },
         onConnectionClosed: (reason) => {
           console.warn('[anam] connection closed:', reason);
+        },
+        // TALK_STREAM_INTERRUPTED fires when the avatar finishes its current
+        // speech turn — use it to unlock the mic immediately (cancels the
+        // word-count fallback timer, which would otherwise keep the mic locked
+        // for 10–30 s).
+        onTalkStreamInterrupted: () => {
+          console.log('[anam] talk stream interrupted/finished — clearing speaking lock');
+          clearAvatarSpeakingLock();
         },
       });
 
@@ -2201,7 +2217,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
         {/* Gradient fill when avatar is disabled */}
         {!avatarEnabled && (
           <div
-            className="absolute inset-0 flex flex-col items-center justify-center select-none"
+            className="absolute inset-0 flex flex-col items-center justify-center select-none pointer-events-none"
             style={{
               background: 'linear-gradient(120deg, #C47B42, #C49868, #45A8C8, #3A8FB5, #C47B42)',
               backgroundSize: '400% 400%',
@@ -2268,6 +2284,46 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
             </div>
           </div>
         ))}
+
+        {/* ── Transcript overlay — slides over avatar when showTranscript=true ── */}
+        {showTranscript && (
+          <div className="absolute inset-0 z-30 flex flex-col bg-black/85 backdrop-blur-sm">
+            {/* Header */}
+            <div className="shrink-0 px-4 py-2.5 border-b border-white/10 flex items-center justify-between">
+              <span className="text-white/80 text-xs font-semibold uppercase tracking-wider">Conversation Transcript</span>
+              <button
+                onClick={() => setShowTranscript(false)}
+                className="text-white/50 hover:text-white/80 transition-colors"
+                title="Close transcript"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            {/* Message list */}
+            <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
+              {visibleMessages.length === 0 ? (
+                <p className="text-white/30 text-sm text-center mt-8">Conversation will appear here as you practice.</p>
+              ) : (
+                visibleMessages.map((m) => (
+                  <div key={m.id} className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
+                    <p className="text-[10px] text-white/40 mb-0.5 px-1">
+                      {m.role === 'user' ? 'You' : (selectedPhysician?.name ?? 'Physician')}
+                    </p>
+                    <div className={`max-w-[85%] px-3 py-2 rounded-xl text-sm leading-relaxed ${
+                      m.role === 'user'
+                        ? 'bg-blue-600/60 text-white/95'
+                        : m.isComplianceBlock
+                          ? 'bg-amber-500/30 text-amber-100 border border-amber-400/30'
+                          : 'bg-white/10 text-white/90'
+                    }`}>
+                      {m.content}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Eval status — top-center so it doesn't clash with nameplate */}
         {evalGenerating && !evalReady && (
@@ -2398,7 +2454,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
             }}
             onFocus={() => setUserTyping(true)}
             onBlur={() => setUserTyping(false)}
-            disabled={loading || sessionEnded}
+            disabled={sessionEnded}
             className="flex-1 resize-none overflow-hidden rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-gray-400 disabled:cursor-not-allowed disabled:opacity-40 leading-5 min-h-[38px] max-h-40"
           />
           <Button

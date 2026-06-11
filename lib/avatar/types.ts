@@ -62,40 +62,53 @@ const FEMALE_NAMES = new Set([
 /**
  * Normalise a raw gender string (from the DB) to our canonical Gender type.
  *
- * Explicit DB values take priority over name inference.  If neither signal
- * is conclusive we default to 'male' (preserves existing Tavus behaviour).
+ * First-name inference takes PRIORITY over the DB field because the synthetic
+ * Snowflake dataset contains incorrect PHYSICIAN_GENDER values for some records
+ * (e.g. Dr. John Byrd is labelled "Female").  A known first name is far more
+ * reliable than a potentially-wrong DB column.
+ *
+ * Strategy:
+ *   1. firstName lookup in curated Sets  → used when name is recognisable
+ *   2. PHYSICIAN_GENDER DB field          → used when name is unknown
+ *   3. Default: 'male'                    → preserves existing Tavus behaviour
  *
  * @param dbGender  Value of PHYSICIAN_GENDER from Snowflake (may be null/undefined)
- * @param firstName Physician first name — used as a fallback when dbGender is
- *                  null, empty, or an unrecognised value
+ * @param firstName Physician first name — primary signal when present in lookup
  */
 export function normalizeGender(
   dbGender: string | null | undefined,
   firstName?: string | null,
 ): Gender {
-  // ── Signal 1: explicit DB gender field ───────────────────────────────────
-  if (typeof dbGender === 'string' && dbGender.trim() !== '') {
-    const g = dbGender.trim().toLowerCase();
-    // Accept 'female', 'f', 'woman', 'w' → female
-    if (g === 'female' || g === 'f' || g === 'woman' || g === 'w') return 'female';
-    // Accept 'male', 'm', 'man' → male
-    if (g === 'male' || g === 'm' || g === 'man') return 'male';
-    // Still try startsWith as a last-resort for legacy values ('Female', 'FEMALE', etc.)
-    if (g.startsWith('f')) return 'female';
-    if (g.startsWith('m')) return 'male';
-    // Unrecognised value — fall through to name-based detection
-    console.warn(`[avatar] unrecognised PHYSICIAN_GENDER value: "${dbGender}" — falling back to name`);
-  }
-
-  // ── Signal 2: first-name inference ───────────────────────────────────────
+  // ── Signal 1 (PRIMARY): first-name inference ──────────────────────────────
+  // The curated name Sets cover all common American given names used in the
+  // synthetic dataset.  When a match is found it takes precedence over the DB
+  // field, which can contain incorrect data.
   if (typeof firstName === 'string' && firstName.trim() !== '') {
     const name = firstName.trim().toLowerCase();
-    if (FEMALE_NAMES.has(name)) return 'female';
-    if (MALE_NAMES.has(name)) return 'male';
-    console.warn(`[avatar] first name "${firstName}" not in gender lookup — defaulting to male`);
+    if (FEMALE_NAMES.has(name)) {
+      console.log(`[avatar] gender by name "${firstName}" → female`);
+      return 'female';
+    }
+    if (MALE_NAMES.has(name)) {
+      console.log(`[avatar] gender by name "${firstName}" → male`);
+      return 'male';
+    }
+    // Name not in either Set — fall through to DB field
+    console.warn(`[avatar] first name "${firstName}" not in gender lookup — trying DB field`);
   }
 
-  // ── Default: male (preserves existing Tavus behaviour) ───────────────────
+  // ── Signal 2 (FALLBACK): explicit DB gender field ─────────────────────────
+  // Only reached when the first name is unknown / absent.
+  if (typeof dbGender === 'string' && dbGender.trim() !== '') {
+    const g = dbGender.trim().toLowerCase();
+    if (g === 'female' || g === 'f' || g === 'woman' || g === 'w') return 'female';
+    if (g === 'male'   || g === 'm' || g === 'man')                 return 'male';
+    if (g.startsWith('f')) return 'female';
+    if (g.startsWith('m')) return 'male';
+    console.warn(`[avatar] unrecognised PHYSICIAN_GENDER value: "${dbGender}" — defaulting to male`);
+  }
+
+  // ── Default ───────────────────────────────────────────────────────────────
   return 'male';
 }
 
