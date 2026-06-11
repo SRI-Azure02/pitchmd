@@ -1,11 +1,7 @@
 // ── Anam persona pools ──────────────────────────────────────────────────────
 //
-// These personas were pre-created in Anam Lab with avatar faces (stock) and
-// voice models already attached. We only need the persona UUID — the session
-// token endpoint resolves face + voice + voice-model server-side.
-//
-// Gender-based selection mirrors the Tavus replica logic: detect the AI agent's
-// gender, then randomly pick one persona from the matching pool.
+// Pre-created in Anam Lab with avatar faces (stock) and voice models attached.
+// Only the UUID is needed — face + voice are resolved server-side.
 //
 // Isomorphic (imported by the /api/anam/session-token route handler).
 
@@ -24,7 +20,16 @@ export const ANAM_PERSONAS: PersonaConfig = {
   ],
 };
 
-/** Randomly pick one Anam persona ID from the pool matching the physician gender. */
-export function pickAnamPersona(gender: string | null | undefined): string {
-  return pickFromPool(ANAM_PERSONAS, gender);
+/**
+ * Randomly pick one Anam persona ID from the gender-matched pool.
+ *
+ * @param dbGender  PHYSICIAN_GENDER from Snowflake (primary signal)
+ * @param firstName Physician first name (fallback signal when DB value is
+ *                  null/empty/unrecognised — more reliable for synthetic data)
+ */
+export function pickAnamPersona(
+  dbGender: string | null | undefined,
+  firstName?: string | null,
+): string {
+  return pickFromPool(ANAM_PERSONAS, dbGender, firstName);
 }
