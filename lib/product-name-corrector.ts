@@ -18,12 +18,14 @@ function escapeRegex(s: string): string {
 
 /**
  * Derive the canonical display form of a brand name.
- * Preserves mixed-case (e.g. "CAR-T", "iBrance") by title-casing only the
- * first character while keeping the rest as returned from the database.
+ * Forces sentence case — first character upper, remainder lower — so that
+ * TTS engines (Tavus, Anam, ElevenLabs) pronounce the name as a word rather
+ * than spelling it out letter-by-letter.  All-caps DB values like "VENCLEXTA"
+ * become "Venclexta", which every TTS reads as a spoken word.
  */
 function canonicalForm(brand: string): string {
   if (!brand) return brand;
-  return brand.charAt(0).toUpperCase() + brand.slice(1);
+  return brand.charAt(0).toUpperCase() + brand.slice(1).toLowerCase();
 }
 
 /**
