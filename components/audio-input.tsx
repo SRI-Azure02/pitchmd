@@ -33,9 +33,10 @@ const MIN_BLOB_SIZE  = 500;  // bytes — smaller blobs are almost certainly sil
 const MIN_WORDS      = 1;   // minimum word count to accept a transcript
 // Minimum peak RMS amplitude (0–127 scale) to accept a segment as speech.
 // Below this value the window is treated as silence / background noise and
-// skipped without calling the STT API.  ~8 ≈ –24 dBFS; normal speech
-// sits at –20 to –6 dBFS, typical ambient noise at –50 to –35 dBFS.
-const SPEECH_MIN_RMS = 8;
+// skipped without calling the STT API.  Set to 1 to pass all but
+// completely silent segments — low-gain mics (e.g. Edge on Windows)
+// may only reach RMS 2–5 during normal speech.
+const SPEECH_MIN_RMS = 1;
 const RING_R        = 20;
 const CIRCUMFERENCE = 2 * Math.PI * RING_R;
 

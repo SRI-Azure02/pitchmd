@@ -2292,7 +2292,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
           Inside it, an inner square div (max 520 px, aspect-ratio 1:1) contains
           the video and all avatar UI.  This prevents the video from stretching
           across the full screen width while keeping the dark "room" feel. */}
-      <div className="flex-1 relative min-h-0 flex items-center justify-center" style={{ background: '#0f0f0f' }}>
+      <div className="flex-1 relative min-h-0 flex items-center justify-center" style={{ background: 'radial-gradient(ellipse at center, #1a2a4a 0%, #0d1829 50%, #030810 100%)' }}>
 
         {/* Back button — pinned to the top-right corner of the dark stage */}
         <div className="absolute top-3 right-3 z-40">
