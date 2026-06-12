@@ -11,7 +11,7 @@ import PerformancePanel from './performance-panel';
 import CallJournal from './call-journal';
 import LoopBack from './loop-back';
 import EngagementPlaybook from './engagement-playbook';
-import { Send, RotateCcw, Square, Volume2, VolumeX, Video, VideoOff, MessageSquare, Search, ChevronDown, X, Check, BarChart2, ArrowUp, ArrowDown, ArrowUpDown, Hash, Mic, BookOpen, NotebookPen, Map, Camera, Monitor, Sparkles, Database, ShieldAlert, Languages, Target, Bell } from 'lucide-react';
+import { Send, RotateCcw, Square, Volume2, VolumeX, Video, VideoOff, MessageSquare, Search, ChevronDown, X, Check, BarChart2, ArrowUp, ArrowDown, ArrowUpDown, Hash, Mic, BookOpen, NotebookPen, Map, Camera, Monitor, Sparkles, Database, ShieldAlert, Languages, Target, Bell, PhoneOff, Hourglass } from 'lucide-react';
 import { parseEmotion, speakText, stopCurrentAudio } from '@/lib/elevenlabs';
 import { buildCorrector, type Corrector } from '@/lib/product-name-corrector';
 import { getMindsetDescription } from '@/lib/mindset-descriptions';
@@ -2292,7 +2292,45 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
           Inside it, an inner square div (max 520 px, aspect-ratio 1:1) contains
           the video and all avatar UI.  This prevents the video from stretching
           across the full screen width while keeping the dark "room" feel. */}
-      <div className="flex-1 relative min-h-0 flex items-center justify-center" style={{ background: 'radial-gradient(ellipse at center, #1a2a4a 0%, #0d1829 50%, #030810 100%)' }}>
+      <div className="flex-1 relative min-h-0 flex flex-col items-center justify-center overflow-hidden" style={{ background: '#010610' }}>
+
+        {/* ── Depth background: atmospheric glow + vignette + grain ─────────────
+            Three layers create genuine spatial depth:
+            1. Vignette     — edge darkness, lens fall-off
+            2. Center glow  — soft ambient light on the physician's plane;
+                              no shapes/blobs, just a tonal gradient that makes
+                              the centre feel closer than the receding edges
+            3. Grain        — film texture sits on top, visible throughout     */}
+
+        {/* 1. Vignette — darkens edges, creates lens falloff */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{ background: 'radial-gradient(ellipse 75% 65% at 50% 44%, transparent 18%, rgba(0,1,10,0.92) 100%)' }}
+        />
+
+        {/* 2. Atmospheric centre glow — featureless, no bokeh circles.
+            Implies ambient light on the physician space; edges stay dark.
+            Blue-navy tint (matches app accent) reinforces the space's colour. */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: [
+              'radial-gradient(ellipse 65% 75% at 50% 44%, rgba(28,68,140,0.82) 0%, rgba(12,30,72,0.45) 50%, transparent 75%)',
+              'radial-gradient(ellipse 40% 35% at 50% 22%, rgba(40,88,175,0.38) 0%, transparent 68%)',
+            ].join(', '),
+          }}
+        />
+
+        {/* 3. Film grain — topmost so it textures the whole lit-and-dark space */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C%2Ffilter%3E%3Crect width='256' height='256' filter='url(%23g)'/%3E%3C%2Fsvg%3E")`,
+            backgroundRepeat: 'repeat',
+            backgroundSize: '256px 256px',
+            opacity: 0.28,
+          }}
+        />
 
         {/* Back button — pinned to the top-right corner of the dark stage */}
         <div className="absolute top-3 right-3 z-40">
@@ -2360,26 +2398,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
             </div>
           )}
 
-          {/* Physician nameplate — glass pill at bottom-center */}
-          {selectedPhysician && (
-            <div className="absolute bottom-4 left-0 right-0 flex justify-center z-10 pointer-events-none">
-              <div className="bg-black/55 backdrop-blur-md rounded-2xl px-5 py-2 text-center max-w-xs">
-                <p className="text-white font-semibold text-sm leading-tight">
-                  {selectedPhysician.name}
-                </p>
-                {(selectedPhysician.specialty || selectedPhysician.segment) && (
-                  <p className="text-white/55 text-xs mt-0.5">
-                    {[selectedPhysician.specialty, selectedPhysician.segment].filter(Boolean).join(' · ')}
-                  </p>
-                )}
-                {physicianMindsets[physicianIdRef.current ?? ''] && (
-                  <p className="mt-1 inline-flex items-center gap-1 text-[10px] font-medium text-violet-200/80 bg-violet-900/40 border border-violet-700/40 px-2 py-0.5 rounded-full">
-                    {physicianMindsets[physicianIdRef.current ?? '']}
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
+          {/* Nameplate moved outside the avatar square — rendered below */}
 
           {/* Compliance block notices — higher z so they overlay the nameplate */}
           {visibleMessages.filter(m => m.isComplianceBlock).slice(-1).map(m => (
@@ -2398,6 +2417,25 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
 
         </div>
         {/* END square avatar window */}
+
+        {/* Physician nameplate — below the avatar square, on the gradient stage */}
+        {selectedPhysician && (
+          <div className="mt-4 mb-1 text-center pointer-events-none select-none">
+            <p className="text-white font-semibold text-base leading-tight tracking-wide" style={{ textShadow: '0 1px 12px rgba(37,99,235,0.5)' }}>
+              {selectedPhysician.name}
+            </p>
+            {(selectedPhysician.specialty || selectedPhysician.segment) && (
+              <p className="text-white/50 text-xs mt-1 tracking-widest uppercase font-medium">
+                {[selectedPhysician.specialty, selectedPhysician.segment].filter(Boolean).join(' · ')}
+              </p>
+            )}
+            {physicianMindsets[physicianIdRef.current ?? ''] && (
+              <p className="mt-2.5 inline-flex items-center gap-1 text-[10px] font-semibold text-violet-200/90 bg-violet-900/50 border border-violet-600/40 px-3 py-0.5 rounded-full backdrop-blur-sm tracking-wide">
+                {physicianMindsets[physicianIdRef.current ?? '']}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* ── Transcript overlay — slides over avatar when showTranscript=true ── */}
         {showTranscript && (
@@ -2466,38 +2504,119 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
       </div>
 
       {/* ── Bottom bar ─────────────────────────────────────────────────────── */}
-      <div className="shrink-0 px-3 pt-2 pb-2" style={{ background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(16px)', borderTop: '1px solid rgba(0,0,0,0.08)' }}>
-        {/* Timer row: label | progress bar | voice+video */}
-        <div className="mb-2 flex items-center gap-2">
-          <div className="w-20 shrink-0">
-            {timeRemaining !== null && sessionDuration !== null ? (
-              isLastThird ? (
-                <span className="text-xs font-bold px-2 py-0.5 rounded" style={{ background: '#b04848', color: 'white' }}>
-                  {timeRemaining}s
-                </span>
-              ) : (
-                <p className="text-xs font-medium text-gray-600">{timeRemaining}s</p>
-              )
-            ) : null}
-          </div>
-          <div className="flex-1">
-            {timeRemaining !== null && sessionDuration !== null && (
-              <div className="w-full h-1 bg-gray-200 rounded-full overflow-hidden">
-                <div
-                  style={{
-                    width: `${(timeRemaining / sessionDuration) * 100}%`,
-                    height: '100%',
-                    background: timerRatio !== null && timerRatio > 2/3 ? '#4e9e6b' : timerRatio !== null && timerRatio > 1/3 ? '#c07c3a' : '#b04848',
-                    transition: 'width 1s linear, background 1s ease',
-                  }}
-                />
+      <div className="shrink-0 px-4 pt-3 pb-4" style={{ background: 'rgba(252,252,253,0.97)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+
+        {/* Row 1 — centred controls: timer · transcript · mic · end-session */}
+        <div className="flex items-center justify-center gap-2.5 mb-3">
+
+          {/* Hourglass timer ring — visible while session is running */}
+          {timeRemaining !== null && sessionDuration !== null && (() => {
+            const ringColor = timerRatio !== null && timerRatio > 2/3 ? '#22c55e' : timerRatio !== null && timerRatio > 1/3 ? '#f97316' : '#ef4444';
+            return (
+              <div className="relative w-10 h-10 shrink-0" title={`${timeRemaining}s remaining`}>
+                <svg className="absolute inset-0 w-full h-full" viewBox="0 0 44 44">
+                  <circle cx="22" cy="22" r={18} fill="none" stroke="rgba(0,0,0,0.07)" strokeWidth="3" />
+                  <circle
+                    cx="22" cy="22" r={18} fill="none"
+                    stroke={ringColor} strokeWidth="3"
+                    strokeDasharray={2 * Math.PI * 18}
+                    strokeDashoffset={timerRatio !== null ? 2 * Math.PI * 18 * (1 - timerRatio) : 0}
+                    strokeLinecap="round"
+                    transform="rotate(-90 22 22)"
+                    style={{ transition: 'stroke-dashoffset 1s linear, stroke 1s ease' }}
+                  />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <Hourglass className="w-3.5 h-3.5" style={{ color: ringColor }} />
+                </div>
               </div>
-            )}
-          </div>
-          {/* Pinned voice/video toggles */}
-          <div className="flex items-center gap-1 shrink-0">
+            );
+          })()}
+
+          {/* Transcript toggle — solid blue fill when open */}
+          <Button
+            type="button" size="icon" variant="ghost"
+            onClick={() => setShowTranscript((v) => !v)}
+            className={`h-9 w-9 rounded-full shrink-0 transition-all duration-150 ${
+              showTranscript
+                ? 'bg-blue-500 text-white shadow-lg shadow-blue-200 hover:bg-blue-600'
+                : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100'
+            }`}
+            title={showTranscript ? 'Hide transcript' : 'Show transcript'}
+          >
+            <MessageSquare className="w-4 h-4" />
+          </Button>
+
+          {/* Microphone */}
+          <AudioInput
+            onTranscript={(text) => {
+              const corrected = correctorRef.current(text);
+              if (corrected !== text) console.log(`[corrector] Whisper: "${text}" → "${corrected}"`);
+              setInputValue((prev) => prev + (prev ? ' ' : '') + corrected);
+            }}
+            onAutoSubmit={handleAutoSubmit}
+            onCountdown={(pct) => setTranscriptCountdownActive(pct !== null)}
+            userTyping={userTyping}
+            disabled={sessionEnded || !roleplaying}
+          />
+
+          {/* End / New session */}
+          {sessionEnded ? (
+            <Button
+              type="button" variant="ghost" size="icon"
+              onClick={handleNewSession}
+              title="New session"
+              className="h-9 w-9 rounded-full shrink-0 text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all duration-150"
+            >
+              <RotateCcw className="w-4 h-4" />
+            </Button>
+          ) : (
+            <Button
+              type="button" variant="ghost" size="icon"
+              onClick={() => sendMessage('done', messagesRef.current)}
+              disabled={sessionEnded}
+              className="h-9 w-9 rounded-full shrink-0 text-gray-400 hover:text-white hover:bg-red-500 hover:shadow-lg hover:shadow-red-200 transition-all duration-150"
+              title="End session"
+            >
+              <PhoneOff className="w-4 h-4" />
+            </Button>
+          )}
+        </div>
+
+        {/* Row 2 — pill centred at max-w-2xl; voice/video pinned to far right */}
+        <div className="relative flex items-center justify-center">
+          <form onSubmit={handleSubmit} className="flex gap-2 items-center w-full max-w-2xl">
+            <textarea
+              ref={textareaRef}
+              rows={1}
+              placeholder={sessionEnded ? 'Session ended' : 'Type your response...'}
+              value={inputValue}
+              onChange={(e) => { setInputValue(e.target.value); setUserTyping(true); }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSubmit(e as unknown as React.FormEvent);
+                }
+              }}
+              onFocus={() => setUserTyping(true)}
+              onBlur={() => setUserTyping(false)}
+              disabled={sessionEnded}
+              className="flex-1 resize-none overflow-hidden rounded-full border border-gray-200/80 bg-white/90 px-5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400/80 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-100 focus-visible:border-blue-300 disabled:cursor-not-allowed disabled:opacity-40 leading-5 min-h-[40px] max-h-40 transition-all duration-200"
+            />
+            <Button
+              type="submit"
+              disabled={loading || !inputValue.trim() || sessionEnded}
+              size="icon"
+              className="rounded-full shrink-0 w-9 h-9 bg-gray-900 hover:bg-gray-700 text-white shadow-sm disabled:opacity-25 transition-all duration-150 hover:scale-105 active:scale-95"
+            >
+              <ArrowUp className="w-4 h-4" />
+            </Button>
+          </form>
+
+          {/* Voice / Video — absolute right edge, secondary controls */}
+          <div className="absolute right-0 flex items-center gap-0.5">
             {!ttsAvailable && (
-              <span className="text-xs text-amber-500" title="TTS unavailable">🔇</span>
+              <span className="text-xs text-amber-400 mr-1" title="TTS unavailable">🔇</span>
             )}
             <Button
               type="button" size="icon" variant="ghost"
@@ -2507,7 +2626,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                 setVoiceEnabled(next);
                 if (!next) stopCurrentAudio();
               }}
-              className="h-7 w-7 rounded-full text-gray-600 hover:text-gray-800 hover:bg-gray-100"
+              className={`h-8 w-8 rounded-full transition-all duration-150 ${voiceEnabled ? 'text-gray-500 hover:text-gray-800 hover:bg-gray-100' : 'text-gray-300 hover:text-gray-500 hover:bg-gray-100'}`}
               title={voiceEnabled ? 'Disable voice' : 'Enable voice'}
             >
               {voiceEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
@@ -2519,93 +2638,18 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                 setAvatarEnabled(next);
                 avatarEnabledRef.current = next;
                 if (next && sessionStarted && selectedPhysicianDataRef.current && !isAvatarConnected()) {
-                  // Connect the active provider mid-session
                   await initAvatar(selectedPhysicianDataRef.current);
                 } else if (!next) {
                   cleanupAvatar();
                 }
               }}
-              className={`h-7 w-7 rounded-full hover:bg-gray-100 ${avatarEnabled ? 'text-blue-500' : 'text-gray-400'}`}
+              className={`h-8 w-8 rounded-full transition-all duration-150 ${avatarEnabled ? 'text-blue-500 hover:text-blue-700 hover:bg-blue-50' : 'text-gray-300 hover:text-gray-500 hover:bg-gray-100'}`}
               title={avatarEnabled ? 'Disable video avatar' : 'Enable video avatar'}
             >
               {avatarEnabled ? <Video className="w-3.5 h-3.5" /> : <VideoOff className="w-3.5 h-3.5" />}
             </Button>
           </div>
         </div>
-
-        {/* Input row */}
-        <form onSubmit={handleSubmit} className="flex gap-2 items-center">
-          {/* Transcript toggle */}
-          <Button
-            type="button" size="icon" variant="ghost"
-            onClick={() => setShowTranscript((v) => !v)}
-            className={`h-8 w-8 rounded-full shrink-0 ${showTranscript ? 'bg-gray-200 text-gray-700' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}
-            title={showTranscript ? 'Hide transcript' : 'Show transcript'}
-          >
-            <MessageSquare className="w-4 h-4" />
-          </Button>
-          <AudioInput
-            onTranscript={(text) => {
-                // Apply the same brand-name corrector used for Tavus STT so that
-                // Whisper transcripts also get pharmaceutical spelling fixed
-                // (e.g. "venclexta" → "VENCLEXTA", "im-bruvica" → "Imbruvica").
-                const corrected = correctorRef.current(text);
-                if (corrected !== text) {
-                  console.log(`[corrector] Whisper: "${text}" → "${corrected}"`);
-                }
-                setInputValue((prev) => prev + (prev ? ' ' : '') + corrected);
-              }}
-            onAutoSubmit={handleAutoSubmit}
-            onCountdown={(pct) => setTranscriptCountdownActive(pct !== null)}
-            userTyping={userTyping}
-            disabled={sessionEnded || !roleplaying}
-          />
-          <textarea
-            ref={textareaRef}
-            rows={1}
-            placeholder={sessionEnded ? 'Session ended' : 'Type your response...'}
-            value={inputValue}
-            onChange={(e) => { setInputValue(e.target.value); setUserTyping(true); }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSubmit(e as unknown as React.FormEvent);
-              }
-            }}
-            onFocus={() => setUserTyping(true)}
-            onBlur={() => setUserTyping(false)}
-            disabled={sessionEnded}
-            className="flex-1 resize-none overflow-hidden rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-gray-400 disabled:cursor-not-allowed disabled:opacity-40 leading-5 min-h-[38px] max-h-40"
-          />
-          <Button
-            type="submit"
-            disabled={loading || !inputValue.trim() || sessionEnded}
-            size="icon"
-            className="rounded-full shrink-0 bg-gray-800 hover:bg-gray-700 text-white"
-          >
-            <Send className="w-4 h-4" />
-          </Button>
-          {sessionEnded ? (
-            <Button
-              type="button" variant="ghost" size="icon"
-              onClick={handleNewSession}
-              title="New session"
-              className="rounded-full shrink-0 text-gray-600 hover:text-gray-800 hover:bg-gray-100"
-            >
-              <RotateCcw className="w-4 h-4" />
-            </Button>
-          ) : (
-            <Button
-              type="button" variant="ghost" size="icon"
-              onClick={() => sendMessage('done', messagesRef.current)}
-              disabled={sessionEnded}
-              className="rounded-full shrink-0 text-slate-400 hover:text-red-500 hover:bg-red-50"
-              title="End session"
-            >
-              <Square className="w-4 h-4" />
-            </Button>
-          )}
-        </form>
       </div>
 
       {/* Complete Session banner — shown after session ends */}
