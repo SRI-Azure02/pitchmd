@@ -139,11 +139,17 @@ export async function POST(request: NextRequest) {
         // immediately and logged as 'blocked'.
         const repText = messages.filter(m => !m.internal).slice(-1)[0]?.content ?? '';
         let repTurnLogged = false; // guard against double-logging
+        // Captured here so Phase 4 can gate RAG on compliance status.
+        // 'clean' = no violations → physician converses naturally, no PI injection.
+        // 'flagged' = soft violation → inject PI so physician can challenge the claim.
+        // 'blocked' messages never reach Phase 4 (we return early below).
+        let repComplianceStatus: 'clean' | 'flagged' | 'blocked' = 'clean';
 
         try {
           const rules = await getComplianceRules();
           if (rules.length > 0 && repText) {
             const inputCheck = checkInput(repText, rules);
+            repComplianceStatus = inputCheck.status; // hoist for Phase 4
 
             if (inputCheck.status === 'blocked' && inputCheck.primaryViolation) {
               const v = inputCheck.primaryViolation;
@@ -211,17 +217,21 @@ export async function POST(request: NextRequest) {
         }
 
         // ── Phase 4: RAG context retrieval ───────────────────────────────────
-        // Retrieve the most relevant approved document chunks for this turn
-        // and inject them into the system prompt (strict RAG mode).
+        // PI context is injected ONLY when the rep's turn was compliance-flagged.
+        // For clean turns the physician converses naturally as a real HCP would —
+        // no PI reference unless the rep has said something non-compliant.
+        // This also skips the opening turn (repText empty = __begin_roleplay__).
         let ragSystemBlock = '';
-        try {
-          const ragChunks = await retrieveRelevantChunks(repText || 'CLL treatment venetoclax', sf);
-          ragSystemBlock = buildRagSystemBlock(ragChunks);
-          if (ragChunks.length > 0) {
-            console.log(`[rag] ${ragChunks.length} chunks retrieved (top similarity: ${ragChunks[0]?.similarity?.toFixed(3) ?? 'n/a'})`);
+        if (repText && repComplianceStatus === 'flagged') {
+          try {
+            const ragChunks = await retrieveRelevantChunks(repText, sf);
+            ragSystemBlock = buildRagSystemBlock(ragChunks);
+            if (ragChunks.length > 0) {
+              console.log(`[rag] ${ragChunks.length} chunks retrieved for flagged turn (top similarity: ${ragChunks[0]?.similarity?.toFixed(3) ?? 'n/a'})`);
+            }
+          } catch (ragErr: any) {
+            console.error('[rag] retrieval error (fail open):', ragErr?.message);
           }
-        } catch (ragErr: any) {
-          console.error('[rag] retrieval error (fail open):', ragErr?.message);
         }
 
         // Final system prompt = base + RAG context (if any documents ingested)

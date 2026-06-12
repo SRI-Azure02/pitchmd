@@ -98,7 +98,7 @@ export default function DashboardPage() {
       <div className="flex flex-col flex-1 w-full min-h-0">
 
         {/* Header */}
-        <div className="flex justify-between items-center px-6 pt-4 mb-3 shrink-0">
+        <div className="flex justify-between items-center px-6 pt-4 pb-3 mb-0 border-b border-slate-200/70 shrink-0">
           <div>
             <h1 style={{
               fontSize: '28px',

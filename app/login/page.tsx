@@ -47,7 +47,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-[#F1EFE9] flex items-center justify-center p-4">
-      <Card className="w-full max-w-lg shadow-lg bg-white">
+      <Card className="w-full max-w-lg bg-white shadow-[0_2px_8px_rgba(0,0,0,0.07),0_20px_60px_rgba(255,107,0,0.10)]">
         <div className="p-12">
           <div className="mb-10 text-center">
             <h1 className="text-4xl font-semibold text-slate-900 mb-3">PitchMD™</h1>

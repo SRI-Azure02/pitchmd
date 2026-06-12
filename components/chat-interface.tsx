@@ -1615,10 +1615,10 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
       return (
         <div className="flex flex-col h-full min-h-0">
           {/* ── Header ──────────────────────────────────────────────────── */}
-          <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b border-slate-100 shrink-0">
+          <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-100 shrink-0">
             <div>
-              <p className="text-lg font-semibold text-slate-900">Select a Physician</p>
-              <p className="text-sm text-slate-400">Choose who you'd like to practice with today</p>
+              <p className="text-xl font-semibold tracking-tight text-slate-900">Select a Physician</p>
+              <p className="text-sm text-slate-400 mt-0.5">Choose who you'd like to practice with today</p>
             </div>
             <div className="flex items-center gap-3">
               {/* Avatar provider toggle — applies to the next session you start */}
@@ -1693,14 +1693,6 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                 {showPhysicianId ? 'Hide ID' : 'Show ID'}
               </button>
 
-              {/* Segment */}
-              <PhysicianFilterDropdown label="Segment" options={uniqueSegments}
-                activeFilters={filterValues.segment}
-                onFilter={vals => setFilterValues(prev => ({ ...prev, segment: vals }))}
-                isOpen={openDropdown === 'segment'}
-                onOpen={() => setOpenDropdown('segment')}
-                onClose={() => setOpenDropdown(v => v === 'segment' ? null : v)}
-              />
               {/* Specialty */}
               <PhysicianFilterDropdown label="Specialty" options={uniqueSpecialties}
                 activeFilters={filterValues.specialty}
@@ -1708,6 +1700,14 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                 isOpen={openDropdown === 'specialty'}
                 onOpen={() => setOpenDropdown('specialty')}
                 onClose={() => setOpenDropdown(v => v === 'specialty' ? null : v)}
+              />
+              {/* Segment */}
+              <PhysicianFilterDropdown label="Segment" options={uniqueSegments}
+                activeFilters={filterValues.segment}
+                onFilter={vals => setFilterValues(prev => ({ ...prev, segment: vals }))}
+                isOpen={openDropdown === 'segment'}
+                onOpen={() => setOpenDropdown('segment')}
+                onClose={() => setOpenDropdown(v => v === 'segment' ? null : v)}
               />
               {/* Mindset */}
               <PhysicianFilterDropdown
@@ -1818,10 +1818,10 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
 
                     // Readiness badge colour
                     const readinessBadge = (val: string): React.CSSProperties => {
-                      if (val === 'Field Ready')   return { background: '#d1fae5', color: '#065f46' };
-                      if (val === 'Not Ready')     return { background: '#fee2e2', color: '#991b1b' };
-                      if (val === 'Approaching')   return { background: '#fef3c7', color: '#92400e' };
-                      return { background: '#f1f5f9', color: '#475569' };
+                      if (val === 'Field Ready')   return { background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0' };
+                      if (val === 'Not Ready')     return { background: '#fff7ed', color: '#c2410c', border: '1px solid #fed7aa' };
+                      if (val === 'Approaching')   return { background: '#fefce8', color: '#a16207', border: '1px solid #fde68a' };
+                      return { background: '#f8fafc', color: '#64748b', border: '1px solid #e2e8f0' };
                     };
 
                     return (
@@ -2117,43 +2117,49 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
       badge: string,
       action?: () => void,
       extraClass = '',
+      accentColor = '',
     ) => {
       const active = !!action;
+      const isHovered = hoveredSplashBtn === label;
       return (
         <button
           key={label}
           onClick={action}
           disabled={!active}
-          style={hoveredSplashBtn === label ? { background: 'linear-gradient(135deg, #C47B42, #C49868, #45A8C8)' } : {}}
+          style={isHovered ? { background: 'linear-gradient(135deg, #C47B42, #C49868, #45A8C8)' } : {}}
           onMouseEnter={() => { if (active) setHoveredSplashBtn(label); }}
           onMouseLeave={() => setHoveredSplashBtn(null)}
-          className={`relative flex items-center gap-5 rounded-2xl border px-6 py-12 text-left transition-all duration-200 ${
+          className={`relative overflow-hidden flex items-center gap-5 rounded-2xl border px-6 py-12 text-left transition-all duration-200 ${
             active
-              ? 'border-slate-200 bg-[#F1EFE9] shadow-sm hover:shadow-md hover:border-transparent cursor-pointer'
-              : 'border-slate-100 bg-slate-50/60 cursor-not-allowed'
+              ? 'border-slate-200 bg-[#F1EFE9] shadow-[0_1px_4px_rgba(0,0,0,0.05),0_4px_16px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.08),0_12px_32px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 cursor-pointer'
+              : 'border-slate-100 bg-[#F1EFE9]/60 cursor-not-allowed'
           } ${extraClass}`}
         >
+
           {/* Icon */}
           <div className={`shrink-0 transition-colors ${
-            active ? (hoveredSplashBtn === label ? 'text-white' : 'text-slate-500') : 'text-slate-300'
+            active ? (isHovered ? 'text-white' : 'text-slate-500') : 'text-slate-300'
           }`}>
             {icon}
           </div>
 
           {/* Text */}
           <div className="flex flex-col justify-between min-w-0 gap-3">
-            <span className={`text-xs font-semibold uppercase tracking-widest transition-colors ${
-              active ? (hoveredSplashBtn === label ? 'text-white/70' : 'text-slate-400') : 'text-slate-300'
-            }`}>
+            <span
+              className={`text-xs font-semibold uppercase tracking-widest transition-colors ${
+                active ? (isHovered ? 'text-white/70' : '') : 'text-slate-300'
+              }`}
+              style={active && !isHovered && accentColor ? { color: accentColor } : {}}
+            >
               {badge}
             </span>
             <p className={`font-semibold text-base leading-snug transition-colors ${
-              active ? (hoveredSplashBtn === label ? 'text-white' : 'text-slate-800') : 'text-slate-400'
+              active ? (isHovered ? 'text-white' : 'text-slate-800') : 'text-slate-400'
             }`}>
               {label}
             </p>
             <p className={`text-sm leading-snug transition-colors ${
-              active ? (hoveredSplashBtn === label ? 'text-white/80' : 'text-slate-500') : 'text-slate-300'
+              active ? (isHovered ? 'text-white/80' : 'text-slate-500') : 'text-slate-300'
             }`}>
               {description}
             </p>
@@ -2227,6 +2233,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
               'Pre-Field',
               handleStartSession,
               'flex-1',
+              '#BF4E19',
             )}
             {splashTile(
               'Review Performance',
@@ -2235,6 +2242,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
               'Pre-Field',
               () => setPerformanceMode(true),
               'flex-1',
+              '#BF4E19',
             )}
           </div>
 
@@ -2247,6 +2255,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
               'In-Field',
               () => setEngagementPlaybookMode(true),
               'w-full',
+              '#2B5FA6',
             )}
           </div>
 
@@ -2259,6 +2268,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
               'Post-Field',
               () => setCallJournalMode(true),
               'flex-1',
+              '#0D8A78',
             )}
             {splashTile(
               'Loop Back',
@@ -2267,6 +2277,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
               'Post-Field',
               () => setLoopBackMode(true),
               'flex-1',
+              '#0D8A78',
             )}
           </div>
 
