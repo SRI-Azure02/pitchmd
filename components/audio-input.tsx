@@ -31,12 +31,17 @@ const SEGMENT_MS    = 3000;  // MediaRecorder timeslice — collect data every 3
 const SUBMIT_WAIT   = 10_000; // ms of transcript silence before auto-submit
 const MIN_BLOB_SIZE  = 500;  // bytes — smaller blobs are almost certainly silent
 const MIN_WORDS      = 1;   // minimum word count to accept a transcript
-// Minimum peak RMS amplitude (0–127 scale) to accept a segment as speech.
-// Below this value the window is treated as silence / background noise and
-// skipped without calling the STT API.  Set to 1 to pass all but
-// completely silent segments — low-gain mics (e.g. Edge on Windows)
-// may only reach RMS 2–5 during normal speech.
-const SPEECH_MIN_RMS = 1;
+
+// ── Dynamic RMS threshold (replaces the old hardcoded SPEECH_MIN_RMS) ───────
+// On each recording start we run a short calibration window to measure the
+// device's ambient noise floor, then set the gate to floor × CALIB_FACTOR.
+// The calibrated value is persisted in localStorage (keyed by browser deviceId)
+// so subsequent sessions load the threshold instantly without waiting.
+const MIN_RMS_THRESHOLD  = 1;    // absolute floor — never gate below this
+const CALIB_MS           = 2000; // ambient sampling window in ms
+const CALIB_FACTOR       = 2.5;  // threshold = ambient_p25 × CALIB_FACTOR
+const STORAGE_KEY_PREFIX = 'pitchmd:mic-rms:';
+const STORAGE_TTL_MS     = 7 * 24 * 60 * 60 * 1000; // 7 days
 const RING_R        = 20;
 const CIRCUMFERENCE = 2 * Math.PI * RING_R;
 
@@ -80,6 +85,10 @@ export default function AudioInput({
   const dataArrayRef      = useRef<Uint8Array<ArrayBuffer> | null>(null);
   const peakVolumeRef     = useRef<number>(0);
   const volumeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Dynamic calibration
+  const dynamicThresholdRef = useRef<number>(MIN_RMS_THRESHOLD);
+  const calibSamplesRef     = useRef<number[]>([]);
+  const calibTimerRef       = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setSupported(
@@ -151,7 +160,7 @@ export default function AudioInput({
       streamRef.current = stream;
 
       // Wire up amplitude analyser so each 3-second segment can be checked
-      // against SPEECH_MIN_RMS before sending to the STT API.
+      // against a dynamic threshold before sending to the STT API.
       try {
         const audioCtx = new AudioContext();
         audioCtxRef.current = audioCtx;
@@ -160,17 +169,55 @@ export default function AudioInput({
         analyserRef.current = analyser;
         dataArrayRef.current = new Uint8Array(analyser.frequencyBinCount) as Uint8Array<ArrayBuffer>;
         audioCtx.createMediaStreamSource(stream).connect(analyser);
-        // Sample every 80 ms and record the peak RMS over each window.
+        // Sample every 80 ms — track peak for the current segment and collect
+        // raw samples during the calibration window.
         volumeIntervalRef.current = setInterval(() => {
           if (!analyserRef.current || !dataArrayRef.current) return;
           analyserRef.current.getByteTimeDomainData(dataArrayRef.current);
           const sum = dataArrayRef.current.reduce((acc, v) => acc + (v - 128) ** 2, 0);
           const rms = Math.sqrt(sum / dataArrayRef.current.length);
           if (rms > peakVolumeRef.current) peakVolumeRef.current = rms;
+          // Collect raw samples while calibration window is open
+          if (calibTimerRef.current !== null) calibSamplesRef.current.push(rms);
         }, 80);
       } catch {
         // AudioContext unavailable (e.g. jsdom in tests) — proceed without gating
       }
+
+      // ── Dynamic threshold calibration ──────────────────────────────────────
+      // Load a saved threshold from a previous session for this device first
+      // so the gate works correctly from the very first segment.
+      const deviceId   = stream.getAudioTracks()[0]?.getSettings()?.deviceId ?? 'default';
+      const storageKey = `${STORAGE_KEY_PREFIX}${deviceId}`;
+      dynamicThresholdRef.current = MIN_RMS_THRESHOLD; // safe bootstrap default
+      try {
+        const raw = localStorage.getItem(storageKey);
+        if (raw) {
+          const saved = JSON.parse(raw) as { threshold: number; ts: number };
+          if (Date.now() - saved.ts < STORAGE_TTL_MS && saved.threshold >= MIN_RMS_THRESHOLD) {
+            dynamicThresholdRef.current = saved.threshold;
+            console.log(`[audio-input] loaded cached RMS threshold ${saved.threshold.toFixed(1)} for device …${deviceId.slice(-6)}`);
+          }
+        }
+      } catch { /* ignore localStorage errors */ }
+
+      // Always run a fresh calibration in the background to keep the threshold
+      // accurate (e.g. the user moved to a noisier room).
+      calibSamplesRef.current = [];
+      calibTimerRef.current = setTimeout(() => {
+        calibTimerRef.current = null; // mark calibration complete
+        const samples = [...calibSamplesRef.current];
+        calibSamplesRef.current = [];
+        if (samples.length === 0) return;
+        samples.sort((a, b) => a - b);
+        const p25      = samples[Math.floor(samples.length * 0.25)];
+        const newThr   = Math.max(MIN_RMS_THRESHOLD, Math.round(p25 * CALIB_FACTOR * 10) / 10);
+        dynamicThresholdRef.current = newThr;
+        try {
+          localStorage.setItem(storageKey, JSON.stringify({ threshold: newThr, ts: Date.now() }));
+        } catch { /* ignore */ }
+        console.log(`[audio-input] calibrated RMS threshold → ${newThr.toFixed(1)} (p25=${p25.toFixed(1)}, ${samples.length} samples, device …${deviceId.slice(-6)})`);
+      }, CALIB_MS);
 
       const mime = pickMimeType();
       mimeTypeRef.current = mime;
@@ -188,8 +235,9 @@ export default function AudioInput({
           // Amplitude gate — skip silent / background-noise windows
           const peak = peakVolumeRef.current;
           peakVolumeRef.current = 0; // reset for next window
-          if (peak < SPEECH_MIN_RMS) {
-            console.log(`[audio-input] quiet segment skipped (peak RMS ${peak.toFixed(1)} < ${SPEECH_MIN_RMS})`);
+          const thr = dynamicThresholdRef.current;
+          if (peak < thr) {
+            console.log(`[audio-input] quiet segment skipped (peak RMS ${peak.toFixed(1)} < threshold ${thr.toFixed(1)})`);
             return;
           }
           transcribeBlob(blob);
@@ -208,6 +256,9 @@ export default function AudioInput({
 
   const stopRecording = () => {
     clearSubmitTimer();
+    // Tear down calibration
+    if (calibTimerRef.current) { clearTimeout(calibTimerRef.current); calibTimerRef.current = null; }
+    calibSamplesRef.current = [];
     // Tear down amplitude tracker
     if (volumeIntervalRef.current) { clearInterval(volumeIntervalRef.current); volumeIntervalRef.current = null; }
     audioCtxRef.current?.close().catch(() => {});
