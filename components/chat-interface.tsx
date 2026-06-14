@@ -1661,7 +1661,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
           </div>
 
           {/* ── Filter ribbon ───────────────────────────────────────────── */}
-          <div className="shrink-0 px-4 py-2.5 border-b border-slate-100 bg-slate-50/60">
+          <div className="shrink-0 px-4 py-2.5 border-b border-slate-200 bg-slate-100/80">
             <div className="flex flex-wrap items-center gap-2">
               {/* Search */}
               <div className="relative flex-1 min-w-[180px] max-w-xs">
@@ -1756,6 +1756,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
           </div>
 
           {/* ── Physician table ──────────────────────────────────────────── */}
+          <div className="shrink-0 h-px" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.14) 0%, transparent 100%)', height: '8px', pointerEvents: 'none' }} />
           <div className="flex-1 overflow-auto">
             {physicianHook.loading ? (
               <div className="flex items-center justify-center h-40 gap-2 text-slate-400">

@@ -459,6 +459,9 @@ export default function EngagementPlaybook({ username: _username, onBack }: Enga
         </div>
       </div>
 
+      {/* Shadow strip */}
+      <div className="shrink-0" style={{ height: '8px', background: 'linear-gradient(to bottom, rgba(0,0,0,0.14) 0%, transparent 100%)', pointerEvents: 'none' }} />
+
       {/* ── Table ──────────────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-auto">
         {hook.loading ? (

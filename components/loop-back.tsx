@@ -346,6 +346,9 @@ export default function LoopBack({ username: _username, onBack }: LoopBackProps)
         </div>
       </div>
 
+      {/* Shadow strip */}
+      <div className="shrink-0" style={{ height: '8px', background: 'linear-gradient(to bottom, rgba(0,0,0,0.14) 0%, transparent 100%)', pointerEvents: 'none' }} />
+
       {/* All pending — collapsible, oldest first */}
       <div className="flex-1 overflow-auto">
         {!loading && allPendingTasks.length > 0 && (
@@ -462,7 +465,7 @@ export default function LoopBack({ username: _username, onBack }: LoopBackProps)
                 return (
                   <React.Fragment key={p.PHYSICIAN_ID}>
                     <tr
-                      className="group border-b border-slate-100 hover:bg-slate-100/70 transition-colors cursor-pointer"
+                      className="group border-b border-slate-100 bg-white hover:bg-slate-50 transition-colors cursor-pointer"
                       onClick={() => setExpandedId(prev => prev === p.PHYSICIAN_ID ? null : p.PHYSICIAN_ID)}
                     >
                       {/* Name */}

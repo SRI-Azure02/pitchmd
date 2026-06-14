@@ -663,6 +663,9 @@ export default function CallJournal({ username, onBack }: CallJournalProps) {
         )}
       </div>
 
+      {/* Shadow strip */}
+      <div className="shrink-0" style={{ height: '8px', background: 'linear-gradient(to bottom, rgba(0,0,0,0.14) 0%, transparent 100%)', pointerEvents: 'none' }} />
+
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-4 py-3">
         <div className="space-y-3">

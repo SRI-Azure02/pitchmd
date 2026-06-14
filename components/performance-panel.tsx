@@ -245,6 +245,9 @@ export default function PerformancePanel({ onBack }: PerformancePanelProps) {
         </button>
       </div>
 
+      {/* Shadow strip */}
+      <div className="shrink-0" style={{ height: '8px', background: 'linear-gradient(to bottom, rgba(0,0,0,0.14) 0%, transparent 100%)', pointerEvents: 'none' }} />
+
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
         {loading && (
