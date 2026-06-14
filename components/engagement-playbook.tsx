@@ -107,8 +107,8 @@ function FilterDropdown({ label, options, value, onChange, isOpen, onToggle }: {
 function PbCard({ label, children, className = '' }: { label: string; children: React.ReactNode; className?: string }) {
   return (
     <div className={`rounded-xl border border-slate-200 bg-white overflow-hidden flex flex-col ${className}`}>
-      <div className="px-4 py-2 border-b border-slate-100 bg-slate-50/60 shrink-0">
-        <span className="text-xs font-semibold uppercase tracking-widest text-slate-400">{label}</span>
+      <div className="px-4 py-2 border-b border-slate-100 bg-white shrink-0">
+        <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#2B5FA6' }}>{label}</span>
       </div>
       <div className="px-4 py-3 flex-1">{children}</div>
     </div>
@@ -273,7 +273,7 @@ export default function EngagementPlaybook({ username: _username, onBack }: Enga
 
         {/* ── Row 1: Summary — full width ─────────────────────────────────── */}
         <div className="rounded-xl border border-slate-200 overflow-hidden">
-          <div className="px-4 pt-3 pb-2.5 bg-gradient-to-r from-orange-50 to-sky-50 border-b border-slate-100">
+          <div className="px-4 pt-3 pb-2.5 bg-white border-b border-slate-100">
             {physician?.SEGMENT_NAME && (
               <span className="inline-block text-xs font-semibold px-2.5 py-0.5 rounded-full bg-orange-100 text-orange-700 mb-1.5">
                 {physician.SEGMENT_NAME}
@@ -351,9 +351,11 @@ export default function EngagementPlaybook({ username: _username, onBack }: Enga
                 </span>
               )}
             </span>
-            {tasksExpanded
-              ? <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
-              : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+              stroke={tasksExpanded ? '#2B5FA6' : '#cbd5e1'}
+              strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points={tasksExpanded ? "18 15 12 9 6 15" : "6 9 12 15 18 9"} />
+            </svg>
           </button>
           {tasksExpanded && (
             <div className="px-4 py-3">
@@ -386,6 +388,7 @@ export default function EngagementPlaybook({ username: _username, onBack }: Enga
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-slate-100 bg-white shrink-0">
         <div>
+          <span className="text-xs font-bold uppercase tracking-widest" style={{ color: '#2B5FA6' }}>In-field</span>
           <p className="text-lg font-semibold text-slate-900">Engagement Playbook</p>
           <p className="text-sm text-slate-400">AI-powered pre-call brief for every physician visit</p>
         </div>
@@ -502,9 +505,12 @@ export default function EngagementPlaybook({ username: _username, onBack }: Enga
                       {/* Physician name */}
                       <td className="px-4 py-3 font-semibold text-slate-900 whitespace-nowrap">
                         <span className="flex items-center gap-2">
-                          {expanded
-                            ? <ChevronUp   className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                            : <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />}
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                            stroke={expanded ? '#2B5FA6' : '#cbd5e1'}
+                            strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"
+                            className="shrink-0">
+                            <polyline points={expanded ? "18 15 12 9 6 15" : "6 9 12 15 18 9"} />
+                          </svg>
                           Dr. {p.FIRST_NAME} {p.LAST_NAME}
                         </span>
                       </td>

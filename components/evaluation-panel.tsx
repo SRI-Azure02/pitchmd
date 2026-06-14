@@ -3,8 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
-  BarChart, Bar, Cell, XAxis, Tooltip, ResponsiveContainer,
-  ComposedChart, Area, Line, Legend,
+  ComposedChart, Area, Line, XAxis, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
 import { parseSnowflakeDate, formatDateTime } from '@/lib/dates';
 
@@ -71,7 +70,12 @@ function CollapsibleDimension({ title, score, rationale, indicators, sessionCoun
               }`}>{Number(score).toFixed(1)}/10</span>
           )}
         </div>
-        <span className="text-slate-400 text-lg">{open ? '−' : '+'}</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+          stroke={open ? '#BF4E19' : '#cbd5e1'}
+          strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"
+          className="shrink-0">
+          <polyline points={open ? "18 15 12 9 6 15" : "6 9 12 15 18 9"} />
+        </svg>
       </button>
       {open && (
         <div className="px-5 pb-5 space-y-4 border-t border-slate-100">
@@ -250,8 +254,6 @@ export default function EvaluationPanel({ open, onClose, content, username, phys
 
   const aggregationNote = `Aggregated across ${sessionCount} most recent session${sessionCount !== 1 ? 's' : ''} with this physician`;
 
-  const barData = DIMENSIONS.map(d => ({ name: d.short, fullName: d.label, score: e?.[d.key] ?? 0 }));
-
   const histPhysicianData = historyWithPhysician.map((r: any) => ({
     date: formatDateTime(r.EVALUATED_AT),
     Overall: r.OVERALL_SCORE, CK: r.CLINICAL_KNOWLEDGE_SCORE, OH: r.OBJECTION_HANDLING_SCORE,
@@ -302,6 +304,7 @@ export default function EvaluationPanel({ open, onClose, content, username, phys
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[90vh] overflow-y-auto" style={{ maxWidth: '90rem', width: '90vw' }}>
         <DialogHeader>
+          <span className="text-xs font-bold uppercase tracking-widest" style={{ color: '#BF4E19' }}>Session evaluation</span>
           <DialogTitle className="text-xl font-bold text-slate-900">
             Evaluation Report
             {physicianName && <span className="ml-2 text-base font-normal text-slate-500">— {physicianName}</span>}
@@ -363,7 +366,7 @@ export default function EvaluationPanel({ open, onClose, content, username, phys
               {Array.isArray(e.RECOMMENDATIONS) && e.RECOMMENDATIONS.length > 0 ? (
                 <ul className="space-y-2">{e.RECOMMENDATIONS.map((rec: string, i: number) => (
                   <li key={i} className="flex items-start gap-2">
-                    <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
+                    <span className="mt-1.5 w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#2B5FA6' }} />
                     <span className="text-sm text-slate-700 leading-relaxed">{rec}</span>
                   </li>
                 ))}</ul>
@@ -371,23 +374,25 @@ export default function EvaluationPanel({ open, onClose, content, username, phys
             </div>
             <div className="border border-slate-200 rounded-lg p-5 bg-white">
               <p className="text-sm font-bold text-slate-800 mb-1">Dimension Scores</p>
-              <p className="text-xs text-slate-400 mb-4">Median across most recent {sessionCount} session{sessionCount !== 1 ? 's' : ''}</p>
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={barData} margin={{ top: 20, right: 10, left: 10, bottom: 5 }}>
-                  <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                  <Tooltip formatter={(value: any, name: any, props: any) => [value, props.payload.fullName]} />
-                  <Bar dataKey="score" radius={[4, 4, 0, 0]} label={{ position: 'top', fontSize: 12, fontWeight: 600, formatter: (v: any) => Number(v).toFixed(1) }}>
-                    {barData.map((entry, index) => <Cell key={index} fill={DIM_COLORS[index]} />)}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-              <div className="flex flex-wrap gap-x-6 gap-y-1 mt-3 justify-center">
-                {DIMENSIONS.map((d, i) => (
-                  <span key={d.short} className="flex items-center gap-1.5 text-xs text-slate-500">
-                    <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: DIM_COLORS[i] }} />
-                    <span className="font-bold text-slate-700">{d.short}</span> — {d.label}
-                  </span>
-                ))}
+              <p className="text-xs text-slate-400 mb-4">Median across most recent {sessionCount} session{sessionCount !== 1 ? 's' : ''} · expand below for full details</p>
+              <div className="grid grid-cols-5 gap-2">
+                {DIMENSIONS.map((d, i) => {
+                  const score = e?.[d.key] != null ? Number(e[d.key]) : null;
+                  const pct = score != null ? (score / 10) * 100 : 0;
+                  const scoreColor = score == null ? '#94a3b8' : score >= 8 ? '#047857' : score >= 6 ? '#b45309' : '#dc2626';
+                  const bg = score == null ? '#f8fafc' : score >= 8 ? '#f0fdf9' : score >= 6 ? '#fefce8' : '#fff7ed';
+                  const border = score == null ? '#e2e8f0' : score >= 8 ? '#a7f3d0' : score >= 6 ? '#fef08a' : '#fed7aa';
+                  return (
+                    <div key={d.short} className="rounded-xl p-3 text-center" style={{ background: bg, border: `1px solid ${border}` }}>
+                      <p className="text-[10px] font-bold uppercase tracking-wide mb-0.5" style={{ color: DIM_COLORS[i] }}>{d.short}</p>
+                      <p className="text-xl font-bold mb-1" style={{ color: scoreColor }}>{score != null ? score.toFixed(1) : '—'}</p>
+                      <div className="h-1.5 rounded-full mb-1.5" style={{ background: '#e2e8f0' }}>
+                        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: DIM_COLORS[i] }} />
+                      </div>
+                      <p className="text-[9px] text-slate-400 leading-tight">{d.label}</p>
+                    </div>
+                  );
+                })}
               </div>
             </div>
             <CollapsibleDimension title="Clinical Knowledge" score={e.CLINICAL_KNOWLEDGE_SCORE} rationale={e.CLINICAL_KNOWLEDGE_RATIONALE} sessionCount={sessionCount} indicators={[

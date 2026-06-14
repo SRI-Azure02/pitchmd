@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Shield, ChevronDown, ChevronUp, Check, Clock, AlertTriangle, Search, X, Upload, FileText, Database, Bell, Trash2, Loader2 } from 'lucide-react';
+import { Shield, Check, Clock, AlertTriangle, Search, X, Upload, FileText, Database, Bell, Trash2, Loader2 } from 'lucide-react';
 
 interface EscalationAlert {
   PATTERN_ID: string;
@@ -253,7 +253,7 @@ export default function ComplianceDashboard({ onBack }: { onBack: () => void }) 
       {/* Header */}
       <div className="flex items-center justify-between px-6 pt-5 pb-3 border-b border-slate-100 shrink-0">
         <div className="flex items-center gap-3">
-          <Shield className="w-5 h-5 text-slate-400" />
+          <Shield className="w-7 h-7 text-slate-400" />
           <div>
             <p className="text-lg font-semibold text-slate-900">Compliance</p>
             <p className="text-sm text-slate-400">Audit log · Document library</p>
@@ -272,7 +272,7 @@ export default function ComplianceDashboard({ onBack }: { onBack: () => void }) 
             onClick={() => setActiveTab(key)}
             className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
               activeTab === key
-                ? 'border-blue-500 text-blue-600'
+                ? 'border-[#BF4E19] text-[#BF4E19]'
                 : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
@@ -532,7 +532,12 @@ export default function ComplianceDashboard({ onBack }: { onBack: () => void }) 
                         {reviewingSession === s.SESSION_ID ? 'Marking…' : 'Mark reviewed'}
                       </button>
                     )}
-                    {isExpanded ? <ChevronUp className="w-4 h-4 text-slate-400 shrink-0" /> : <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />}
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                      stroke={isExpanded ? '#BF4E19' : '#94a3b8'}
+                      strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"
+                      className="shrink-0">
+                      <polyline points={isExpanded ? "18 15 12 9 6 15" : "6 9 12 15 18 9"} />
+                    </svg>
                   </div>
                 </div>
               </div>

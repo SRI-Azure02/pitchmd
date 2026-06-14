@@ -21,10 +21,10 @@ const DIMS = [
 ];
 
 function readinessColor(r: string | null) {
-  if (!r) return 'bg-slate-100 text-slate-600';
-  if (r === 'Field Ready') return 'bg-green-100 text-green-700';
-  if (r.includes('Coaching')) return 'bg-yellow-100 text-yellow-700';
-  return 'bg-red-100 text-red-700';
+  if (!r) return 'bg-slate-100 text-slate-500';
+  if (r === 'Field Ready') return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
+  if (r.includes('Coaching')) return 'bg-amber-50 text-amber-700 border border-amber-200';
+  return 'bg-red-50 text-red-700 border border-red-200';
 }
 
 function toChartRows(rows: any[]) {
@@ -89,7 +89,12 @@ function ScoreRibbon({
                 {score != null ? score.toFixed(1) : '—'}
                 <span className="text-sm font-normal text-slate-400"> /10</span>
               </span>
-              <span className="text-slate-400 text-lg ml-2">{expanded ? '−' : '+'}</span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                stroke={expanded ? '#BF4E19' : '#cbd5e1'}
+                strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"
+                className="ml-2 shrink-0">
+                <polyline points={expanded ? "18 15 12 9 6 15" : "6 9 12 15 18 9"} />
+              </svg>
             </>
           )}
         </div>
@@ -100,6 +105,27 @@ function ScoreRibbon({
           <p className="text-xs text-slate-400 pt-4">
             Aggregated across {sessionCount} most recent session{sessionCount !== 1 ? 's' : ''} with this physician segment.
           </p>
+
+          {/* Dimension mini-cards */}
+          <div className="grid grid-cols-5 gap-2">
+            {DIMS.map((d, i) => {
+              const score = summary?.[d.key] != null ? Number(summary[d.key]) : null;
+              const pct = score != null ? (score / 10) * 100 : 0;
+              const scoreColor = score == null ? '#94a3b8' : score >= 8 ? '#047857' : score >= 6 ? '#b45309' : '#dc2626';
+              const bg = score == null ? '#f8fafc' : score >= 8 ? '#f0fdf9' : score >= 6 ? '#fefce8' : '#fff7ed';
+              const border = score == null ? '#e2e8f0' : score >= 8 ? '#a7f3d0' : score >= 6 ? '#fef08a' : '#fed7aa';
+              return (
+                <div key={d.short} className="rounded-xl p-2.5 text-center" style={{ background: bg, border: `1px solid ${border}` }}>
+                  <p className="text-[10px] font-bold uppercase tracking-wide mb-0.5" style={{ color: DIM_COLORS[i] }}>{d.short}</p>
+                  <p className="text-xl font-bold" style={{ color: scoreColor }}>{score != null ? score.toFixed(1) : '—'}</p>
+                  <div className="h-1 rounded-full my-1.5" style={{ background: '#e2e8f0' }}>
+                    <div className="h-full rounded-full" style={{ width: `${pct}%`, background: DIM_COLORS[i] }} />
+                  </div>
+                  <p className="text-[9px] text-slate-400 leading-tight">{d.label}</p>
+                </div>
+              );
+            })}
+          </div>
 
           {summary?.COACHING_PRIORITY && (
             <div>
@@ -207,6 +233,7 @@ export default function PerformancePanel({ onBack }: PerformancePanelProps) {
       {/* Header */}
       <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-slate-100 bg-white shrink-0">
         <div>
+          <span className="text-xs font-bold uppercase tracking-widest" style={{ color: '#BF4E19' }}>Pre-field</span>
           <p className="text-lg font-semibold text-slate-900">Review Performance</p>
           <p className="text-sm text-slate-400">Scores and feedback from your recent training sessions</p>
         </div>

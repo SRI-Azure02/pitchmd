@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { usePhysicianList } from '@/lib/hooks/use-physician-list';
 import { Paginator } from '@/components/ui/paginator';
 import {
-  ArrowDown, ArrowUp, ArrowUpDown, CheckSquare, ChevronDown, ChevronUp,
+  ArrowDown, ArrowUp, ArrowUpDown, CheckSquare,
   Circle, Clock, Plus, Search, Square, Trash2, X,
 } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
@@ -40,6 +40,29 @@ function daysSince(isoDate: string): number {
 
 function fmtDate(isoDate: string): string {
   return new Date(isoDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function priorityDot(days: number): string {
+  if (days > 10) return '#ef4444';
+  if (days >= 6) return '#f59e0b';
+  if (days >= 3) return '#fcd34d';
+  return '#0D8A78';
+}
+
+function PendingBadge({ days }: { days: number }) {
+  const label = days === 0 ? 'Today' : days === 1 ? '1d ago' : days > 10 ? `${days}d overdue` : `${days}d ago`;
+  if (days > 10) return (
+    <span className="text-xs font-medium px-2 py-0.5 rounded-full border whitespace-nowrap"
+      style={{ color: '#ef4444', background: '#fef2f2', borderColor: '#fecaca' }}>{label}</span>
+  );
+  if (days >= 3) return (
+    <span className="text-xs font-medium px-2 py-0.5 rounded-full border whitespace-nowrap"
+      style={{ color: '#b45309', background: '#fefce8', borderColor: '#fef08a' }}>{label}</span>
+  );
+  return (
+    <span className="text-xs font-medium px-2 py-0.5 rounded-full border whitespace-nowrap"
+      style={{ color: '#0D8A78', background: '#f0fdf9', borderColor: '#a7f3d0' }}>{label}</span>
+  );
 }
 
 function AgeBadge({ days }: { days: number }) {
@@ -150,6 +173,7 @@ export default function LoopBack({ username: _username, onBack }: LoopBackProps)
   const [tasksLoading, setTasksLoading] = useState(true);
   const [expandedId, setExpandedId]     = useState<string | null>(null);
   const [sortConfig, setSortConfig]     = useState<{ field: SortField; dir: SortDir } | null>(null);
+  const [allPendingOpen, setAllPendingOpen] = useState(true);
 
   // Load tasks
   const loadTasks = useCallback(() => {
@@ -263,11 +287,21 @@ export default function LoopBack({ username: _username, onBack }: LoopBackProps)
 
   const loading = physicianHook.loading || tasksLoading;
 
+  const allPendingTasks = tasks
+    .filter(t => !t.COMPLETED)
+    .sort((a, b) => new Date(a.CREATED_AT).getTime() - new Date(b.CREATED_AT).getTime());
+
+  const physicianMap = physicianHook.physicians.reduce<Record<string, string>>((acc, p) => {
+    acc[p.PHYSICIAN_ID] = `Dr. ${p.FIRST_NAME} ${p.LAST_NAME}`;
+    return acc;
+  }, {});
+
   return (
-    <div className="flex flex-col h-full min-h-0 bg-white">
+    <div className="flex flex-col h-full min-h-0" style={{ backgroundColor: '#F1EFE9' }}>
       {/* Header */}
       <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-slate-100 bg-white shrink-0">
         <div>
+          <span className="text-xs font-bold uppercase tracking-widest" style={{ color: '#0D8A78' }}>Post-field</span>
           <p className="text-lg font-semibold text-slate-900">Loop Back</p>
           <p className="text-sm text-slate-400">Track commitments and follow-up actions from your calls</p>
         </div>
@@ -312,8 +346,63 @@ export default function LoopBack({ username: _username, onBack }: LoopBackProps)
         </div>
       </div>
 
-      {/* Table */}
+      {/* All pending — collapsible, oldest first */}
       <div className="flex-1 overflow-auto">
+        {!loading && allPendingTasks.length > 0 && (
+          <div className="mx-4 mt-3 mb-2 bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+            <button
+              onClick={() => setAllPendingOpen(v => !v)}
+              className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-slate-50 transition-colors border-b border-slate-100"
+            >
+              <div className="flex items-center gap-2">
+                <Clock className="w-3.5 h-3.5" style={{ color: '#BF4E19' }} />
+                <span className="text-sm font-bold uppercase tracking-wide" style={{ color: '#BF4E19' }}>All pending — oldest first</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-slate-400">{allPendingTasks.length} task{allPendingTasks.length !== 1 ? 's' : ''}</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                  stroke={allPendingOpen ? '#BF4E19' : '#cbd5e1'}
+                  strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points={allPendingOpen ? "18 15 12 9 6 15" : "6 9 12 15 18 9"} />
+                </svg>
+              </div>
+            </button>
+            {allPendingOpen && (
+              <>
+                <div>
+                  {allPendingTasks.map(t => {
+                    const days = daysSince(t.CREATED_AT);
+                    const physName = physicianMap[t.PHYSICIAN_ID] ?? t.PHYSICIAN_ID;
+                    return (
+                      <div key={t.TASK_ID} className="flex items-center gap-3 px-5 py-2.5 border-b border-slate-50 last:border-0">
+                        <div className="w-2 h-2 rounded-full shrink-0" style={{ background: priorityDot(days) }} />
+                        <p className="text-sm text-slate-700 flex-1 min-w-0 truncate">
+                          {t.TASK_TEXT}
+                          <span className="ml-1.5 text-xs text-slate-400">— {physName}</span>
+                        </p>
+                        <PendingBadge days={days} />
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 px-5 py-2 border-t border-slate-100 bg-slate-50">
+                  {([
+                    { color: '#ef4444', label: 'Overdue (>10d)' },
+                    { color: '#f59e0b', label: 'High (6–10d)' },
+                    { color: '#fcd34d', label: 'Medium (3–5d)' },
+                    { color: '#0D8A78', label: 'Recent (0–2d)' },
+                  ] as const).map(({ color, label }) => (
+                    <span key={label} className="flex items-center gap-1.5 text-[10px] text-slate-500">
+                      <span className="w-2 h-2 rounded-full inline-block" style={{ background: color }} />{label}
+                    </span>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* HCP table */}
         {loading ? (
           <div className="flex items-center justify-center h-40 gap-2 text-slate-400">
             <Spinner className="w-4 h-4" />
@@ -379,7 +468,12 @@ export default function LoopBack({ username: _username, onBack }: LoopBackProps)
                       {/* Name */}
                       <td className="px-4 py-3 font-semibold text-slate-900 whitespace-nowrap">
                         <span className="flex items-center gap-2">
-                          {open ? <ChevronUp className="w-3.5 h-3.5 text-slate-400 shrink-0" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />}
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                            stroke={open ? '#0D8A78' : '#cbd5e1'}
+                            strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"
+                            className="shrink-0">
+                            <polyline points={open ? "18 15 12 9 6 15" : "6 9 12 15 18 9"} />
+                          </svg>
                           Dr. {p.FIRST_NAME} {p.LAST_NAME}
                         </span>
                       </td>
@@ -417,7 +511,8 @@ export default function LoopBack({ username: _username, onBack }: LoopBackProps)
                     {open && (
                       <tr className="border-b border-slate-200">
                         <td colSpan={5} className="p-0">
-                          <div className="bg-slate-50 px-6 py-4 space-y-1">
+                          <div className="px-4 py-2 bg-[#F1EFE9]">
+                          <div className="bg-white rounded-r-xl px-5 py-4 space-y-1 shadow-sm" style={{ borderLeft: '3px solid #0D8A78', borderTop: '1px solid #e2e8f0', borderRight: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0' }}>
                             {/* Open tasks */}
                             {openTasks.length === 0 && doneTasks.length === 0 && (
                               <p className="text-sm text-slate-400 py-2">No tasks yet. Add one below.</p>
@@ -437,6 +532,7 @@ export default function LoopBack({ username: _username, onBack }: LoopBackProps)
                             )}
                             {/* Add task */}
                             <AddTaskInput onAdd={(text) => handleAddTask(p.PHYSICIAN_ID, text)} />
+                          </div>
                           </div>
                         </td>
                       </tr>

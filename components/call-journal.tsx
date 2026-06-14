@@ -2,8 +2,8 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
-  ChevronDown, ChevronUp, ChevronLeft, ChevronRight,
-  Mic, MicOff, Send, Edit2, ArrowLeft, Phone, Users, PlusCircle,
+  ChevronLeft, ChevronRight,
+  Mic, MicOff, FileText, Send, Edit2, Phone, Users, PlusCircle,
 } from 'lucide-react';
 
 // ── US Federal Holidays 2025–2027 ─────────────────────────────────────────────
@@ -211,7 +211,7 @@ function NoteRow({ physician, existingNote, callDate, onSaved, onClose }: NoteRo
   };
 
   return (
-    <div className="bg-slate-100/70 border-t border-slate-100 px-6 py-4 space-y-3">
+    <div className="bg-white border-t border-orange-100 mx-3 my-2 rounded-r-xl px-4 py-4 space-y-3 shadow-sm" style={{ borderLeft: '3px solid #FF6B00', borderRight: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0' }}>
       {editing && (
         <div className="flex items-center gap-4">
           <button onClick={recorder.state.recording ? recorder.stop : recorder.start}
@@ -373,18 +373,23 @@ function PhysicianTable({ physicians, notes, expandedRow, callDate, onToggleRow,
                     </span>
                   </td>
                   {/* Sticky Notes column — same bg as row so no white bleed */}
-                  <td className={`sticky right-0 px-4 py-2.5 shadow-[-1px_0_0_0_#e2e8f0] transition-colors ${isExpanded ? 'bg-slate-100/70' : 'bg-white group-hover:bg-slate-100/70'}`}>
+                  <td className={`sticky right-0 px-3 py-2.5 shadow-[-1px_0_0_0_#e2e8f0] transition-colors text-center ${isExpanded ? 'bg-slate-100/70' : 'bg-white group-hover:bg-slate-100/70'}`}>
                     <button
                       onClick={() => onToggleRow(p.PHYSICIAN_ID)}
-                      className="h-9 px-4 rounded-full flex items-center gap-2 border text-sm font-medium transition-all whitespace-nowrap"
-                      style={hoveredBtn === p.PHYSICIAN_ID || isExpanded
-                        ? { background: 'linear-gradient(135deg,#FF6B00,#00C8FF)', color: 'white', borderColor: 'transparent' }
-                        : { borderColor: '#e2e8f0', background: 'white', color: '#64748b' }}
-                      onMouseEnter={() => setHoveredBtn(p.PHYSICIAN_ID)}
-                      onMouseLeave={() => setHoveredBtn(null)}
+                      title={existingNote ? 'View call notes' : 'Record call note'}
+                      className={`w-8 h-8 rounded-lg inline-flex items-center justify-center transition-all ${
+                        existingNote
+                          ? 'border hover:opacity-80'
+                          : 'bg-slate-50 hover:border-slate-400'
+                      }`}
+                      style={existingNote
+                        ? { background: '#f0fdf9', borderColor: '#a7f3d0', border: '1px solid #a7f3d0' }
+                        : { border: '1px dashed #cbd5e1' }}
                     >
-                      <Mic className="w-3.5 h-3.5 shrink-0" />
-                      {existingNote ? 'Edit Notes' : 'Record Notes'}
+                      {existingNote
+                        ? <FileText className="w-4 h-4" style={{ color: '#0D8A78' }} />
+                        : <Mic className="w-4 h-4 text-slate-400" />
+                      }
                     </button>
                   </td>
                 </tr>
@@ -579,10 +584,11 @@ export default function CallJournal({ username, onBack }: CallJournalProps) {
   const selectedLabel = selectedDate.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
 
   return (
-    <div className="flex flex-col h-full min-h-screen bg-[#F5F4EF]">
+    <div className="flex flex-col h-full min-h-screen bg-[#F1EFE9]">
       {/* Header — consistent with physician selection screen */}
       <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-slate-100 bg-white shrink-0">
         <div>
+          <span className="text-xs font-bold uppercase tracking-widest" style={{ color: '#0D8A78' }}>Post-field</span>
           <p className="text-lg font-semibold text-slate-900">Call Journal</p>
           <p className="text-sm text-slate-400">Log your call notes for each physician</p>
         </div>
@@ -617,7 +623,11 @@ export default function CallJournal({ username, onBack }: CallJournalProps) {
           <button onClick={() => setMonthExpanded(v => !v)}
             className="p-1.5 rounded-full hover:bg-slate-100 transition-colors shrink-0"
             title={monthExpanded ? 'Collapse' : 'Expand to month'}>
-            {monthExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+              stroke={monthExpanded ? '#0D8A78' : '#94a3b8'}
+              strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points={monthExpanded ? "18 15 12 9 6 15" : "6 9 12 15 18 9"} />
+            </svg>
           </button>
         </div>
 
