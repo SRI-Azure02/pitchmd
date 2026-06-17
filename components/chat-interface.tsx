@@ -7,11 +7,14 @@ import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import AudioInput from './audio-input';
 import EvaluationPanel from './evaluation-panel';
+import CameraConsentModal from './camera-consent-modal';
+import CameraSetupModal from './camera-setup-modal';
+import type { FacialAnalysisResult } from '@/app/api/facial-analysis/route';
 import PerformancePanel from './performance-panel';
 import CallJournal from './call-journal';
 import LoopBack from './loop-back';
 import EngagementPlaybook from './engagement-playbook';
-import { Send, RotateCcw, Square, Volume2, VolumeX, Video, VideoOff, MessageSquare, Search, ChevronDown, X, Check, BarChart2, ArrowUp, ArrowDown, ArrowUpDown, Hash, Mic, BookOpen, NotebookPen, Map, Camera, Monitor, Sparkles, Database, ShieldAlert, Languages, Target, Bell, PhoneOff, Hourglass } from 'lucide-react';
+import { Send, RotateCcw, Square, Volume2, VolumeX, Video, VideoOff, MessageSquare, Search, ChevronDown, X, Check, BarChart2, ArrowUp, ArrowDown, ArrowUpDown, Hash, Mic, BookOpen, NotebookPen, Map, Camera, Monitor, Sparkles, Database, ShieldAlert, Languages, Target, Bell, PhoneOff, Hourglass, ShieldCheck, ToggleLeft, Trash2 } from 'lucide-react';
 import { parseEmotion, speakText, stopCurrentAudio } from '@/lib/elevenlabs';
 import { buildCorrector, type Corrector } from '@/lib/product-name-corrector';
 import { getMindsetDescription } from '@/lib/mindset-descriptions';
@@ -29,8 +32,14 @@ interface Message {
   internal?: boolean;
   /** Phase 3: rep input was blocked by compliance filter */
   isComplianceBlock?: boolean;
-  /** Rule code that triggered the block */
+  /** Phase 3: rep input was flagged (warning) — physician still responds */
+  isComplianceFlag?: boolean;
+  /** Rule code that triggered the block/flag */
   complianceRuleCode?: string;
+  /** Human-readable rule name */
+  complianceRuleName?: string;
+  /** Screen share notification — rendered as an info card, not a speech bubble */
+  isScreenShare?: boolean;
 }
 
 
@@ -83,7 +92,7 @@ const ROADMAP_ITEMS = [
     icon: <Monitor className="w-5 h-5" />,
     title: 'Screen Content Reader',
     description: 'Trigger an on-demand screen capture so PitchMD can read and reference what\'s currently on your screen.',
-    status: 'Planned',
+    status: 'Pending Testing',
   },
   {
     icon: <Camera className="w-5 h-5" />,
@@ -95,7 +104,7 @@ const ROADMAP_ITEMS = [
     icon: <Sparkles className="w-5 h-5" />,
     title: 'Enhanced Avatar',
     description: 'More expressive and responsive physician personas with richer emotional range, improved lip-sync, and context-aware gestures.',
-    status: 'Planned',
+    status: 'Live',
   },
   {
     icon: <Database className="w-5 h-5" />,
@@ -290,6 +299,31 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   const [evalRefreshTrigger, setEvalRefreshTrigger] = useState(0); // incremented to force EvaluationPanel re-fetch
   const [showTranscript, setShowTranscript] = useState(false);
   const [transcriptCountdownActive, setTranscriptCountdownActive] = useState(false);
+
+  // ── Facial analysis state ────────────────────────────────────────────────
+  const [consentModalOpen, setConsentModalOpen]   = useState(false);
+  const [cameraSetupOpen, setCameraSetupOpen]     = useState(false);
+  const [cameraActive, setCameraActive]           = useState(false);
+  const [facialAnalysis, setFacialAnalysis]       = useState<FacialAnalysisResult | null>(null);
+  const [facialAnalysisRunning, setFacialAnalysisRunning] = useState(false);
+  // Ref-based camera internals — no re-render needed for stream/frames/interval
+  const cameraStreamRef        = useRef<MediaStream | null>(null);
+  const capturedFramesRef      = useRef<string[]>([]);
+  const frameCaptureIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Persistent hidden video element — avoids the async loadedmetadata race in captureFrame
+  const captureVideoRef        = useRef<HTMLVideoElement | null>(null);
+  // Stores the physician being selected while the consent modal is open
+  const pendingPhysicianRef    = useRef<any>(null);
+
+  // ── Screen reader state ───────────────────────────────────────────────────
+  const [screenCapturing, setScreenCapturing] = useState(false);
+  // Screen context accumulates across multiple captures for the whole session.
+  // screenAcknowledgedRef tracks whether the physician has acknowledged the
+  // current accumulated content — resets each time new content is added so
+  // the physician always reacts to the latest capture.
+  const [pendingScreenContext, setPendingScreenContext] = useState<string | null>(null);
+  const screenAcknowledgedRef = useRef(false);
+  const screenCaptureCountRef = useRef(0);
   const [avatarEnabled, setAvatarEnabled] = useState(true);
   const voiceEnabledRef = useRef(false); // matches voiceEnabled initial state
 
@@ -658,6 +692,10 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
       // Trigger REPEVAL directly — don't rely on the Cortex Agent to call it.
       // history is the conversation BEFORE "done", which is what REPEVAL needs.
       triggerEvaluation(history);
+
+      // Stop camera and run facial analysis in parallel with REPEVAL
+      stopCamera();
+      runFacialAnalysis();
     }
 
     const isInternalSeed = text === '__begin_roleplay__';
@@ -692,8 +730,9 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
 
       let contextMessages: Message[];
       if (inRoleplay) {
-        // Send full history — Claude handles long context efficiently
-        contextMessages = updatedMessages;
+        // Send full history — Claude handles long context efficiently.
+        // Strip screen share annotation cards — they're UI-only, not speech turns.
+        contextMessages = updatedMessages.filter((m) => !m.isScreenShare);
       } else {
         // Legacy Cortex path: trimmed window to reduce planning-step latency
         const HEAD = Math.min(2, updatedMessages.length);
@@ -706,6 +745,13 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
 
       // Route: direct Claude API during roleplay; Snowflake Cortex as fallback
       const endpoint = inRoleplay ? '/api/roleplay/message' : '/api/cortex/query';
+      // Screen context persists for the whole session. Track whether this is
+      // the first send so the physician gets an "acknowledge" prompt once,
+      // then a quieter "for reference" prompt on all subsequent turns.
+      const screenContextForThisCall = pendingScreenContext;
+      const isNewScreenContent = screenContextForThisCall !== null && !screenAcknowledgedRef.current;
+      if (isNewScreenContent) screenAcknowledgedRef.current = true;
+
       const requestBody = inRoleplay
         ? {
             messages: contextMessages.map((m) => ({
@@ -717,6 +763,8 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
             username,
             mindsetDescription: selectedMindsetDescRef.current ?? undefined,
             sessionId: sessionIdRef.current ?? undefined,
+            screenContent: screenContextForThisCall ?? undefined,
+            screenContentIsNew: isNewScreenContent,
           }
         : {
             messages: contextMessages.map((m) => ({ role: m.role, content: m.content })),
@@ -895,10 +943,18 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                     // pick up TTS audio from the speakers and auto-submit it as user speech.
                     console.log('[tts] speaking | voice:', currentVoiceRef.current ?? 'browser', '| emotion:', emotion);
                     setAvatarSpeaking(true);
-                    speakText(speechText, currentVoiceRef.current, emotion)
+                    // Re-enable mic 1 s before speech ends so it's ready the moment
+                    // the physician finishes. onNearlyDone fires early; the .then()
+                    // is a safety net in case onNearlyDone never fired (very short clips).
+                    const enableMicEarly = () => {
+                      setAvatarSpeaking(false);
+                      setInputValue(''); // discard phantom text captured during speech
+                    };
+                    speakText(speechText, currentVoiceRef.current, emotion, enableMicEarly)
                       .then(() => {
+                        // Safety net — enableMicEarly may already have fired
                         setAvatarSpeaking(false);
-                        setInputValue(''); // discard any phantom text captured while physician spoke
+                        setInputValue('');
                       })
                       .catch((err) => {
                         setAvatarSpeaking(false);
@@ -913,6 +969,21 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
 
               setStatusMessage('');
               setLoading(false);
+
+            } else if (event.type === 'rep_flagged') {
+              // Flagged (warning) input — physician will still respond, but show
+              // an amber training notice so the rep knows their message was non-compliant.
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: `compliance_flag_${Date.now()}`,
+                  role: 'assistant' as const,
+                  content: event.message ?? 'Your message may be outside approved promotional guidelines.',
+                  isComplianceFlag: true,
+                  complianceRuleCode: event.rule_code,
+                  complianceRuleName: event.rule_name,
+                },
+              ]);
 
             } else if (event.type === 'input_blocked') {
               // Phase 3: rep input blocked by compliance filter
@@ -970,8 +1041,16 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     physicianHook.load();
   };
 
-  const handlePhysicianSelect = async (physician: any) => {
-    setHoveredBtnKey(null); // clear hover state — mouseLeave never fires on click-through
+  const handlePhysicianSelect = (physician: any) => {
+    setHoveredBtnKey(null);
+    // Stash physician and show consent modal — session starts after user responds.
+    pendingPhysicianRef.current = physician;
+    setFacialAnalysis(null);
+    capturedFramesRef.current = [];
+    setConsentModalOpen(true);
+  };
+
+  const startSessionWithPhysician = async (physician: any, withCamera: boolean, preVerifiedStream?: MediaStream) => {
     const id: string = physician.PHYSICIAN_ID;
     const name = `Dr. ${physician.FIRST_NAME} ${physician.LAST_NAME}`;
 
@@ -999,18 +1078,39 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     setSessionStarted(true);
     hasStarted.current = true;
 
+    // Start camera if consent was given. If a pre-verified stream was passed from
+    // CameraSetupModal, reuse it directly instead of calling getUserMedia again.
+    if (withCamera) startCamera(preVerifiedStream);
+
     // Fire avatar init and the LLM opening message concurrently.
-    // Avatar setup (Daily.co join / Anam connect) takes 5–10 s; the LLM
-    // responds in 2–5 s.  Running both at once halves perceived startup
-    // latency.  If the LLM responds before the avatar stream is active,
-    // physician speech is buffered in pendingSpeechRef and drained inside
-    // initTavusAvatar / initAnamAvatar the moment the stream activates.
     const avatarInit = avatarEnabledRef.current
       ? initAvatar(physician)
       : Promise.resolve(true);
-    // Kick off roleplay with a silent internal seed message — concurrently.
     sendMessage('__begin_roleplay__', []);
     await avatarInit;
+  };
+
+  const handleConsentAccept = () => {
+    setConsentModalOpen(false);
+    setCameraSetupOpen(true);
+  };
+
+  const handleConsentDecline = async () => {
+    setConsentModalOpen(false);
+    const physician = pendingPhysicianRef.current;
+    if (physician) await startSessionWithPhysician(physician, false);
+  };
+
+  const handleSetupConfirm = async (stream: MediaStream) => {
+    setCameraSetupOpen(false);
+    const physician = pendingPhysicianRef.current;
+    if (physician) await startSessionWithPhysician(physician, true, stream);
+  };
+
+  const handleSetupSkip = async () => {
+    setCameraSetupOpen(false);
+    const physician = pendingPhysicianRef.current;
+    if (physician) await startSessionWithPhysician(physician, false);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -1023,6 +1123,159 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     if (userTyping || sessionEnded) return;
     const current = inputRef.current.trim();
     if (current && !loading) sendMessage(current, messagesRef.current);
+  };
+
+  // ── Facial analysis ──────────────────────────────────────────────────────
+
+  const captureFrame = () => {
+    const video = captureVideoRef.current;
+    if (!video || video.readyState < 2) return; // HAVE_CURRENT_DATA not yet ready
+    const track = cameraStreamRef.current?.getVideoTracks()[0];
+    if (!track || track.readyState !== 'live') return;
+    const w = video.videoWidth  || 640;
+    const h = video.videoHeight || 480;
+    const canvas = document.createElement('canvas');
+    canvas.width  = Math.min(w, 640);
+    canvas.height = Math.round(h * (canvas.width / w));
+    canvas.getContext('2d')!.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const b64 = canvas.toDataURL('image/jpeg', 0.75).split(',')[1];
+    if (b64) capturedFramesRef.current.push(b64);
+  };
+
+  const startCamera = async (existingStream?: MediaStream) => {
+    try {
+      const stream = existingStream ?? await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      cameraStreamRef.current = stream;
+      capturedFramesRef.current = [];
+
+      // Attach stream to a persistent hidden video element so captureFrame can
+      // draw synchronously without the loadedmetadata async race each time.
+      const vid = document.createElement('video');
+      vid.srcObject = stream;
+      vid.muted = true;
+      vid.playsInline = true;
+      vid.style.cssText = 'position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;top:-9999px';
+      document.body.appendChild(vid);
+      captureVideoRef.current = vid;
+      await vid.play().catch(() => {});
+
+      setCameraActive(true);
+      // Capture first frame immediately, then every 20 seconds
+      captureFrame();
+      frameCaptureIntervalRef.current = setInterval(captureFrame, 20_000);
+    } catch (err: any) {
+      if (err?.name !== 'NotAllowedError' && err?.name !== 'AbortError') {
+        console.error('[camera] getUserMedia failed:', err?.message);
+      }
+    }
+  };
+
+  const stopCamera = () => {
+    if (frameCaptureIntervalRef.current) {
+      clearInterval(frameCaptureIntervalRef.current);
+      frameCaptureIntervalRef.current = null;
+    }
+    if (captureVideoRef.current) {
+      captureVideoRef.current.srcObject = null;
+      captureVideoRef.current.remove();
+      captureVideoRef.current = null;
+    }
+    if (cameraStreamRef.current) {
+      cameraStreamRef.current.getTracks().forEach(t => t.stop());
+      cameraStreamRef.current = null;
+    }
+    setCameraActive(false);
+  };
+
+  const runFacialAnalysis = async () => {
+    const frames = capturedFramesRef.current;
+    if (frames.length === 0) return;
+    setFacialAnalysisRunning(true);
+    try {
+      const res = await fetch('/api/facial-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ frames }),
+      });
+      if (!res.ok) throw new Error(`facial-analysis API error: ${res.status}`);
+      const result: FacialAnalysisResult = await res.json();
+      setFacialAnalysis(result);
+    } catch (err: any) {
+      console.error('[facial-analysis] failed:', err?.message);
+    } finally {
+      setFacialAnalysisRunning(false);
+    }
+  };
+
+  // ── Screen capture ────────────────────────────────────────────────────────
+  const handleScreenCapture = async () => {
+    if (screenCapturing || sessionEnded || !roleplaying) return;
+    setScreenCapturing(true);
+    try {
+      // 1. Request display media (browser native picker — works on laptop + iPad)
+      const stream = await (navigator.mediaDevices as any).getDisplayMedia({
+        video: { frameRate: 1 },
+        audio: false,
+      });
+
+      // 2. Grab one frame via canvas
+      const video = document.createElement('video');
+      video.srcObject = stream;
+      video.muted = true;
+      await new Promise<void>((resolve) => { video.onloadedmetadata = () => resolve(); });
+      video.play();
+      await new Promise<void>((resolve) => { video.oncanplay = () => resolve(); });
+
+      const MAX_W = 1280;
+      const scale = video.videoWidth > MAX_W ? MAX_W / video.videoWidth : 1;
+      const canvas = document.createElement('canvas');
+      canvas.width  = Math.round(video.videoWidth  * scale);
+      canvas.height = Math.round(video.videoHeight * scale);
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      // 3. Stop stream immediately after capture
+      stream.getTracks().forEach((t: MediaStreamTrack) => t.stop());
+
+      // 4. Convert to base64 JPEG
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.80);
+      const base64  = dataUrl.split(',')[1];
+
+      // 5. Send to screen-reader API
+      const res = await fetch('/api/screen-reader', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64, mediaType: 'image/jpeg' }),
+      });
+      if (!res.ok) throw new Error(`Screen reader API error: ${res.status}`);
+      const { content } = await res.json();
+
+      // 6. Accumulate into session-wide context, numbered by capture order.
+      // Reset acknowledged so the physician reacts to the new addition.
+      screenCaptureCountRef.current += 1;
+      const captureLabel = `[Screen ${screenCaptureCountRef.current}]`;
+      screenAcknowledgedRef.current = false;
+      setPendingScreenContext(prev =>
+        prev ? `${prev}\n\n---\n\n${captureLabel}\n${content}` : `${captureLabel}\n${content}`
+      );
+
+      // 7. Add a visual notification card in the transcript
+      const screenMsg: Message = {
+        id: `screen_${Date.now()}`,
+        role: 'user',
+        content: content,
+        isScreenShare: true,
+      };
+      setMessages((prev) => [...prev, screenMsg]);
+      messagesRef.current = [...messagesRef.current, screenMsg];
+    } catch (err: any) {
+      // User cancelled the picker — ignore silently; any real error → log
+      if (err?.name !== 'NotAllowedError' && err?.name !== 'AbortError') {
+        console.error('[screen-reader] capture failed:', err?.message);
+      }
+    } finally {
+      setScreenCapturing(false);
+    }
   };
 
   const handleNewSession = () => {
@@ -1061,6 +1314,14 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     setEvalGenerating(false);
     setEvalRefreshTrigger(0);
     setShowTranscript(false);
+    setPendingScreenContext(null);
+    screenAcknowledgedRef.current = false;
+    screenCaptureCountRef.current = 0;
+    stopCamera();
+    capturedFramesRef.current = [];
+    setFacialAnalysis(null);
+    setFacialAnalysisRunning(false);
+    pendingPhysicianRef.current = null;
   };
 
   // ── Tavus avatar helpers ──────────────────────────────────────────────────
@@ -1614,6 +1875,48 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     if (physicianSelectionMode) {
       return (
         <div className="flex flex-col h-full min-h-0">
+          {/* ── Camera setup modal (shown after consent accept) ─────────── */}
+          <CameraSetupModal
+            open={cameraSetupOpen}
+            onConfirm={handleSetupConfirm}
+            onSkip={handleSetupSkip}
+          />
+
+          {/* ── Consent modal ───────────────────────────────────────────── */}
+          {consentModalOpen && (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', padding: '1rem' }} onClick={handleConsentDecline}>
+              <div className="bg-white rounded-2xl shadow-2xl p-6 flex flex-col gap-4" style={{ maxWidth: '28rem', width: '100%' }} onClick={e => e.stopPropagation()}>
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-lg bg-slate-100"><Camera className="w-4 h-4 text-slate-600" /></div>
+                  <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Optional Feature</span>
+                </div>
+                <p className="text-lg font-bold text-slate-900">Facial Expression Analysis</p>
+                <p className="text-sm text-slate-600 leading-relaxed">PitchMD can analyse your facial expressions and include a <strong>Confidence</strong>, <strong>Nervousness</strong>, and <strong>Engagement</strong> assessment in your evaluation report.</p>
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3 p-3 rounded-lg bg-slate-50 border border-slate-100">
+                    <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                    <p className="text-xs text-slate-600 leading-relaxed"><span className="font-semibold text-slate-700">No video is stored.</span> Periodic still frames are sent to an AI model for analysis only.</p>
+                  </div>
+                  <div className="flex items-start gap-3 p-3 rounded-lg bg-slate-50 border border-slate-100">
+                    <ToggleLeft className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
+                    <p className="text-xs text-slate-600 leading-relaxed"><span className="font-semibold text-slate-700">You can turn it off at any time.</span> A camera button lets you disable capture mid-session.</p>
+                  </div>
+                  <div className="flex items-start gap-3 p-3 rounded-lg bg-slate-50 border border-slate-100">
+                    <Trash2 className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+                    <p className="text-xs text-slate-600 leading-relaxed"><span className="font-semibold text-slate-700">Consent is per-session.</span> You will be asked each time you start a new session.</p>
+                  </div>
+                </div>
+                <div className="flex gap-3 mt-2">
+                  <button onClick={handleConsentAccept} className="flex-1 h-10 rounded-lg bg-slate-900 hover:bg-slate-700 text-white text-sm font-medium flex items-center justify-center gap-2">
+                    <Camera className="w-3.5 h-3.5" />Enable Camera
+                  </button>
+                  <button onClick={handleConsentDecline} className="flex-1 h-10 rounded-lg border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50">
+                    Continue Without Camera
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           {/* ── Header ──────────────────────────────────────────────────── */}
           <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-100 shrink-0">
             <div>
@@ -1940,7 +2243,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
             onPageChange={physicianHook.setPage}
           />
 
-          <EvaluationPanel open={evalOpen} onClose={() => setEvalOpen(false)} content="" username={username} physicianId={evalPhysicianId} />
+          <EvaluationPanel open={evalOpen} onClose={() => setEvalOpen(false)} content="" username={username} physicianId={evalPhysicianId} facialAnalysis={facialAnalysis} facialAnalysisRunning={facialAnalysisRunning} />
 
           {/* Fixed-position column header tooltip */}
           {tableTooltip && (
@@ -2194,7 +2497,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
           </button>
 
           {roadmapOpen && (
-            <div className="absolute bottom-full left-0 mb-2 w-80 bg-white rounded-xl shadow-xl border border-slate-100 z-50 overflow-hidden">
+            <div className="absolute bottom-full left-0 mb-2 w-[480px] bg-white rounded-xl shadow-xl border border-slate-100 z-50 overflow-hidden">
               <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
                 <div>
                   <p className="text-sm font-semibold text-slate-800">Product Roadmap</p>
@@ -2204,14 +2507,20 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                   <X className="w-3.5 h-3.5" />
                 </button>
               </div>
-              <div className="divide-y divide-slate-50">
+              <div className="divide-y divide-slate-50 overflow-y-auto max-h-96">
                 {ROADMAP_ITEMS.map((item, i) => (
                   <div key={i} className="flex items-start gap-3 px-4 py-3.5">
                     <div className="mt-0.5 shrink-0 p-1.5 rounded-lg bg-slate-100 text-slate-500">{item.icon}</div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
                         <p className="text-sm font-medium text-slate-800 leading-snug">{item.title}</p>
-                        <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider text-amber-600 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded-full">{item.status}</span>
+                        <span className={`shrink-0 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${
+                          item.status === 'Live'
+                            ? 'text-emerald-700 bg-emerald-50 border-emerald-100'
+                            : item.status === 'Pending Testing'
+                              ? 'text-blue-600 bg-blue-50 border-blue-100'
+                              : 'text-amber-600 bg-amber-50 border-amber-100'
+                        }`}>{item.status}</span>
                       </div>
                       <p className="mt-1 text-xs text-slate-500 leading-relaxed">{item.description}</p>
                     </div>
@@ -2290,7 +2599,11 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
           content=""
           username={username}
           physicianId={evalPhysicianId}
+          facialAnalysis={facialAnalysis}
+          facialAnalysisRunning={facialAnalysisRunning}
         />
+
+
       </div>
     );
   }
@@ -2412,6 +2725,23 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
 
           {/* Nameplate moved outside the avatar square — rendered below */}
 
+          {/* Screen share notification — shows what was read from the screen */}
+          {pendingScreenContext && (
+            <div className="absolute bottom-3 left-3 right-3 z-20">
+              <div className="px-3.5 py-2.5 rounded-xl bg-emerald-950/80 border border-emerald-500/40 text-emerald-100 text-xs shadow-lg backdrop-blur-sm">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Monitor className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-emerald-400">
+                    {screenCaptureCountRef.current > 1
+                      ? `${screenCaptureCountRef.current} screens shared · Send a message to continue`
+                      : 'Screen shared · Send a message to continue'}
+                  </span>
+                </div>
+                <p className="line-clamp-2 text-emerald-100/70 leading-relaxed">{pendingScreenContext}</p>
+              </div>
+            </div>
+          )}
+
           {/* Compliance block notices — higher z so they overlay the nameplate */}
           {visibleMessages.filter(m => m.isComplianceBlock).slice(-1).map(m => (
             <div key={m.id} className="absolute bottom-3 left-3 right-3 z-20">
@@ -2469,6 +2799,31 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                 <p className="text-white/30 text-sm text-center mt-8">Conversation will appear here as you practice.</p>
               ) : (
                 visibleMessages.map((m) => (
+                  m.isScreenShare ? (
+                    <div key={m.id} className="flex flex-col items-center">
+                      <div className="flex items-center gap-1.5 text-[10px] text-emerald-300/80 mb-1 uppercase tracking-widest font-semibold">
+                        <Monitor className="w-3 h-3" />
+                        Screen shared
+                      </div>
+                      <div className="max-w-[90%] px-3 py-2 rounded-xl text-xs leading-relaxed bg-emerald-900/40 border border-emerald-500/30 text-emerald-100/80 italic">
+                        {m.content}
+                      </div>
+                    </div>
+                  ) : m.isComplianceFlag ? (
+                    // Amber inline training notice — rep was flagged but physician still responds
+                    <div key={m.id} className="flex flex-col items-center">
+                      <div className="flex items-center gap-1.5 text-[10px] text-amber-300/90 mb-1 uppercase tracking-widest font-semibold">
+                        <ShieldAlert className="w-3 h-3" />
+                        Compliance Notice{m.complianceRuleCode ? ` · ${m.complianceRuleCode}` : ''}
+                      </div>
+                      <div
+                        className="max-w-[90%] px-3 py-2 rounded-xl text-xs leading-relaxed border"
+                        style={{ background: 'rgba(217,119,6,0.15)', borderColor: 'rgba(217,119,6,0.35)', color: 'rgba(253,230,138,0.9)' }}
+                      >
+                        {m.content}
+                      </div>
+                    </div>
+                  ) : (
                   <div key={m.id} className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
                     <p className="text-[10px] text-white/40 mb-0.5 px-1">
                       {m.role === 'user' ? 'You' : (selectedPhysician?.name ?? 'Physician')}
@@ -2483,6 +2838,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                       {m.content}
                     </div>
                   </div>
+                  )
                 ))
               )}
             </div>
@@ -2545,6 +2901,45 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
             );
           })()}
 
+          {/* Camera toggle — stops/resumes facial capture mid-session */}
+          {roleplaying && !sessionEnded && cameraActive !== undefined && capturedFramesRef.current !== undefined && (
+            cameraActive ? (
+              <Button
+                type="button" size="icon" variant="ghost"
+                onClick={stopCamera}
+                className="h-9 w-9 rounded-full shrink-0 text-emerald-500 hover:text-red-500 hover:bg-red-50 transition-all duration-150"
+                title="Camera on — click to turn off facial capture"
+              >
+                <Camera className="w-4 h-4" />
+              </Button>
+            ) : null
+          )}
+
+          {/* Screen share button — captures screen and feeds content to physician */}
+          {roleplaying && !sessionEnded && (
+            <Button
+              type="button" size="icon" variant="ghost"
+              onClick={handleScreenCapture}
+              disabled={screenCapturing}
+              className={`h-9 w-9 rounded-full shrink-0 transition-all duration-150 ${
+                pendingScreenContext
+                  ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-200 hover:bg-emerald-600'
+                  : screenCapturing
+                    ? 'text-blue-400 hover:bg-gray-100'
+                    : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100'
+              }`}
+              title={pendingScreenContext
+                ? screenCaptureCountRef.current > 1
+                  ? `${screenCaptureCountRef.current} screens shared — physician will see all on your next message`
+                  : 'Screen shared — physician will see it on your next message'
+                : 'Share screen with physician'}
+            >
+              {screenCapturing
+                ? <Spinner className="w-3.5 h-3.5" />
+                : <Monitor className="w-4 h-4" />}
+            </Button>
+          )}
+
           {/* Transcript toggle — solid blue fill when open */}
           <Button
             type="button" size="icon" variant="ghost"
@@ -2569,7 +2964,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
             onAutoSubmit={handleAutoSubmit}
             onCountdown={(pct) => setTranscriptCountdownActive(pct !== null)}
             userTyping={userTyping}
-            disabled={sessionEnded || !roleplaying}
+            disabled={sessionEnded || !roleplaying || avatarSpeaking}
           />
 
           {/* End / New session */}
@@ -2701,7 +3096,10 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
         physicianId={evalPhysicianId}
         generating={evalGenerating}
         refreshTrigger={evalRefreshTrigger}
+        facialAnalysis={facialAnalysis}
+        facialAnalysisRunning={facialAnalysisRunning}
       />
+
     </div>
   );
 }

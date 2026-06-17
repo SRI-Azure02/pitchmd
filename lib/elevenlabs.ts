@@ -63,7 +63,12 @@ function cancelCurrentAudio() {
 
 // ─── Browser Web Speech API fallback ─────────────────────────
 
-function speakWithBrowser(text: string, emotion: string): Promise<void> {
+// Average English speech rate used to estimate when to fire onNearlyDone
+// for the browser TTS path where we don't have exact audio duration.
+const WORDS_PER_SECOND = 2.2; // ~130 wpm
+const EARLY_MIC_MS     = 1000; // how early to re-enable the mic (ms before end)
+
+function speakWithBrowser(text: string, emotion: string, onNearlyDone?: () => void): Promise<void> {
   return new Promise((resolve, reject) => {
     if (!window.speechSynthesis) {
       reject(new Error('Web Speech API not supported'));
@@ -94,7 +99,18 @@ function speakWithBrowser(text: string, emotion: string): Promise<void> {
       ?? voices[0];
     if (preferred) utterance.voice = preferred;
 
-    utterance.onend = () => { currentUtterance = null; resolve(); };
+    // Estimate speech duration from word count and fire onNearlyDone 1s before end
+    if (onNearlyDone) {
+      const wordCount = text.trim().split(/\s+/).length;
+      const estimatedMs = (wordCount / (WORDS_PER_SECOND * utterance.rate)) * 1000;
+      const earlyMs = Math.max(0, estimatedMs - EARLY_MIC_MS);
+      const t = setTimeout(onNearlyDone, earlyMs);
+      const origOnend = () => { clearTimeout(t); currentUtterance = null; resolve(); };
+      utterance.onend = origOnend;
+    } else {
+      utterance.onend = () => { currentUtterance = null; resolve(); };
+    }
+
     utterance.onerror = (e) => {
       currentUtterance = null;
       // "interrupted" / "canceled" are normal side-effects of stopCurrentAudio()
@@ -116,7 +132,8 @@ function speakWithBrowser(text: string, emotion: string): Promise<void> {
 export async function speakText(
   text: string,
   voiceId: string | null | undefined,
-  emotion: string
+  emotion: string,
+  onNearlyDone?: () => void,
 ): Promise<void> {
   cancelCurrentAudio();
 
@@ -130,10 +147,9 @@ export async function speakText(
   // Skip ElevenLabs if not configured or no voice ID — go straight to browser TTS.
   if (mode !== 'real' || !voiceId) {
     if (mode === 'stub' && voiceId) {
-      // Developer stub mode with a voice model — log and use browser TTS.
       console.info('[tts] stub mode — using browser TTS');
     }
-    await speakWithBrowser(ttsText, emotion);
+    await speakWithBrowser(ttsText, emotion, onNearlyDone);
     return;
   }
 
@@ -155,7 +171,7 @@ export async function speakText(
     if (!response.ok) {
       const body = await response.json().catch(() => null);
       console.warn('[tts] ElevenLabs failed (HTTP', response.status, body?.detail ?? '', ') — falling back to browser TTS');
-      await speakWithBrowser(ttsText, emotion);
+      await speakWithBrowser(ttsText, emotion, onNearlyDone);
       return;
     }
 
@@ -164,8 +180,23 @@ export async function speakText(
     currentObjectUrl = audioUrl;
     const audio = new Audio(audioUrl);
     currentAudio = audio;
-    // Wait for playback to finish (not just start) so callers know when speech ends.
+
     await new Promise<void>((resolve) => {
+      let nearlyDoneFired = false;
+
+      // Fire onNearlyDone exactly 1 s before the end using timeupdate.
+      // Once audio.duration is known (after metadata loads) we watch currentTime.
+      if (onNearlyDone) {
+        audio.ontimeupdate = () => {
+          if (!nearlyDoneFired && audio.duration > 0 &&
+              audio.currentTime >= audio.duration - EARLY_MIC_MS / 1000) {
+            nearlyDoneFired = true;
+            audio.ontimeupdate = null;
+            onNearlyDone();
+          }
+        };
+      }
+
       audio.onended = () => { cancelCurrentAudio(); resolve(); };
       audio.onerror = () => { cancelCurrentAudio(); resolve(); };
       audio.play().catch(() => { cancelCurrentAudio(); resolve(); });
@@ -173,7 +204,7 @@ export async function speakText(
 
   } catch (err) {
     console.warn('[tts] ElevenLabs error — falling back to browser TTS:', err);
-    await speakWithBrowser(ttsText, emotion);
+    await speakWithBrowser(ttsText, emotion, onNearlyDone);
   }
 }
 
