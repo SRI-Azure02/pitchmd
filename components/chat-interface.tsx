@@ -7,10 +7,17 @@ import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import AudioInput from './audio-input';
 import EvaluationPanel from './evaluation-panel';
-import CameraConsentModal from './camera-consent-modal';
 import CameraSetupModal from './camera-setup-modal';
-import type { FacialAnalysisResult } from '@/app/api/facial-analysis/route';
 import PerformancePanel from './performance-panel';
+
+interface FacialAnalysisResult {
+  confidence: number;
+  nervousness: number;
+  engagement: number;
+  summary: string;
+  observations: string[];
+  frameCount: number;
+}
 import CallJournal from './call-journal';
 import LoopBack from './loop-back';
 import EngagementPlaybook from './engagement-playbook';
