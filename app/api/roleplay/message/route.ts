@@ -113,12 +113,13 @@ export async function POST(request: NextRequest) {
           return;
         }
 
-        const { messages, physician, username, mindsetDescription, sessionId } = (await request.json()) as {
+        const { messages, physician, username, mindsetDescription, sessionId, screenContent } = (await request.json()) as {
           messages: Array<{ role: string; content: string; internal?: boolean }>;
           physician: any;
           username: string;
           mindsetDescription?: string;
           sessionId?: string;
+          screenContent?: string;
         };
 
         const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -143,13 +144,18 @@ export async function POST(request: NextRequest) {
         // 'clean' = no violations → physician converses naturally, no PI injection.
         // 'flagged' = soft violation → inject PI so physician can challenge the claim.
         // 'blocked' messages never reach Phase 4 (we return early below).
+        // repComplianceStatus drives Phase 4 RAG gating. 'rewrite_needed' is an
+        // output-filter concept but checkInput can technically return it — treat it
+        // as 'flagged' so RAG still fires and the physician can challenge the claim.
         let repComplianceStatus: 'clean' | 'flagged' | 'blocked' = 'clean';
 
         try {
           const rules = await getComplianceRules();
           if (rules.length > 0 && repText) {
             const inputCheck = checkInput(repText, rules);
-            repComplianceStatus = inputCheck.status; // hoist for Phase 4
+            // 'rewrite_needed' is an output-filter concept; treat it as 'flagged'
+            // so Phase 4 RAG fires and the physician can challenge the claim.
+            repComplianceStatus = inputCheck.status === 'rewrite_needed' ? 'flagged' : inputCheck.status;
 
             if (inputCheck.status === 'blocked' && inputCheck.primaryViolation) {
               const v = inputCheck.primaryViolation;
@@ -234,10 +240,13 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Final system prompt = base + RAG context (if any documents ingested)
-        const systemPrompt = ragSystemBlock
-          ? baseSystemPrompt + ragSystemBlock
-          : baseSystemPrompt;
+        // Screen content block — injected when the rep shares their screen
+        const screenContentBlock = screenContent
+          ? `\n\nSHARED SCREEN CONTENT:\nThe pharmaceutical representative has just shared their screen with you. Here is what it shows:\n---\n${screenContent}\n---\nIn your NEXT response, acknowledge what the rep has shared on their screen and react to it as a real physician would during a detailing visit — whether that means showing interest, skepticism, asking a question about the data, or expressing a clinical concern. Do not ignore the shared content.`
+          : '';
+
+        // Final system prompt = base + RAG context + screen context (if present)
+        const systemPrompt = [baseSystemPrompt, ragSystemBlock, screenContentBlock].filter(Boolean).join('');
 
         // Map to Anthropic format.
         const anthropicMessages = messages
@@ -274,7 +283,7 @@ export async function POST(request: NextRequest) {
         // Runs after streaming completes. The `done` event (sent below) carries
         // the FINAL canonical text — if the filter rewrites or blocks, the
         // client sees the corrected version even though chunks may have streamed.
-        let complianceStatus: string = 'clean';
+        let complianceStatus: 'clean' | 'flagged' | 'blocked' = 'clean';
         let complianceFlags: ComplianceViolation[] = [];
 
         try {
@@ -377,7 +386,7 @@ export async function POST(request: NextRequest) {
             turnIndex: messages.length,
             speaker: 'persona',
             rawText: output,
-            overallStatus: complianceStatus as 'clean' | 'flagged' | 'blocked',
+            overallStatus: complianceStatus,
             complianceFlags: complianceFlags.map(v => ({
               rule_code: v.rule_code,
               rule_type: v.rule_type,
