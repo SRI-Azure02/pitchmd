@@ -53,6 +53,41 @@ export interface FilterResult {
   primaryViolation?: ComplianceViolation;
 }
 
+// ── Efficacy claim detection ─────────────────────────────────────────────────
+//
+// Fair-balance rules should only fire when the physician is making an actual
+// clinical efficacy assertion — not when they merely mention the drug name
+// in a question, greeting, or neutral bridging statement.
+//
+// If none of these markers are present the physician isn't claiming anything
+// clinical, so there is nothing to balance.
+//
+const EFFICACY_CLAIM_MARKERS = [
+  // Clinical outcome language
+  'response rate', 'remission', 'progression-free', 'overall survival',
+  'pfs', 'os ', 'hazard ratio', 'hr ', 'median', 'months',
+  'cr rate', 'orr', 'mrd', 'minimal residual',
+  // Comparative / superiority language
+  'superior', 'better than', 'compared to', 'vs ', 'versus',
+  'outperform', 'more effective', 'higher rate', 'lower rate',
+  'significant', 'statistically',
+  // Trial / data language
+  'trial', 'study', 'data show', 'data suggest', 'evidence',
+  'murano', 'cll14', 'viale', 'glow', 'bellwave', 'captivate',
+  // Benefit language
+  'benefit', 'efficac', 'effective', 'works well', 'good result',
+  'positive result', 'demonstrated', 'shown to',
+  // Fixed-duration / convenience claims
+  'fixed duration', 'time-limited', 'no continuous', 'stop therapy',
+  'finite treatment', 'treatment-free',
+  // Combination regimen claims
+  'obinutuzumab', 'rituximab', 'azacitidine', 'g-ven', 'r-ven',
+];
+
+function hasEfficacyClaim(lowerText: string): boolean {
+  return EFFICACY_CLAIM_MARKERS.some(m => lowerText.includes(m));
+}
+
 // ── Balance presence detection ───────────────────────────────────────────────
 //
 // For each fair_balance rule, we define short key phrases that confirm the
@@ -137,6 +172,11 @@ export function checkOutput(
 
     // ── FAIR BALANCE ───────────────────────────────────────────────────────
     if (rule.RULE_TYPE === 'fair_balance') {
+      // Only require balance when the physician is making an actual efficacy
+      // assertion. A response that merely mentions the drug name in a question
+      // or bridging statement ("What did you want to discuss about Venclexta?")
+      // is not a promotional claim and must not trigger a rewrite.
+      if (!hasEfficacyClaim(lowerText)) continue;
       if (!hasBalancePresent(lowerText, rule.RULE_CODE)) {
         violations.push({
           rule_code:      rule.RULE_CODE,

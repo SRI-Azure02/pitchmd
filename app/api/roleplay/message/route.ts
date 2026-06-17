@@ -113,13 +113,14 @@ export async function POST(request: NextRequest) {
           return;
         }
 
-        const { messages, physician, username, mindsetDescription, sessionId, screenContent } = (await request.json()) as {
+        const { messages, physician, username, mindsetDescription, sessionId, screenContent, screenContentIsNew } = (await request.json()) as {
           messages: Array<{ role: string; content: string; internal?: boolean }>;
           physician: any;
           username: string;
           mindsetDescription?: string;
           sessionId?: string;
           screenContent?: string;
+          screenContentIsNew?: boolean;
         };
 
         const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -189,20 +190,35 @@ export async function POST(request: NextRequest) {
               return;
             }
 
-            if (inputCheck.status === 'flagged' && sessionId) {
-              repTurnLogged = true;
-              sf.logComplianceTurn({
-                sessionId,
-                appUserId: session.userId,
-                physicianId: physician.PHYSICIAN_ID ?? null,
-                turnIndex: messages.length - 1,
-                speaker: 'rep',
-                rawText: repText,
-                overallStatus: 'flagged',
-                complianceFlags: inputCheck.violations.map(v2 => ({
-                  rule_code: v2.rule_code, rule_type: v2.rule_type, action: v2.action,
-                })),
-              }).catch(e => console.error('[compliance] rep flag log error:', e?.message));
+            if (inputCheck.status === 'flagged') {
+              // Notify the client so a visible amber warning appears in the chat
+              // alongside the physician's response. The rep must see training feedback
+              // even for non-blocking violations.
+              const primaryFlag = inputCheck.primaryViolation;
+              safeEnqueue({
+                type: 'rep_flagged',
+                rule_code:  primaryFlag?.rule_code  ?? 'UNKNOWN',
+                rule_type:  primaryFlag?.rule_type  ?? 'unknown',
+                rule_name:  primaryFlag?.rule_name  ?? 'Compliance notice',
+                message:    primaryFlag?.redirect_message
+                  ?? 'Your message contained content that may be outside approved promotional guidelines. The physician has been prompted to address this.',
+              });
+
+              if (sessionId) {
+                repTurnLogged = true;
+                sf.logComplianceTurn({
+                  sessionId,
+                  appUserId: session.userId,
+                  physicianId: physician.PHYSICIAN_ID ?? null,
+                  turnIndex: messages.length - 1,
+                  speaker: 'rep',
+                  rawText: repText,
+                  overallStatus: 'flagged',
+                  complianceFlags: inputCheck.violations.map(v2 => ({
+                    rule_code: v2.rule_code, rule_type: v2.rule_type, action: v2.action,
+                  })),
+                }).catch(e => console.error('[compliance] rep flag log error:', e?.message));
+              }
             }
           }
         } catch (inputFilterErr: any) {
@@ -240,9 +256,13 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Screen content block — injected when the rep shares their screen
+        // Screen content block — injected every turn once the rep shares their screen.
+        // First send: physician is prompted to acknowledge and react.
+        // Subsequent turns: content stays available as background reference.
         const screenContentBlock = screenContent
-          ? `\n\nSHARED SCREEN CONTENT:\nThe pharmaceutical representative has just shared their screen with you. Here is what it shows:\n---\n${screenContent}\n---\nIn your NEXT response, acknowledge what the rep has shared on their screen and react to it as a real physician would during a detailing visit — whether that means showing interest, skepticism, asking a question about the data, or expressing a clinical concern. Do not ignore the shared content.`
+          ? screenContentIsNew
+            ? `\n\nSHARED SCREEN CONTENT (NEW):\nThe pharmaceutical representative has just shared their screen with you. Here is what it shows:\n---\n${screenContent}\n---\nIn your NEXT response, acknowledge what the rep has shared and react authentically — show interest, skepticism, ask a question about the data, or raise a clinical concern. Do not ignore this content.`
+            : `\n\nSHARED SCREEN CONTENT (SESSION REFERENCE):\nThe representative shared the following content earlier in this visit. It remains available as context — reference it naturally if it becomes relevant to the conversation, but do not re-acknowledge it as new.\n---\n${screenContent}\n---`
           : '';
 
         // Final system prompt = base + RAG context + screen context (if present)
@@ -306,44 +326,58 @@ export async function POST(request: NextRequest) {
 
             } else if (filterResult.status === 'rewrite_needed') {
               // ── REWRITE: re-generate with balance injection (up to 2 attempts)
-              const balanceInjection = buildBalanceInjection(filterResult.violations);
-              const rewriteSystemPrompt = systemPrompt + balanceInjection;
-              let rewriteSucceeded = false;
-
-              for (let attempt = 0; attempt < 2; attempt++) {
-                try {
-                  const regenMsg = await anthropic.messages.create({
-                    model: 'claude-haiku-4-5-20251001',
-                    max_tokens: 250,
-                    system: rewriteSystemPrompt,
-                    messages: anthropicMessages,
-                  });
-                  const regenText = ((regenMsg.content[0] as any)?.text ?? '').trim();
-                  const regenOutput = /^\[EMOTION:/i.test(regenText)
-                    ? regenText
-                    : `[EMOTION:neutral] ${regenText}`;
-
-                  // Verify re-generation passes the filter
-                  const recheck = checkOutput(regenOutput, rules);
-                  if (recheck.status === 'clean' || recheck.status === 'flagged') {
-                    output = regenOutput;
-                    complianceStatus = 'flagged'; // was non-compliant, now corrected
-                    rewriteSucceeded = true;
-                    console.log(`[compliance] rewrite succeeded (attempt ${attempt + 1}) — ${filterResult.violations.map(v => v.rule_code).join(', ')}`);
-                    break;
-                  }
-                } catch (regenErr: any) {
-                  console.error(`[compliance] rewrite attempt ${attempt + 1} failed:`, regenErr?.message);
-                }
-              }
-
-              if (!rewriteSucceeded) {
-                // Fallback: use safe fallback message from first violation
-                const fallback = filterResult.primaryViolation?.fallback
-                  ?? "I would recommend reviewing the full VENCLEXTA Prescribing Information for the complete benefit-risk profile.";
-                output = `[EMOTION:neutral] ${fallback}`;
+              //
+              // Fair-balance obligations apply to PROMOTIONAL content from the rep,
+              // not to natural physician dialogue. Only enforce a balance rewrite
+              // when the rep's preceding turn was itself non-compliant (flagged or
+              // blocked). If the rep said something clean, the physician mentioning
+              // the drug name is normal conversation — log it but don't substitute text.
+              if (repComplianceStatus === 'clean') {
+                // Fair-balance obligations apply to the rep's promotional content,
+                // not to natural physician dialogue. If the rep's turn was clean,
+                // suppress the rewrite and log for monitoring only.
                 complianceStatus = 'flagged';
-                console.log(`[compliance] rewrite fallback used — ${filterResult.violations.map(v => v.rule_code).join(', ')}`);
+                console.log(`[compliance] rewrite_needed suppressed — rep turn was clean (${filterResult.violations.map(v => v.rule_code).join(', ')})`);
+              } else {
+                const balanceInjection = buildBalanceInjection(filterResult.violations);
+                const rewriteSystemPrompt = systemPrompt + balanceInjection;
+                let rewriteSucceeded = false;
+
+                for (let attempt = 0; attempt < 2; attempt++) {
+                  try {
+                    const regenMsg = await anthropic.messages.create({
+                      model: 'claude-haiku-4-5-20251001',
+                      max_tokens: 250,
+                      system: rewriteSystemPrompt,
+                      messages: anthropicMessages,
+                    });
+                    const regenText = ((regenMsg.content[0] as any)?.text ?? '').trim();
+                    const regenOutput = /^\[EMOTION:/i.test(regenText)
+                      ? regenText
+                      : `[EMOTION:neutral] ${regenText}`;
+
+                    // Verify re-generation passes the filter
+                    const recheck = checkOutput(regenOutput, rules);
+                    if (recheck.status === 'clean' || recheck.status === 'flagged') {
+                      output = regenOutput;
+                      complianceStatus = 'flagged'; // was non-compliant, now corrected
+                      rewriteSucceeded = true;
+                      console.log(`[compliance] rewrite succeeded (attempt ${attempt + 1}) — ${filterResult.violations.map(v => v.rule_code).join(', ')}`);
+                      break;
+                    }
+                  } catch (regenErr: any) {
+                    console.error(`[compliance] rewrite attempt ${attempt + 1} failed:`, regenErr?.message);
+                  }
+                }
+
+                if (!rewriteSucceeded) {
+                  // Fallback: use safe fallback message from first violation
+                  const fallback = filterResult.primaryViolation?.fallback
+                    ?? "I would recommend reviewing the full VENCLEXTA Prescribing Information for the complete benefit-risk profile.";
+                  output = `[EMOTION:neutral] ${fallback}`;
+                  complianceStatus = 'flagged';
+                  console.log(`[compliance] rewrite fallback used — ${filterResult.violations.map(v => v.rule_code).join(', ')}`);
+                }
               }
 
             } else if (filterResult.status === 'flagged') {
