@@ -1221,7 +1221,7 @@ export class SnowflakeClient {
 
   /**
    * Insert a document chunk WITHOUT an embedding (keyword-only fallback).
-   * Used when Snowflake Cortex EMBED_TEXT_1024 is unavailable.
+   * Used when Cortex embedding is unavailable (stores chunk without a vector).
    */
   async ingestDocumentChunkNoEmbedding(params: {
     docId: string;
@@ -1265,23 +1265,28 @@ export class SnowflakeClient {
     if (embeddingCount > 0) {
       // ── Vector search (preferred) ─────────────────────────────────────
       // Try each known model until one succeeds for the query embedding
-      const models = ['voyage-lite-02-instruct', 'multilingual-e5-large', 'snowflake-arctic-embed-l'];
+      // Must match the models used during ingest (ingest/route.ts EMBEDDING_MODELS)
+      const models = ['e5-base-v2', 'snowflake-arctic-embed-m', 'multilingual-e5-small'];
       for (const model of models) {
         try {
           const safeModel = model.replace(/[^a-zA-Z0-9\-_.]/g, '');
           return await this.executeQuery(`
             SELECT
-              c.CHUNK_TEXT, c.SECTION_LABEL, c.PAGE_NUMBER, d.PRODUCT, d.DOC_NAME,
+              c.CHUNK_TEXT    AS "chunkText",
+              c.SECTION_LABEL AS "sectionLabel",
+              c.PAGE_NUMBER   AS "pageNumber",
+              d.PRODUCT       AS "product",
+              d.DOC_NAME      AS "docName",
               VECTOR_COSINE_SIMILARITY(
                 c.EMBEDDING,
                 SNOWFLAKE.CORTEX.EMBED_TEXT_768('${safeModel}', :1)
-              ) AS SIMILARITY
+              ) AS "similarity"
             FROM CORTEX_TESTING.PUBLIC.SYNTHETIC_DOCUMENT_CHUNKS c
             JOIN CORTEX_TESTING.PUBLIC.SYNTHETIC_COMPLIANCE_DOCUMENTS d
               ON c.DOC_ID = d.DOC_ID
             WHERE d.MLR_STATUS = 'approved'
               AND c.EMBEDDING IS NOT NULL
-            ORDER BY SIMILARITY DESC
+            ORDER BY "similarity" DESC
             LIMIT ${safeLimit}
           `, { '1': { type: 'TEXT', value: queryText } });
         } catch { /* try next model */ }
@@ -1298,18 +1303,20 @@ export class SnowflakeClient {
 
     if (keywords.length === 0) return [];
 
-    const conditions = keywords.map((_, i) => `LOWER(c.CHUNK_TEXT) LIKE :${i + 2}`).join(' OR ');
-    const bindings: Record<string, { type: string; value: string }> = {
-      '1': { type: 'TEXT', value: queryText },
-    };
+    const conditions = keywords.map((_, i) => `LOWER(c.CHUNK_TEXT) LIKE :${i + 1}`).join(' OR ');
+    const bindings: Record<string, { type: string; value: string }> = {};
     keywords.forEach((kw, i) => {
-      bindings[String(i + 2)] = { type: 'TEXT', value: `%${kw}%` };
+      bindings[String(i + 1)] = { type: 'TEXT', value: `%${kw}%` };
     });
 
     return await this.executeQuery(`
       SELECT
-        c.CHUNK_TEXT, c.SECTION_LABEL, c.PAGE_NUMBER, d.PRODUCT, d.DOC_NAME,
-        0.5 AS SIMILARITY
+        c.CHUNK_TEXT    AS "chunkText",
+        c.SECTION_LABEL AS "sectionLabel",
+        c.PAGE_NUMBER   AS "pageNumber",
+        d.PRODUCT       AS "product",
+        d.DOC_NAME      AS "docName",
+        0.5             AS "similarity"
       FROM CORTEX_TESTING.PUBLIC.SYNTHETIC_DOCUMENT_CHUNKS c
       JOIN CORTEX_TESTING.PUBLIC.SYNTHETIC_COMPLIANCE_DOCUMENTS d
         ON c.DOC_ID = d.DOC_ID
