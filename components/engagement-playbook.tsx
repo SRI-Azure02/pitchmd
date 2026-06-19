@@ -6,7 +6,7 @@ import { Paginator } from '@/components/ui/paginator';
 import { parseSnowflakeDate } from '@/lib/dates';
 import {
   ArrowDown, ArrowUp, ArrowUpDown, BookOpen, Check, ChevronDown, ChevronUp,
-  Search, X, RefreshCw, AlertCircle,
+  Search, X, RefreshCw, AlertCircle, Activity,
 } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 
@@ -40,11 +40,18 @@ interface BrandShare {
   change: number;
 }
 
+interface ActivityRow {
+  date: string;
+  channel: string;
+  message: string;
+}
+
 interface PhysicianPlaybookState {
   status: 'idle' | 'loading' | 'done' | 'error';
   playbook: PlaybookJSON | null;
   marketShare: BrandShare[] | null;
   openTasks: string[];
+  recentActivity: ActivityRow[];
   error: string | null;
 }
 
@@ -195,7 +202,7 @@ export default function EngagementPlaybook({ username: _username, onBack }: Enga
     if (current?.status === 'done') return;
     setPlaybookStates(prev => ({
       ...prev,
-      [physicianId]: { status: 'loading', playbook: null, marketShare: null, openTasks: [], error: null },
+      [physicianId]: { status: 'loading', playbook: null, marketShare: null, openTasks: [], recentActivity: [], error: null },
     }));
     try {
       const res = await fetch('/api/playbook', {
@@ -213,13 +220,14 @@ export default function EngagementPlaybook({ username: _username, onBack }: Enga
           playbook: data.playbook,
           marketShare: data.marketShare ?? [],
           openTasks: data.openTasks ?? [],
+          recentActivity: data.recentActivity ?? [],
           error: null,
         },
       }));
     } catch (err: any) {
       setPlaybookStates(prev => ({
         ...prev,
-        [physicianId]: { status: 'error', playbook: null, marketShare: null, openTasks: [], error: err.message },
+        [physicianId]: { status: 'error', playbook: null, marketShare: null, openTasks: [], recentActivity: [], error: err.message },
       }));
     }
   };
@@ -227,7 +235,7 @@ export default function EngagementPlaybook({ username: _username, onBack }: Enga
   const handleRetry = (physicianId: string) => {
     setPlaybookStates(prev => ({
       ...prev,
-      [physicianId]: { status: 'idle', playbook: null, marketShare: null, openTasks: [], error: null },
+      [physicianId]: { status: 'idle', playbook: null, marketShare: null, openTasks: [], recentActivity: [], error: null },
     }));
     handleViewPlaybook(physicianId);
   };
@@ -262,9 +270,10 @@ export default function EngagementPlaybook({ username: _username, onBack }: Enga
       );
     }
 
-    const pb = state.playbook!;
-    const ms = state.marketShare ?? [];
-    const tasks = state.openTasks ?? [];
+    const pb       = state.playbook!;
+    const ms       = state.marketShare ?? [];
+    const tasks    = state.openTasks ?? [];
+    const activity = state.recentActivity ?? [];
     const physician = hook.physicians.find(ph => ph.PHYSICIAN_ID === physicianId);
     const tasksExpanded = tasksExpandedId === physicianId;
 
@@ -367,6 +376,33 @@ export default function EngagementPlaybook({ username: _username, onBack }: Enga
             </div>
           )}
         </div>
+
+        {/* ── Row 5: Recent Interactions — last 5 from SYNTHETIC_ACTIVITY ──── */}
+        {activity.length > 0 && (
+          <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+            <div className="px-4 py-2.5 border-b border-slate-100 bg-slate-50/60 flex items-center gap-2">
+              <Activity className="w-3.5 h-3.5 shrink-0" style={{ color: '#2B5FA6' }} />
+              <span className="text-xs font-semibold uppercase tracking-widest text-slate-400">Recent Interactions</span>
+            </div>
+            <div className="divide-y divide-slate-100">
+              {activity.map((a, i) => (
+                <div key={i} className="px-4 py-2.5 flex items-start gap-3">
+                  <div className="shrink-0 mt-0.5">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-sky-400 mt-1" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="text-xs font-semibold text-slate-500">{formatDate(a.date)}</span>
+                      <span className="text-xs text-slate-400">·</span>
+                      <span className="text-xs text-slate-400">{channelLabel(a.channel)}</span>
+                    </div>
+                    <p className="text-sm text-slate-700 leading-snug line-clamp-2">{a.message}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
       </div>
     );

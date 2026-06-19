@@ -421,6 +421,10 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   // Full physician object stored at selection time; used to build the Claude
   // system prompt for direct-API roleplay (bypasses Snowflake Cortex Agent).
   const selectedPhysicianDataRef = useRef<any>(null);
+  // SSE abort controller — cancelled when rep continues speaking after auto-submit
+  const sseAbortRef                  = useRef<AbortController | null>(null);
+  const pendingContinuationRef       = useRef<string | null>(null);
+  const pendingContinuationHistRef   = useRef<Message[] | null>(null);
   const sendMessageRef = useRef<(text: string, history: Message[]) => Promise<void>>(
     async () => { },
   );
@@ -777,10 +781,13 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
             messages: contextMessages.map((m) => ({ role: m.role, content: m.content })),
           };
 
+      sseAbortRef.current?.abort();
+      sseAbortRef.current = new AbortController();
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody),
+        signal: sseAbortRef.current.signal,
       });
 
       if (!response.ok || !response.body) throw new Error('Failed to connect to agent');
@@ -1026,6 +1033,23 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
         setStatusMessage('');
       }
     } catch (error: any) {
+      if (error.name === 'AbortError' && pendingContinuationRef.current !== null) {
+        // Rep kept talking — resend with combined transcript
+        const combinedText = pendingContinuationRef.current;
+        const combinedHist = pendingContinuationHistRef.current ?? [];
+        pendingContinuationRef.current     = null;
+        pendingContinuationHistRef.current = null;
+        setMessages(combinedHist);
+        messagesRef.current = combinedHist;
+        setLoading(false);
+        loadingRef.current = false;
+        setStreamingContent('');
+        streamingContentRef.current = '';
+        setAvatarSpeaking(false);
+        sendMessage(combinedText, combinedHist);
+        return;
+      }
+      if (error.name === 'AbortError') return; // cancelled without continuation — silent
       setMessages((prev) => [
         ...prev,
         {
@@ -1067,8 +1091,22 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
       currentVoiceRef.current = physician.VOICE_MODEL;
     }
 
+    // Enrich physician with call notes, open tasks, and recent activity from Snowflake.
+    // Non-fatal — session proceeds even if the fetch fails.
+    let enrichedPhysician = { ...physician };
+    try {
+      const ctx = await fetch(`/api/physicians/${id}/context`).then(r => r.json());
+      if (!ctx.error) {
+        enrichedPhysician.CALL_NOTES      = ctx.callNotes      ?? [];
+        enrichedPhysician.OPEN_TASKS      = ctx.openTasks      ?? [];
+        enrichedPhysician.RECENT_ACTIVITY = ctx.recentActivity ?? [];
+      }
+    } catch (e) {
+      console.warn('[session] physician context fetch failed — proceeding without enrichment', e);
+    }
+
     // Store full physician object so sendMessage can build the Claude system prompt.
-    selectedPhysicianDataRef.current = physician;
+    selectedPhysicianDataRef.current = enrichedPhysician;
 
     // Capture assigned mindset (if any) for this session — locked in at start.
     const assignedMindset = physicianMindsets[id] ?? null;
@@ -1130,6 +1168,24 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     if (userTyping || sessionEnded) return;
     const current = inputRef.current.trim();
     if (current && !loading) sendMessage(current, messagesRef.current);
+  };
+
+  const handleContinuation = (continuationText: string) => {
+    if (sessionEnded) return;
+    const msgs = messagesRef.current;
+    // Find the last non-internal user message (the one that was just auto-submitted)
+    let lastUserIdx = -1;
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      if (msgs[i].role === 'user' && !msgs[i].internal) { lastUserIdx = i; break; }
+    }
+    if (lastUserIdx === -1) return;
+    const combined  = msgs[lastUserIdx].content + ' ' + continuationText;
+    const histBefore = msgs.slice(0, lastUserIdx);
+    // Store — picked up in sendMessage's AbortError catch to re-send combined
+    pendingContinuationRef.current     = combined;
+    pendingContinuationHistRef.current = histBefore;
+    stopCurrentAudio();
+    sseAbortRef.current?.abort();
   };
 
   // ── Facial analysis ──────────────────────────────────────────────────────
@@ -2969,6 +3025,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
               setInputValue((prev) => prev + (prev ? ' ' : '') + corrected);
             }}
             onAutoSubmit={handleAutoSubmit}
+            onContinuation={handleContinuation}
             onCountdown={(pct) => setTranscriptCountdownActive(pct !== null)}
             userTyping={userTyping}
             disabled={sessionEnded || !roleplaying || avatarSpeaking}

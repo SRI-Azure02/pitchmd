@@ -48,11 +48,32 @@ function buildSystemPrompt(
   const name        = `Dr. ${physician.FIRST_NAME} ${physician.LAST_NAME}`;
   const specialty   = physician.SPECIALTY ?? 'General Practice';
   const state       = physician.STATE     ?? '';
-  const segment     = physician.SEGMENT_NAME           ?? 'Standard';
+  const segment     = physician.SEGMENT_NAME            ?? 'Standard';
   const attitudinal = physician.ATTITUDINAL_DESCRIPTION ?? 'Professional and evidence-focused';
 
   const mindsetSection = mindsetDescription
     ? `\n${mindsetDescription}\n\nIMPORTANT: The HCP MINDSET above is your PRIMARY behavioral directive. It overrides any generic instructions. Every response MUST authentically reflect the mindset traits listed above. Do not blend in generic "balanced" physician behavior — commit fully to the mindset.`
+    : '';
+
+  // Call history — last 3 AI summaries from SYNTHETIC_CALL_JOURNAL
+  const callNotes: any[] = physician.CALL_NOTES ?? [];
+  const callHistorySection = callNotes.length > 0
+    ? `\nPAST INTERACTIONS WITH THIS REP (most recent first — use to inform your attitude and recall commitments):\n` +
+      callNotes.map((n: any) => `- ${n.CALL_DATE ?? 'Unknown date'}: ${n.AI_SUMMARY ?? '(no summary)'}`).join('\n')
+    : '';
+
+  // Open loopback tasks — commitments the rep made to this physician
+  const openTasks: any[] = physician.OPEN_TASKS ?? [];
+  const tasksSection = openTasks.length > 0
+    ? `\nOPEN COMMITMENTS THE REP MADE TO YOU (they promised these — you can ask about them):\n` +
+      openTasks.map((t: any) => `- ${t.TASK_TEXT}`).join('\n')
+    : '';
+
+  // Recent promotional activity
+  const recentActivity: any[] = physician.RECENT_ACTIVITY ?? [];
+  const activitySection = recentActivity.length > 0
+    ? `\nRECENT PROMOTIONAL TOUCHPOINTS (for context — you may remember or be indifferent):\n` +
+      recentActivity.map((a: any) => `- ${a.TRANSACTION_DATE} via ${a.PROMOTION_CHANNEL}: "${a.MESSAGE_DELIVERED}"`).join('\n')
     : '';
 
   return `You are roleplaying as ${name}, a ${specialty} physician${state ? ` based in ${state}` : ''}.
@@ -62,7 +83,7 @@ PHYSICIAN PROFILE:
 - Specialty: ${specialty}
 - Patient Segment: ${segment}
 - Attitudinal Profile: ${attitudinal}
-${mindsetSection}
+${mindsetSection}${callHistorySection}${tasksSection}${activitySection}
 SCENARIO:
 ${username} is a pharmaceutical sales representative visiting you for a brief office call. You have up to two minutes for this visit. Engage with them realistically and consistently based on your profile above.
 

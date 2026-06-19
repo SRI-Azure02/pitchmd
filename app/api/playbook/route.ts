@@ -65,14 +65,14 @@ export async function POST(request: NextRequest) {
         ORDER BY FRIDAY_WEEK_ENDING_DATE ASC
       `, { '1': { type: 'TEXT', value: physicianId } }),
 
-      // Recent promotional activity — last 90 days
+      // Recent promotional activity — last 90 days, top 5 for the card + prompt
       sf.executeQuery(`
         SELECT PROMOTION_CHANNEL, MESSAGE_DELIVERED, TRANSACTION_DATE
         FROM CORTEX_TESTING.PUBLIC.SYNTHETIC_ACTIVITY
         WHERE PHYSICIAN_ID = :1
           AND TRANSACTION_DATE >= DATEADD(day, -90, CURRENT_DATE())
         ORDER BY TRANSACTION_DATE DESC
-        LIMIT 10
+        LIMIT 5
       `, { '1': { type: 'TEXT', value: physicianId } }),
 
       // Last 5 call notes (AI summary only — no full transcript)
@@ -208,7 +208,12 @@ Field rules:
     const playbook: PlaybookJSON = JSON.parse(match[0]);
 
     const openTasks = (taskRows as any[]).map((t: any) => t.TASK_TEXT as string);
-    return NextResponse.json({ playbook, physicianName, marketShare, openTasks });
+    const recentActivity = (activityRows as any[]).map((a: any) => ({
+      date:    a.TRANSACTION_DATE as string,
+      channel: a.PROMOTION_CHANNEL as string,
+      message: a.MESSAGE_DELIVERED as string,
+    }));
+    return NextResponse.json({ playbook, physicianName, marketShare, openTasks, recentActivity });
 
   } catch (err: any) {
     console.error('[playbook] error:', err?.message ?? String(err));
