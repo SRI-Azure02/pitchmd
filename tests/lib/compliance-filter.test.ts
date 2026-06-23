@@ -1311,6 +1311,7 @@ describe('compliance-filter', () => {
     });
 
     describe('block rules (hard-stop violations)', () => {
+      // ── Input firewall blocking tests
       it('should return blocked for PII rule with severity=block', () => {
         const rules: ComplianceRule[] = [
           {
@@ -1377,6 +1378,68 @@ describe('compliance-filter', () => {
         const result = checkInput('drop table users', rules);
         expect(result.status).toBe('blocked');
         expect(result.violations[0].redirect_message).toBe('Cannot execute database commands in this session');
+      });
+
+      // ── Output filter blocking tests
+      it('should return blocked for output-level block rule (superlative)', () => {
+        const rules: ComplianceRule[] = [
+          {
+            RULE_ID: 'block-out-001',
+            RULE_CODE: 'SUPERLATIVE_HARD',
+            RULE_NAME: 'Absolute superiority claim',
+            RULE_TYPE: 'superlative',
+            SEVERITY: 'block',
+            DESCRIPTION: JSON.stringify({
+              triggers: ['best drug ever', 'only cure'],
+              redirect_message: 'Cannot make absolute superiority claims'
+            }),
+            ACTIVE: true,
+          },
+        ];
+        const result = checkOutput('This is the best drug ever for CLL', rules);
+        expect(result.status).toBe('blocked');
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0].action).toBe('blocked');
+        expect(result.violations[0].rule_type).toBe('superlative');
+      });
+
+      it('should use default message when redirect_message not provided', () => {
+        const rules: ComplianceRule[] = [
+          {
+            RULE_ID: 'block-out-002',
+            RULE_CODE: 'OFF_LABEL_HARD',
+            RULE_NAME: 'Hard off-label claim',
+            RULE_TYPE: 'off_label',
+            SEVERITY: 'block',
+            DESCRIPTION: JSON.stringify({
+              triggers: ['cures leukemia', 'treats cancer'],
+            }),
+            ACTIVE: true,
+          },
+        ];
+        const result = checkOutput('This drug cures leukemia completely', rules);
+        expect(result.status).toBe('blocked');
+        expect(result.violations[0].redirect_message).toContain('not able to discuss');
+      });
+
+      it('should skip rules with no triggers defined', () => {
+        const rules: ComplianceRule[] = [
+          {
+            RULE_ID: 'no-trigger-001',
+            RULE_CODE: 'NO_TRIGGER_RULE',
+            RULE_NAME: 'Rule with no triggers',
+            RULE_TYPE: 'warning',
+            SEVERITY: 'warning',
+            DESCRIPTION: JSON.stringify({
+              // No triggers defined - should be skipped
+              redirect_message: 'This should never appear'
+            }),
+            ACTIVE: true,
+          },
+        ];
+        const result = checkOutput('Any text here', rules);
+        expect(result.status).toBe('clean');
+        expect(result.violations).toHaveLength(0);
       });
 
     });
