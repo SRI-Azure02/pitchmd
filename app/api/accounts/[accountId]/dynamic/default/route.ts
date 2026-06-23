@@ -1,17 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionFromRequest } from '@/lib/auth';
+import { getSessionFromRequest, AppSession } from '@/lib/auth';
 import { getSnowflakeClient } from '@/lib/snowflake';
 
 const ADMIN_EMAILS = (process.env.COMPLIANCE_ADMIN_EMAILS ?? '')
   .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
 
-function isAdmin(session: Record<string, unknown>): boolean {
-  const check = (v: unknown) =>
-    typeof v === 'string' && ADMIN_EMAILS.includes(v.toLowerCase());
+function isAdmin(session: AppSession): boolean {
   return (
-    check(session.email) ||
-    check(session.username) ||
-    check(session.userId)
+    ADMIN_EMAILS.includes(session.email?.toLowerCase()    ?? '__none__') ||
+    ADMIN_EMAILS.includes(session.username?.toLowerCase() ?? '__none__') ||
+    ADMIN_EMAILS.includes(session.userId?.toLowerCase()   ?? '__none__')
   );
 }
 
@@ -50,16 +48,12 @@ export async function POST(
 ) {
   const session = await getSessionFromRequest(request);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  if (!isAdmin(session as Record<string, unknown>))
+  if (!isAdmin(session))
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const { accountId } = await params;
   const body = await request.json() as { flowData: unknown };
-  const setBy: string =
-    (session as Record<string, unknown>).userId as string ??
-    (session as Record<string, unknown>).username as string ??
-    (session as Record<string, unknown>).email as string ??
-    'unknown';
+  const setBy: string = session.userId ?? session.username ?? session.email ?? 'unknown';
 
   try {
     const sf = getSnowflakeClient();
