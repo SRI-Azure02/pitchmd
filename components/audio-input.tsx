@@ -22,13 +22,15 @@ import { Button } from '@/components/ui/button';
 interface AudioInputProps {
   onTranscript: (text: string) => void;
   onAutoSubmit?: () => void;
+  onContinuation?: (text: string) => void;
   onCountdown?: (progress: number | null) => void;
   disabled?: boolean;
   userTyping?: boolean;
 }
 
-const SEGMENT_MS    = 3000;  // MediaRecorder timeslice — collect data every 3 s
-const SUBMIT_WAIT   = 3_000; // ms of transcript silence before auto-submit
+const SEGMENT_MS         = 3000;  // MediaRecorder timeslice — collect data every 3 s
+const SUBMIT_WAIT        = 3_000; // ms of transcript silence before auto-submit
+const CONTINUATION_WAIT  = 5_000; // ms to keep mic alive after auto-submit for speech continuation
 const MIN_BLOB_SIZE  = 500;  // bytes — smaller blobs are almost certainly silent
 const MIN_WORDS      = 1;   // minimum word count to accept a transcript
 
@@ -62,6 +64,7 @@ function pickMimeType(): string {
 export default function AudioInput({
   onTranscript,
   onAutoSubmit,
+  onContinuation,
   onCountdown,
   disabled,
   userTyping,
@@ -74,9 +77,11 @@ export default function AudioInput({
   const recorderRef      = useRef<MediaRecorder | null>(null);
   const streamRef        = useRef<MediaStream | null>(null);
   const chunksRef        = useRef<Blob[]>([]);
-  const submitTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const progressRef      = useRef<ReturnType<typeof setInterval> | null>(null);
-  const submitStartRef   = useRef<number>(0);
+  const submitTimerRef       = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const progressRef          = useRef<ReturnType<typeof setInterval> | null>(null);
+  const submitStartRef       = useRef<number>(0);
+  const continuationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inContinuationRef    = useRef(false);
   const activeRef        = useRef(false);   // guards against double-start
   const mimeTypeRef      = useRef('');
   // Amplitude tracking — Web Audio API analyser for background-noise gating
@@ -123,8 +128,18 @@ export default function AudioInput({
 
     submitTimerRef.current = setTimeout(() => {
       clearSubmitTimer();
-      stopRecording();
       onAutoSubmit?.();
+      if (onContinuation) {
+        // Keep mic running for CONTINUATION_WAIT — intercept next transcript as continuation
+        inContinuationRef.current = true;
+        continuationTimerRef.current = setTimeout(() => {
+          inContinuationRef.current = false;
+          continuationTimerRef.current = null;
+          stopRecording();
+        }, CONTINUATION_WAIT);
+      } else {
+        stopRecording();
+      }
     }, SUBMIT_WAIT);
   };
 
@@ -141,6 +156,14 @@ export default function AudioInput({
       const data = await res.json() as { transcript: string };
       const text = (data.transcript ?? '').trim();
       if (!text || text.split(/\s+/).length < MIN_WORDS) return;
+      if (inContinuationRef.current) {
+        // Rep kept talking after auto-submit — hand off to continuation handler
+        if (continuationTimerRef.current) { clearTimeout(continuationTimerRef.current); continuationTimerRef.current = null; }
+        inContinuationRef.current = false;
+        stopRecording();
+        onContinuation?.(text);
+        return;
+      }
       onTranscript(text);
       startSubmitTimer(); // reset 3-second silence window
     } catch (err: any) {
@@ -256,6 +279,8 @@ export default function AudioInput({
 
   const stopRecording = () => {
     clearSubmitTimer();
+    if (continuationTimerRef.current) { clearTimeout(continuationTimerRef.current); continuationTimerRef.current = null; }
+    inContinuationRef.current = false;
     // Tear down calibration
     if (calibTimerRef.current) { clearTimeout(calibTimerRef.current); calibTimerRef.current = null; }
     calibSamplesRef.current = [];

@@ -539,6 +539,7 @@ export class SnowflakeClient {
           SUM(CASE WHEN TR_T5 THEN 1 ELSE 0 END)    AS TR_T5,
           SUM(CASE WHEN TR_T6 THEN 1 ELSE 0 END)    AS TR_T6,
           SUM(CASE WHEN TR_T7 THEN 1 ELSE 0 END)    AS TR_T7,
+          SUM(CASE WHEN TR_T8 THEN 1 ELSE 0 END)    AS TR_T8,
           SUM(CASE WHEN CL_L1 THEN 1 ELSE 0 END)    AS CL_L1,
           SUM(CASE WHEN CL_L2 THEN 1 ELSE 0 END)    AS CL_L2,
           SUM(CASE WHEN CL_L3 THEN 1 ELSE 0 END)    AS CL_L3,
@@ -590,6 +591,7 @@ export class SnowflakeClient {
         (ba.TR_T5   > n.cnt / 2) AS TR_T5,
         (ba.TR_T6   > n.cnt / 2) AS TR_T6,
         (ba.TR_T7   > n.cnt / 2) AS TR_T7,
+        (ba.TR_T8   > n.cnt / 2) AS TR_T8,
         (ba.CL_L1   > n.cnt / 2) AS CL_L1,
         (ba.CL_L2   > n.cnt / 2) AS CL_L2,
         (ba.CL_L3   > n.cnt / 2) AS CL_L3,
@@ -1353,6 +1355,168 @@ export class SnowflakeClient {
                d.MLR_STATUS, d.APPROVED_BY, d.APPROVED_DATE
       ORDER BY d.APPROVED_DATE DESC
     `, {});
+  }
+
+  // ─── Evaluation INSERT ────────────────────────────────────────────────────
+
+  async insertEvalResult(params: {
+    physicianId: string;
+    physicianFirstName: string;
+    physicianLastName: string;
+    physicianSpecialty: string;
+    segmentName: string;
+    transcript: string;
+    result: any;
+    appUserId: string;
+    facialAnalysis: { confidence: number; nervousness: number; engagement: number; frameCount: number; summary: string; observations: string[]; } | null;
+    rubricVersion: string;
+    modelUsed: string;
+    evalDurationMs: number;
+  }): Promise<void> {
+    const r = params.result;
+    const ck  = r?.scores?.clinical_knowledge  ?? {};
+    const oh  = r?.scores?.objection_handling  ?? {};
+    const co  = r?.scores?.compliance          ?? {};
+    const tr  = r?.scores?.tone_rapport        ?? {};
+    const cl  = r?.scores?.closing             ?? {};
+    const nv  = r?.non_verbal_presence         ?? {};
+    const fa  = params.facialAnalysis;
+
+    const criteriaMet  = (ck.criteria_met  ?? []) as string[];
+    const checksPassed = (co.checks_passed ?? []) as string[];
+    const behaviorsPresent = (tr.behaviors_present ?? []) as string[];
+    const closingBehaviors = (cl.active_closing_behaviors ?? []) as string[];
+
+    const bool = (v: boolean) => v ? 'true' : 'false';
+    const num  = (v: any)     => v != null ? String(v) : '';
+
+    await this.executeQuery(`
+      INSERT INTO CORTEX_TESTING.ML.REPEVAL_RESULTS (
+        PHYSICIAN_ID, PHYSICIAN_FIRST_NAME, PHYSICIAN_LAST_NAME, SEGMENT_NAME,
+        CONVERSATION_TRANSCRIPT, EVALUATION_RESULT,
+        OVERALL_SCORE,
+        CLINICAL_KNOWLEDGE_SCORE,    CLINICAL_KNOWLEDGE_RATIONALE,
+        OBJECTION_HANDLING_SCORE,    OBJECTION_HANDLING_RATIONALE,
+        COMPLIANCE_SCORE,            COMPLIANCE_RATIONALE,
+        TONE_RAPPORT_SCORE,          TONE_RAPPORT_RATIONALE,
+        CLOSING_SCORE,               CLOSING_RATIONALE,
+        RECOMMENDATIONS, COACHING_PRIORITY, FIELD_READINESS,
+        APP_USER_ID, USER_ID, USER_NAME,
+        CK_C1, CK_C2, CK_C3, CK_C4, CK_C5, CK_C6, CK_C7, CK_C8,
+        OH_OBJECTION_COUNT, OH_OBJECTION_DETAILS,
+        COMP_K1, COMP_K2, COMP_K3, COMP_K4, COMP_K5, COMP_K6,
+        TR_T1, TR_T2, TR_T3, TR_T4, TR_T5, TR_T6, TR_T7, TR_T8,
+        TR_PROFESSIONALISM_SUB_SCORE, TR_RAPPORT_SUB_SCORE,
+        CL_L1, CL_L2, CL_L3, CL_L4, CL_L5, CL_L6,
+        CL_ACTIVE_CLOSING_SCORE, CL_CONTENT_CLOSING_CREDIT,
+        PHYSICIAN_SPECIALTY,
+        ENGAGEMENT_GATE,
+        FA_AVAILABLE, FA_FRAME_COUNT, FA_CONFIDENCE, FA_NERVOUSNESS, FA_ENGAGEMENT,
+        FA_NV_RAW_SCORE, FA_NV_MODIFIER, FA_SUMMARY, FA_CROSS_CHECK_NOTE,
+        RUBRIC_VERSION, MODEL_USED, EVAL_DURATION_MS
+      ) VALUES (
+        :1, :2, :3, :4,
+        :5, PARSE_JSON(:6),
+        :7::FLOAT,
+        :8::INT,  :9,
+        :10::INT, :11,
+        :12::INT, :13,
+        :14::INT, :15,
+        :16::INT, :17,
+        PARSE_JSON(:18), :19, :20,
+        :21, :22, :23,
+        CAST(:24 AS BOOLEAN), CAST(:25 AS BOOLEAN), CAST(:26 AS BOOLEAN), CAST(:27 AS BOOLEAN),
+        CAST(:28 AS BOOLEAN), CAST(:29 AS BOOLEAN), CAST(:30 AS BOOLEAN), CAST(:31 AS BOOLEAN),
+        :32::INT, PARSE_JSON(:33),
+        CAST(:34 AS BOOLEAN), CAST(:35 AS BOOLEAN), CAST(:36 AS BOOLEAN), CAST(:37 AS BOOLEAN),
+        CAST(:38 AS BOOLEAN), CAST(:39 AS BOOLEAN),
+        CAST(:40 AS BOOLEAN), CAST(:41 AS BOOLEAN), CAST(:42 AS BOOLEAN), CAST(:43 AS BOOLEAN),
+        CAST(:44 AS BOOLEAN), CAST(:45 AS BOOLEAN), CAST(:46 AS BOOLEAN), CAST(:47 AS BOOLEAN),
+        NULLIF(:48, '')::FLOAT, NULLIF(:49, '')::FLOAT,
+        CAST(:50 AS BOOLEAN), CAST(:51 AS BOOLEAN), CAST(:52 AS BOOLEAN), CAST(:53 AS BOOLEAN),
+        CAST(:54 AS BOOLEAN), CAST(:55 AS BOOLEAN),
+        NULLIF(:56, '')::FLOAT, NULLIF(:57, '')::INT,
+        :58,
+        :59,
+        CAST(:60 AS BOOLEAN), NULLIF(:61, '')::INT, NULLIF(:62, '')::FLOAT,
+        NULLIF(:63, '')::FLOAT, NULLIF(:64, '')::FLOAT,
+        NULLIF(:65, '')::FLOAT, NULLIF(:66, '')::FLOAT,
+        NULLIF(:67, ''), NULLIF(:68, ''),
+        :69, :70, :71::INT
+      )
+    `, {
+      '1':  { type: 'TEXT', value: params.physicianId },
+      '2':  { type: 'TEXT', value: params.physicianFirstName },
+      '3':  { type: 'TEXT', value: params.physicianLastName },
+      '4':  { type: 'TEXT', value: params.segmentName },
+      '5':  { type: 'TEXT', value: params.transcript },
+      '6':  { type: 'TEXT', value: JSON.stringify(r) },
+      '7':  { type: 'TEXT', value: num(r?.overall_score) },
+      '8':  { type: 'TEXT', value: num(ck.score) },
+      '9':  { type: 'TEXT', value: ck.rationale ?? '' },
+      '10': { type: 'TEXT', value: num(oh.score) },
+      '11': { type: 'TEXT', value: oh.rationale ?? '' },
+      '12': { type: 'TEXT', value: num(co.score) },
+      '13': { type: 'TEXT', value: co.rationale ?? '' },
+      '14': { type: 'TEXT', value: num(tr.score) },
+      '15': { type: 'TEXT', value: tr.rationale ?? '' },
+      '16': { type: 'TEXT', value: num(cl.score) },
+      '17': { type: 'TEXT', value: cl.rationale ?? '' },
+      '18': { type: 'TEXT', value: JSON.stringify(r?.recommendations ?? []) },
+      '19': { type: 'TEXT', value: r?.coaching_priority ?? '' },
+      '20': { type: 'TEXT', value: r?.field_readiness ?? '' },
+      '21': { type: 'TEXT', value: params.appUserId },
+      '22': { type: 'TEXT', value: params.appUserId },
+      '23': { type: 'TEXT', value: params.appUserId },
+      '24': { type: 'TEXT', value: bool(criteriaMet.includes('C1')) },
+      '25': { type: 'TEXT', value: bool(criteriaMet.includes('C2')) },
+      '26': { type: 'TEXT', value: bool(criteriaMet.includes('C3')) },
+      '27': { type: 'TEXT', value: bool(criteriaMet.includes('C4')) },
+      '28': { type: 'TEXT', value: bool(criteriaMet.includes('C5')) },
+      '29': { type: 'TEXT', value: bool(criteriaMet.includes('C6')) },
+      '30': { type: 'TEXT', value: bool(criteriaMet.includes('C7')) },
+      '31': { type: 'TEXT', value: bool(criteriaMet.includes('C8')) },
+      '32': { type: 'TEXT', value: num(oh.objections_identified) },
+      '33': { type: 'TEXT', value: JSON.stringify(oh.objection_details ?? []) },
+      '34': { type: 'TEXT', value: bool(checksPassed.includes('K1')) },
+      '35': { type: 'TEXT', value: bool(checksPassed.includes('K2')) },
+      '36': { type: 'TEXT', value: bool(checksPassed.includes('K3')) },
+      '37': { type: 'TEXT', value: bool(checksPassed.includes('K4')) },
+      '38': { type: 'TEXT', value: bool(checksPassed.includes('K5')) },
+      '39': { type: 'TEXT', value: bool(checksPassed.includes('K6')) },
+      '40': { type: 'TEXT', value: bool(behaviorsPresent.includes('T1')) },
+      '41': { type: 'TEXT', value: bool(behaviorsPresent.includes('T2')) },
+      '42': { type: 'TEXT', value: bool(behaviorsPresent.includes('T3')) },
+      '43': { type: 'TEXT', value: bool(behaviorsPresent.includes('T4')) },
+      '44': { type: 'TEXT', value: bool(behaviorsPresent.includes('T5')) },
+      '45': { type: 'TEXT', value: bool(behaviorsPresent.includes('T6')) },
+      '46': { type: 'TEXT', value: bool(behaviorsPresent.includes('T7')) },
+      '47': { type: 'TEXT', value: bool(behaviorsPresent.includes('T8')) },
+      '48': { type: 'TEXT', value: num(tr.professionalism_sub_score) },
+      '49': { type: 'TEXT', value: num(tr.rapport_sub_score) },
+      '50': { type: 'TEXT', value: bool(closingBehaviors.includes('L1')) },
+      '51': { type: 'TEXT', value: bool(closingBehaviors.includes('L2')) },
+      '52': { type: 'TEXT', value: bool(closingBehaviors.includes('L3')) },
+      '53': { type: 'TEXT', value: bool(closingBehaviors.includes('L4')) },
+      '54': { type: 'TEXT', value: bool(closingBehaviors.includes('L5')) },
+      '55': { type: 'TEXT', value: bool(closingBehaviors.includes('L6')) },
+      '56': { type: 'TEXT', value: num(cl.active_closing_score) },
+      '57': { type: 'TEXT', value: num(cl.content_closing_credit) },
+      '58': { type: 'TEXT', value: params.physicianSpecialty },
+      '59': { type: 'TEXT', value: r?.engagement_gate ?? '' },
+      '60': { type: 'TEXT', value: bool(fa != null && (fa.frameCount ?? 0) >= 3) },
+      '61': { type: 'TEXT', value: fa ? num(fa.frameCount) : '' },
+      '62': { type: 'TEXT', value: fa ? num(fa.confidence) : '' },
+      '63': { type: 'TEXT', value: fa ? num(fa.nervousness) : '' },
+      '64': { type: 'TEXT', value: fa ? num(fa.engagement) : '' },
+      '65': { type: 'TEXT', value: num(nv.nv_raw_score) },
+      '66': { type: 'TEXT', value: num(nv.nv_modifier) },
+      '67': { type: 'TEXT', value: fa?.summary ?? '' },
+      '68': { type: 'TEXT', value: nv.cross_check_note ?? '' },
+      '69': { type: 'TEXT', value: params.rubricVersion },
+      '70': { type: 'TEXT', value: params.modelUsed },
+      '71': { type: 'TEXT', value: String(params.evalDurationMs) },
+    });
   }
 
   // ─── Phase 6: Escalation + Completion Methods ─────────────────────────────

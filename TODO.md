@@ -2,7 +2,7 @@
 
 ---
 
-## [ ] Remove ElevenLabs TTS entirely
+## [x] Remove ElevenLabs TTS entirely
 
 Remove ElevenLabs from all aspects of the product — we are using browser TTS only.
 
@@ -75,7 +75,7 @@ Before a session starts, the engagement playbook panel should show a timeline of
 
 ---
 
-## [ ] Data-driven dynamic personas — multi-agent physician profiling pipeline
+## [x] Data-driven dynamic personas — multi-agent physician profiling pipeline
 
 **Context**: Today's physician personas are static archetypes. This feature replaces them with personas generated in real time from actual physician data, producing objections and attitudes that reflect the specific HCP the rep is about to visit.
 
@@ -192,7 +192,7 @@ Deadline:     Thursday 19 Jun 2026
 
 ---
 
-## [ ] Move post-session evaluation from Snowflake Cortex to the webapp
+## [x] Move post-session evaluation from Snowflake Cortex to the webapp
 
 **Context**: The current evaluation pipeline runs entirely inside Snowflake Cortex (LLM inference via Cortex Complete). This introduces latency, limits prompt flexibility, and makes iterating on evaluation rubrics slow — every change requires a Snowflake-side deployment. Moving evaluation to the Next.js API layer using Claude directly gives full control over prompts, streaming, and output structure.
 
@@ -202,3 +202,156 @@ Deadline:     Thursday 19 Jun 2026
 - Define the evaluation rubric as a TypeScript object in the route (not a Snowflake prompt template) so it can be versioned in git and iterated without a Snowflake deployment
 - Write the final scored result to Snowflake at the end (for compliance logging and history) but do not depend on Snowflake for the inference step itself
 - Remove the Snowflake Cortex Complete call from the existing evaluation path; confirm no other route depends on it before deleting
+
+---
+
+## [x] Territory Intelligence — natural language data query with adaptive output
+
+**Context**: Reps need to interrogate their territory data without leaving the app or writing SQL. A conversational interface on the home screen lets them ask questions in plain English (or via voice) and receive adaptive output — tables for lists, line charts + narrative for trends, and stat cards for single-metric answers. The interface reuses the same pill-shaped chat prompt from the roleplay screen, surfaced via a sliding drawer from the home screen.
+
+---
+
+### UX / Interaction Design
+
+**Entry point**: A `?` button (rounded, muted) sits below the bento card grid on the home screen. Clicking it triggers a slide-up drawer animation — the bento cards translate upward just enough (≈60–70% of viewport height) to reveal the query interface beneath, with the top edge of the cards still peeking above the drawer header. A down-arrow or `×` in the drawer header collapses it back.
+
+**Input**: Same pill-shaped input used in the roleplay screen — text field on the left, circular submit button on the right, microphone (STT) button beside it. STT uses the existing Groq Whisper route with an extended vocabulary prompt that includes physician names from the rep's territory (in addition to brand names).
+
+**Conversation history**: The drawer maintains a scrollable history of Q&A pairs above the input pill so the rep can scroll up to review previous answers in the same session. History is in-memory only (cleared on drawer close).
+
+---
+
+### Adaptive Output — Three Modes
+
+The route returns `{ type, data, narrative, chartConfig? }`. The frontend renders based on `type`:
+
+| `type` | When to use | Components rendered |
+|---|---|---|
+| `'table'` | List queries ("which physicians haven't I called in 2 weeks?") | Sortable table + narrative summary |
+| `'chart'` | Trend queries ("how has Rx volume changed over the past 12 weeks?") | Line chart + data table + narrative |
+| `'stat'` | Single-metric queries ("what's my market share this month?") | Large stat card with trend arrow + narrative |
+
+The route (not the frontend) decides the output type — Claude Haiku classifies the query intent and sets `type` accordingly before executing the SQL.
+
+---
+
+### Backend — `app/api/intelligence/query/route.ts`
+
+**Step 1 — Intent classification + SQL generation** (single Haiku call):
+
+```typescript
+// System prompt includes:
+// 1. Allowed tables + full column list (schema block)
+// 2. Rep's APP_USER_ID (all queries scoped to this user's territory)
+// 3. Output type rules (table / chart / stat)
+// 4. SQL safety rules: SELECT only, no subqueries on unrestricted tables, LIMIT 50 always
+
+// Returns structured JSON:
+{
+  type: 'table' | 'chart' | 'stat',
+  sql: 'SELECT ...',
+  chartConfig?: { xKey: string, yKey: string, seriesKey?: string, title: string },
+  statConfig?: { valueKey: string, label: string, trendKey?: string }
+}
+```
+
+**Allowed tables** (read-only, scoped to rep's territory):
+- `SYNTHETIC_PHYSICIAN_CHARS` — physician demographics, specialty, state
+- `SYNTHETIC_PHYSICIAN_SEGMENT` — segment, attitudinal description
+- `SYNTHETIC_RX` — weekly Rx by brand and physician
+- `SYNTHETIC_ACTIVITY` — promotional touchpoints
+- `SYNTHETIC_CALL_JOURNAL` — call notes (scoped to `APP_USER_ID`)
+- `SYNTHETIC_LOOPBACK` — open tasks (scoped to `APP_USER_ID`)
+
+**Step 2 — SQL execution**: run the generated SQL via `sf.executeQuery()`. All queries must include `AND APP_USER_ID = :repId` or `AND PHYSICIAN_ID IN (SELECT PHYSICIAN_ID FROM rep's territory)` as appropriate.
+
+**Step 3 — Narrative generation** (second Haiku call, cheap): pass the query result rows to Haiku and ask for a 2–3 sentence plain-English summary. For stat cards, include the trend direction. For charts, highlight the most notable inflection point.
+
+**Step 4 — Stream back** via SSE: emit `{ type: 'sql' }` (for debug), `{ type: 'data', rows, chartConfig, statConfig }`, `{ type: 'narrative', text }`, `{ type: 'done' }`.
+
+---
+
+### Frontend — `components/intelligence-drawer.tsx`
+
+- `DrawerState`: `'closed' | 'open'`
+- Slide-up animation: CSS `transform: translateY()` transition on the bento grid wrapper — translate up by `60vh` when open, `0` when closed. The drawer panel sits in a fixed-height container below the grid.
+- Message list: `IntelligenceMessage[]` — each entry has `query`, `type`, `rows`, `chartConfig`, `statConfig`, `narrative`, `loading`
+- On submit: append a loading message, POST to `/api/intelligence/query`, read SSE stream, update the message in place as data arrives
+- Render per `type`:
+  - `'table'` → `<DataTable>` (reuse existing table component) + narrative paragraph
+  - `'chart'` → line chart via `recharts` `<LineChart>` (already in `package.json`) + `<DataTable>` collapsed by default + narrative
+  - `'stat'` → large number with `↑`/`↓`/`→` trend indicator + narrative
+
+**STT extension**: extend the Whisper vocabulary prompt in `app/api/stt/route.ts` to include physician last names from `SYNTHETIC_PHYSICIAN_CHARS` — cache alongside brand names with the same 10-minute TTL.
+
+---
+
+### Snowflake — no schema changes needed
+
+All required tables already exist. No new columns or procedures required.
+
+---
+
+### Implementation notes
+
+- SQL generation must be sandboxed: only `SELECT` statements, no `DROP`/`INSERT`/`UPDATE`/`DELETE`, no access to tables outside the allowed list. Validate with a regex before execution.
+- LIMIT 50 is always appended by the route — never trust the model to include it.
+- The drawer does not persist between sessions — history is in-memory only.
+- If SQL generation fails or returns an unsafe query, return a friendly error message in the narrative field and set `type: 'error'`.
+- **Physician name disambiguation popup**: when the STT transcript contains a name the SQL model cannot confidently match to a `PHYSICIAN_ID`, surface a plain fixed-div overlay (per CLAUDE.md rule 3 — no Radix Dialog) above the drawer message history. The popup shows a ranked shortlist of phonetically similar physicians from the rep's territory (max 5), each row displaying **name + specialty + city** to disambiguate same-sounding names. One tap selects the physician, substitutes their `PHYSICIAN_ID` into the original query, and re-runs automatically — the rep never touches the input field again. If zero phonetic matches are found (name was completely garbled by STT), fall back to showing a full searchable list of all territory physicians with a text filter input at the top of the popup.
+- **Phonetic matching**: run Double Metaphone (or Soundex as a fallback) on the physician last name client-side against the physician list already loaded in the dashboard — no extra Snowflake round-trip. Use Levenshtein edit distance as a tiebreaker when multiple physicians share the same phonetic code. Run entirely in-memory; the physician list is already available from the home screen data fetch.
+- **Disambiguation trigger**: the route signals a disambiguation-needed state by returning `{ type: 'disambiguate', candidates: [{ physicianId, name, specialty, city }] }` in the SSE stream. The frontend intercepts this event and opens the popup instead of rendering a result card.
+
+---
+
+## [ ] Ideal Rep Simulation — AI benchmark vs. real rep comparison and coaching priorities
+
+**Context**: After a rep completes a practice session, replay the exact same physician persona and conversation context with an AI-controlled "ideal rep." Compare the two transcripts turn-by-turn to surface specific, ranked coaching priorities — not generic feedback, but a concrete gap analysis grounded in what a top performer would have actually said.
+
+### Step 1 — Ideal rep simulation
+
+- After the real session ends, re-run the same physician persona against an AI rep agent using the same opening context, physician profile vectors, and compliance rules
+- The AI rep is prompted to demonstrate best-in-class pharma sales technique: lead with clinical insight, anticipate objections, cite data accurately, handle pushback without conceding compliance, and close with a concrete next step
+- The simulation runs the full conversation to natural conclusion (or a fixed turn limit, e.g. 12 exchanges) — not just a single ideal response
+- Store the ideal rep transcript in Snowflake keyed on `session_id` so it is always paired with the real rep transcript
+
+### Step 2 — Turn-by-turn gap analysis
+
+A comparison agent (Claude Haiku) reads both transcripts in parallel and produces a structured diff across dimensions:
+
+| Dimension | What is measured |
+|---|---|
+| **Clinical accuracy** | Did the real rep cite the same data points? Miss any key efficacy or safety facts? |
+| **Objection handling** | How did each rep respond to the same physician pushback? Did the real rep concede prematurely? |
+| **Compliance adherence** | Did the real rep stay on-label? Did the ideal rep navigate fair-balance better? |
+| **Conversational flow** | Did the real rep listen and adapt, or follow a rigid script? |
+| **Close quality** | Did the real rep secure a concrete next step (follow-up, sample acceptance, meeting)? |
+
+Each dimension gets a score (1–5) and a 1–2 sentence rationale grounded in specific transcript moments.
+
+### Step 3 — Coaching priority report
+
+The gap analysis is synthesised into a ranked coaching priority list — ordered by impact, not alphabetically:
+
+```
+#1  Objection handling — conceded too quickly on the safety question (turn 4).
+    Ideal rep reframed using the MONARCH trial subgroup data. Rep did not cite it.
+
+#2  Close quality — session ended without a confirmed next step.
+    Ideal rep secured sample acceptance + follow-up call date in turn 11.
+
+#3  Clinical accuracy — missed the ORR stat for the ≥65 cohort when physician asked.
+    Ideal rep cited 78% vs 43% placebo from the geriatric subgroup analysis.
+```
+
+- Top 3 priorities surfaced prominently in the evaluation panel immediately after the session
+- Full turn-by-turn diff available in an expandable "Ideal Rep Comparison" section
+- Each priority links to the specific exchange in both transcripts so the rep can read exactly what the ideal rep said vs. what they said
+- Priorities stored in Snowflake and feed into the manager dashboard as a longitudinal coaching heatmap across all reps and sessions
+
+### Implementation notes
+
+- The ideal rep simulation runs async after the real session ends — it must not block the evaluation panel; show a "Generating ideal rep comparison…" spinner in the coaching section while it runs
+- Use a separate system prompt persona for the AI rep — it must not have access to the physician's internal profile vectors (it should encounter objections organically, the same way a real rep would)
+- Cap the simulation at a fixed turn limit (12 exchanges) to bound cost; sufficient to cover a complete sales call arc
+- Version the ideal rep persona prompt in git alongside the evaluation rubric so coaching benchmarks are reproducible and comparable over time
