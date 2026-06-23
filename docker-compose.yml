@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  pitchmd:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      # Load from .env.local file
+      - NODE_ENV=development
+    env_file:
+      - .env.local
+    volumes:
+      # Mount source for hot reload (development only)
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 40s
+    networks:
+      - pitchmd-network
+
+  # Optional: Add Snowflake mock/proxy if needed
+  # snowflake-proxy:
+  #   image: ...
+  #   networks:
+  #     - pitchmd-network
+
+networks:
+  pitchmd-network:
+    driver: bridge
