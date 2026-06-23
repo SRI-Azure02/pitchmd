@@ -1210,5 +1210,76 @@ describe('compliance-filter', () => {
       const result = checkInput('Test 😀 @#$%', rules);
       expect(result.status).toBe('clean');
     });
+
+    describe('block rules (hard-stop violations)', () => {
+      it('should return blocked for PII rule with severity=block', () => {
+        const rules: ComplianceRule[] = [
+          {
+            RULE_ID: 'block-001',
+            RULE_CODE: 'PII_PATIENT_NAME',
+            RULE_NAME: 'Patient name disclosure',
+            RULE_TYPE: 'pii',
+            SEVERITY: 'block',
+            DESCRIPTION: JSON.stringify({
+              triggers: ['john smith', 'patient john'],
+              redirect_message: 'Cannot discuss patient names'
+            }),
+            ACTIVE: true,
+          },
+        ];
+        const result = checkInput('The patient john smith presented with...', rules);
+        expect(result.status).toBe('blocked');
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0].action).toBe('blocked');
+      });
+
+      it('should return first block rule violation only', () => {
+        const rules: ComplianceRule[] = [
+          {
+            RULE_ID: 'block-001',
+            RULE_CODE: 'PII_001',
+            RULE_NAME: 'PII block',
+            RULE_TYPE: 'pii',
+            SEVERITY: 'block',
+            DESCRIPTION: JSON.stringify({ triggers: ['john'] }),
+            ACTIVE: true,
+          },
+          {
+            RULE_ID: 'block-002',
+            RULE_CODE: 'PII_002',
+            RULE_NAME: 'Another PII',
+            RULE_TYPE: 'pii',
+            SEVERITY: 'block',
+            DESCRIPTION: JSON.stringify({ triggers: ['smith'] }),
+            ACTIVE: true,
+          },
+        ];
+        const result = checkInput('john smith', rules);
+        expect(result.status).toBe('blocked');
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0].rule_code).toBe('PII_001');
+      });
+
+      it('should capture redirect message from block rule', () => {
+        const rules: ComplianceRule[] = [
+          {
+            RULE_ID: 'block-003',
+            RULE_CODE: 'INJECTION_001',
+            RULE_NAME: 'Injection attempt',
+            RULE_TYPE: 'injection',
+            SEVERITY: 'block',
+            DESCRIPTION: JSON.stringify({
+              triggers: ['drop table', 'delete from'],
+              redirect_message: 'Cannot execute database commands in this session'
+            }),
+            ACTIVE: true,
+          },
+        ];
+        const result = checkInput('drop table users', rules);
+        expect(result.status).toBe('blocked');
+        expect(result.violations[0].redirect_message).toBe('Cannot execute database commands in this session');
+      });
+
+    });
   });
 });
