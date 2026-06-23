@@ -180,6 +180,78 @@ function ScoreRibbon({
   );
 }
 
+interface FacialResult {
+  confidence: number;
+  nervousness: number;
+  engagement: number;
+  summary: string;
+  observations: string[];
+  frameCount: number;
+}
+
+function FacialAnalysisCard({ result }: { result: FacialResult }) {
+  const metrics = [
+    {
+      label: 'Confidence', value: result.confidence,
+      color: (v: number) => v >= 7 ? '#047857' : v >= 5 ? '#b45309' : '#dc2626',
+      bg:    (v: number) => v >= 7 ? '#f0fdf9' : v >= 5 ? '#fefce8' : '#fff7ed',
+      border:(v: number) => v >= 7 ? '#a7f3d0' : v >= 5 ? '#fef08a' : '#fed7aa',
+    },
+    {
+      label: 'Nervousness', value: result.nervousness,
+      color: (v: number) => v <= 3 ? '#047857' : v <= 6 ? '#b45309' : '#dc2626',
+      bg:    (v: number) => v <= 3 ? '#f0fdf9' : v <= 6 ? '#fefce8' : '#fff7ed',
+      border:(v: number) => v <= 3 ? '#a7f3d0' : v <= 6 ? '#fef08a' : '#fed7aa',
+    },
+    {
+      label: 'Engagement', value: result.engagement,
+      color: (v: number) => v >= 7 ? '#047857' : v >= 5 ? '#b45309' : '#dc2626',
+      bg:    (v: number) => v >= 7 ? '#f0fdf9' : v >= 5 ? '#fefce8' : '#fff7ed',
+      border:(v: number) => v >= 7 ? '#a7f3d0' : v >= 5 ? '#fef08a' : '#fed7aa',
+    },
+  ];
+
+  return (
+    <div className="border border-slate-200 rounded-xl bg-white overflow-hidden">
+      <div className="px-6 py-5 border-b border-slate-100">
+        <p className="text-sm font-bold text-slate-800 uppercase tracking-wide">Facial Expression Analysis</p>
+        <p className="text-xs text-slate-400 mt-0.5">
+          Most recent session · {result.frameCount} frame{result.frameCount !== 1 ? 's' : ''} sampled
+        </p>
+      </div>
+      <div className="px-6 pb-6 pt-4 space-y-5">
+        <div className="grid grid-cols-3 gap-3">
+          {metrics.map(m => (
+            <div key={m.label} className="rounded-xl p-3 text-center"
+              style={{ background: m.bg(m.value), border: `1px solid ${m.border(m.value)}` }}>
+              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500 mb-1">{m.label}</p>
+              <p className="text-3xl font-bold mb-1" style={{ color: m.color(m.value) }}>
+                {m.value}<span className="text-sm font-normal text-slate-400">/10</span>
+              </p>
+              <div className="h-1.5 rounded-full bg-slate-200 mx-2">
+                <div className="h-full rounded-full" style={{ width: `${m.value * 10}%`, background: m.color(m.value) }} />
+              </div>
+            </div>
+          ))}
+        </div>
+        {result.summary && (
+          <p className="text-sm text-slate-600 leading-relaxed">{result.summary}</p>
+        )}
+        {result.observations.length > 0 && (
+          <ul className="space-y-2">
+            {result.observations.map((obs, i) => (
+              <li key={i} className="flex items-start gap-2">
+                <span className="mt-1.5 w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#2B5FA6' }} />
+                <span className="text-sm text-slate-700 leading-relaxed">{obs}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Main panel ───────────────────────────────────────────────────────────
 export default function PerformancePanel({ onBack }: PerformancePanelProps) {
   const [summary, setSummary]                   = useState<any>(null);
@@ -190,12 +262,17 @@ export default function PerformancePanel({ onBack }: PerformancePanelProps) {
   const [noData, setNoData]                     = useState(false);
   const [error, setError]                       = useState<string | null>(null);
   const [expandedKey, setExpandedKey]           = useState<string>('__overall__');
+  const [facialResult, setFacialResult]         = useState<FacialResult | null>(null);
 
   const toggle = (key: string) =>
     setExpandedKey(prev => (prev === key ? '' : key));
 
   useEffect(() => {
     fetchData();
+    try {
+      const raw = localStorage.getItem('pitchmd_facial_last');
+      if (raw) setFacialResult(JSON.parse(raw) as FacialResult);
+    } catch { /* ignore */ }
   }, []);
 
   const fetchData = async () => {
@@ -294,6 +371,25 @@ export default function PerformancePanel({ onBack }: PerformancePanelProps) {
                 ))}
               </>
             )}
+
+            {facialResult && (
+              <>
+                <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 px-1 pt-2">
+                  Body Language
+                </p>
+                <FacialAnalysisCard result={facialResult} />
+              </>
+            )}
+          </>
+        )}
+
+        {/* Show facial card even when no score data yet */}
+        {!loading && !summary && facialResult && (
+          <>
+            <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 px-1 pt-2">
+              Body Language
+            </p>
+            <FacialAnalysisCard result={facialResult} />
           </>
         )}
       </div>

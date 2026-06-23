@@ -6,6 +6,8 @@ import {
   ComposedChart, Area, Line, XAxis, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
 import { parseSnowflakeDate, formatDateTime } from '@/lib/dates';
+import type { FacialAnalysisResult } from '@/app/api/facial-analysis/route';
+import type { GapAnalysisResult } from '@/app/api/evaluation/gap-analysis/route';
 
 interface EvaluationPanelProps {
   open: boolean;
@@ -13,8 +15,12 @@ interface EvaluationPanelProps {
   content: string;
   username?: string;
   physicianId?: string | null;
-  generating?: boolean;    // true while REPEVAL is running — show skeleton
-  refreshTrigger?: number; // increment to force a re-fetch
+  sessionId?: string | null;
+  messages?: { role: string; content: string; internal?: boolean }[];
+  generating?: boolean;          // true while REPEVAL is running — show skeleton
+  refreshTrigger?: number;       // increment to force a re-fetch
+  facialAnalysis?: FacialAnalysisResult | null;
+  facialAnalysisRunning?: boolean;
 }
 
 const DIMENSIONS = [
@@ -111,7 +117,7 @@ function EvalSkeleton({ generating }: { generating: boolean }) {
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
           </svg>
-          <p className="text-sm text-amber-700 font-medium">Generating evaluation report… this may take up to 2 minutes.</p>
+          <p className="text-sm text-amber-700 font-medium">Generating evaluation report… this usually takes 30–60 seconds.</p>
         </div>
       )}
 
@@ -185,7 +191,7 @@ function EvalSkeleton({ generating }: { generating: boolean }) {
   );
 }
 
-export default function EvaluationPanel({ open, onClose, content, username, physicianId, generating, refreshTrigger }: EvaluationPanelProps) {
+export default function EvaluationPanel({ open, onClose, content, username, physicianId, sessionId, messages, generating, refreshTrigger, facialAnalysis, facialAnalysisRunning }: EvaluationPanelProps) {
   const [evaluation, setEvaluation] = useState<any>(null);
   const [historyWithPhysician, setHistoryWithPhysician] = useState<any[]>([]);
   const [sessionCount, setSessionCount] = useState<number>(1);
@@ -193,9 +199,18 @@ export default function EvaluationPanel({ open, onClose, content, username, phys
   const [loading, setLoading] = useState(false);
   const [noData, setNoData] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'scores' | 'gap'>('scores');
+  const [gapAnalysis, setGapAnalysis] = useState<GapAnalysisResult | null>(null);
+  const [gapLoading, setGapLoading] = useState(false);
+  const [gapError, setGapError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setActiveTab('scores');
+      setGapAnalysis(null);
+      setGapError(null);
+      return;
+    }
     if (generating) {
       // REPEVAL still running — clear any stale data and stay on skeleton
       setEvaluation(null);
@@ -234,6 +249,26 @@ export default function EvaluationPanel({ open, onClose, content, username, phys
     }
   };
 
+  const fetchGapAnalysis = async () => {
+    if (!messages?.length) { setGapError('No session transcript available.'); return; }
+    setGapLoading(true);
+    setGapError(null);
+    try {
+      const res = await fetch('/api/evaluation/gap-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages, physicianId }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || 'Gap analysis failed');
+      setGapAnalysis(body as GapAnalysisResult);
+    } catch (e: any) {
+      setGapError(e.message);
+    } finally {
+      setGapLoading(false);
+    }
+  };
+
   const e = evaluation;
 
   const fieldReadinessLabel = (): string => {
@@ -259,6 +294,99 @@ export default function EvaluationPanel({ open, onClose, content, username, phys
     Overall: r.OVERALL_SCORE, CK: r.CLINICAL_KNOWLEDGE_SCORE, OH: r.OBJECTION_HANDLING_SCORE,
     CO: r.COMPLIANCE_SCORE, TR: r.TONE_RAPPORT_SCORE, CL: r.CLOSING_SCORE,
   }));
+
+  function FacialAnalysisSection() {
+    if (facialAnalysisRunning) {
+      return (
+        <div className="border border-slate-200 rounded-lg p-5 bg-white">
+          <div className="flex items-center gap-2.5 mb-3">
+            <p className="text-sm font-bold text-slate-800">Facial Expression Analysis</p>
+            <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">Analysing…</span>
+          </div>
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            {['Confidence', 'Nervousness', 'Engagement'].map(label => (
+              <div key={label} className="rounded-xl p-3 text-center bg-slate-50 border border-slate-100 animate-pulse">
+                <div className="h-3 w-16 bg-slate-200 rounded mx-auto mb-2" />
+                <div className="h-8 w-8 bg-slate-200 rounded-full mx-auto mb-1" />
+                <div className="h-2 w-20 bg-slate-200 rounded mx-auto" />
+              </div>
+            ))}
+          </div>
+          <div className="space-y-2">
+            <div className="h-3 w-full bg-slate-100 rounded animate-pulse" />
+            <div className="h-3 w-5/6 bg-slate-100 rounded animate-pulse" />
+          </div>
+        </div>
+      );
+    }
+
+    if (!facialAnalysis) {
+      return (
+        <div className="border border-slate-200 rounded-lg p-5 bg-white">
+          <p className="text-sm font-bold text-slate-800 mb-1">Facial Expression Analysis</p>
+          <p className="text-xs text-slate-400">Camera was not enabled for this session — no facial analysis available.</p>
+        </div>
+      );
+    }
+
+    const metrics = [
+      { label: 'Confidence', value: facialAnalysis.confidence,
+        color: (v: number) => v >= 7 ? '#047857' : v >= 5 ? '#b45309' : '#dc2626',
+        bg:    (v: number) => v >= 7 ? '#f0fdf9' : v >= 5 ? '#fefce8' : '#fff7ed',
+        border:(v: number) => v >= 7 ? '#a7f3d0' : v >= 5 ? '#fef08a' : '#fed7aa',
+      },
+      { label: 'Nervousness', value: facialAnalysis.nervousness,
+        // For nervousness: low is good
+        color: (v: number) => v <= 3 ? '#047857' : v <= 6 ? '#b45309' : '#dc2626',
+        bg:    (v: number) => v <= 3 ? '#f0fdf9' : v <= 6 ? '#fefce8' : '#fff7ed',
+        border:(v: number) => v <= 3 ? '#a7f3d0' : v <= 6 ? '#fef08a' : '#fed7aa',
+      },
+      { label: 'Engagement', value: facialAnalysis.engagement,
+        color: (v: number) => v >= 7 ? '#047857' : v >= 5 ? '#b45309' : '#dc2626',
+        bg:    (v: number) => v >= 7 ? '#f0fdf9' : v >= 5 ? '#fefce8' : '#fff7ed',
+        border:(v: number) => v >= 7 ? '#a7f3d0' : v >= 5 ? '#fef08a' : '#fed7aa',
+      },
+    ];
+
+    return (
+      <div className="border border-slate-200 rounded-lg p-5 bg-white">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <p className="text-sm font-bold text-slate-800">Facial Expression Analysis</p>
+            <p className="text-xs text-slate-400 mt-0.5">Based on {facialAnalysis.frameCount} frame{facialAnalysis.frameCount !== 1 ? 's' : ''} sampled during the session</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-3 mb-5">
+          {metrics.map(m => (
+            <div key={m.label} className="rounded-xl p-3 text-center"
+              style={{ background: m.bg(m.value), border: `1px solid ${m.border(m.value)}` }}>
+              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500 mb-1">{m.label}</p>
+              <p className="text-3xl font-bold mb-1" style={{ color: m.color(m.value) }}>{m.value}<span className="text-sm font-normal text-slate-400">/10</span></p>
+              <div className="h-1.5 rounded-full bg-slate-200 mx-2">
+                <div className="h-full rounded-full" style={{ width: `${m.value * 10}%`, background: m.color(m.value) }} />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {facialAnalysis.summary && (
+          <p className="text-sm text-slate-600 leading-relaxed mb-4">{facialAnalysis.summary}</p>
+        )}
+
+        {facialAnalysis.observations.length > 0 && (
+          <ul className="space-y-2">
+            {facialAnalysis.observations.map((obs, i) => (
+              <li key={i} className="flex items-start gap-2">
+                <span className="mt-1.5 w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#2B5FA6' }} />
+                <span className="text-sm text-slate-700 leading-relaxed">{obs}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    );
+  }
 
   function HistoryChart({ data, title, subtitle }: { data: any[]; title: string; subtitle?: string }) {
     if (!data.length) return (
@@ -311,6 +439,86 @@ export default function EvaluationPanel({ open, onClose, content, username, phys
           </DialogTitle>
           {e && <p className="text-xs text-slate-400 mt-0.5">{aggregationNote}</p>}
         </DialogHeader>
+
+        {/* Tab bar */}
+        <div className="flex gap-1 border-b border-slate-100 mb-4 -mt-1">
+          <button
+            onClick={() => setActiveTab('scores')}
+            className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'scores' ? 'border-[#BF4E19] text-[#BF4E19]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          >
+            Scores
+          </button>
+          <button
+            onClick={() => { setActiveTab('gap'); if (!gapAnalysis && !gapLoading) fetchGapAnalysis(); }}
+            className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors flex items-center gap-1.5 ${activeTab === 'gap' ? 'border-[#BF4E19] text-[#BF4E19]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          >
+            Gap Analysis
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100">TESTING</span>
+          </button>
+        </div>
+
+        {/* Gap Analysis tab */}
+        {activeTab === 'gap' && (
+          <div className="space-y-4 pb-4">
+            {gapLoading && (
+              <div className="space-y-3">
+                {[1,2,3].map((i) => (
+                  <div key={i} className="border border-slate-100 rounded-lg p-4 space-y-2 animate-pulse">
+                    <div className="flex items-center gap-2">
+                      <div className="h-5 w-5 rounded-full bg-slate-200" />
+                      <div className="h-4 w-32 bg-slate-200 rounded" />
+                      <div className="h-4 w-20 bg-slate-100 rounded ml-auto" />
+                    </div>
+                    <div className="h-3 w-full bg-slate-100 rounded" />
+                    <div className="h-3 w-3/4 bg-slate-100 rounded" />
+                  </div>
+                ))}
+              </div>
+            )}
+            {gapError && <div className="py-6 text-center text-sm text-red-500">{gapError}</div>}
+            {!gapLoading && gapAnalysis && (
+              <>
+                <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3">
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Overall Assessment</p>
+                  <p className="text-sm text-slate-700 leading-relaxed">{gapAnalysis.overallAssessment}</p>
+                </div>
+                <div className="space-y-3">
+                  {gapAnalysis.priorities.map((p) => (
+                    <div key={p.rank} className="border border-slate-200 rounded-lg overflow-hidden">
+                      <div className="flex items-center gap-3 px-4 py-3 bg-white">
+                        <span className="shrink-0 w-6 h-6 rounded-full bg-[#BF4E19] text-white text-xs font-bold flex items-center justify-center">{p.rank}</span>
+                        <p className="text-sm font-semibold text-slate-800 flex-1">{p.area}</p>
+                      </div>
+                      <div className="px-4 pb-4 pt-0 space-y-2.5 bg-white border-t border-slate-50">
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Rep said</p>
+                          <p className="text-xs text-slate-600 italic leading-relaxed">"{p.repSaid}"</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 mb-1">Ideal approach</p>
+                          <p className="text-xs text-emerald-800 leading-relaxed bg-emerald-50 rounded-md px-3 py-2">"{p.idealSaid}"</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-blue-500 mb-1">Coaching insight</p>
+                          <p className="text-xs text-slate-600 leading-relaxed">{p.coaching}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={() => { setGapAnalysis(null); fetchGapAnalysis(); }}
+                  className="text-xs text-slate-400 hover:text-slate-600 transition-colors underline underline-offset-2"
+                >
+                  Regenerate analysis
+                </button>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Scores tab content */}
+        {activeTab === 'scores' && <>
         {/* Skeleton — shown while REPEVAL is running (generating) or while loading fresh data */}
         {(generating || loading) && <EvalSkeleton generating={!!generating} />}
         {!generating && !loading && noData && (
@@ -431,6 +639,7 @@ export default function EvaluationPanel({ open, onClose, content, username, phys
               { label: 'Adapted messaging to physician segment', value: e.TR_T5 },
               { label: 'Created conversational moments', value: e.TR_T6 },
               { label: 'Listened and built on physician responses', value: e.TR_T7 },
+              { label: 'Established clear call agenda in opening', value: e.TR_T8 },
             ]} />
             <CollapsibleDimension title="Closing Technique" score={e.CLOSING_SCORE} rationale={e.CLOSING_RATIONALE} sessionCount={sessionCount} indicators={[
               { label: 'Summarized key value points', value: e.CL_L1 },
@@ -440,6 +649,7 @@ export default function EvaluationPanel({ open, onClose, content, username, phys
               { label: 'Connected close to urgency or relevance', value: e.CL_L5 },
               { label: 'Established follow-up timeline', value: e.CL_L6 },
             ]} />
+            <FacialAnalysisSection />
             <HistoryChart
               data={histPhysicianData}
               title={`Score Trend — ${physicianName ?? e.PHYSICIAN_ID ?? ''}`}
@@ -447,6 +657,7 @@ export default function EvaluationPanel({ open, onClose, content, username, phys
             />
           </div>
         )}
+        </>}
       </DialogContent>
     </Dialog>
   );

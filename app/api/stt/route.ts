@@ -39,6 +39,27 @@ let _vocabCache: string | null = null;
 let _vocabCacheTime = 0;
 const VOCAB_TTL_MS = 10 * 60 * 1000;
 
+// Module-level physician names cache for Territory Intelligence STT context
+let _physicianNamesCache: string | null = null;
+let _physicianNamesCacheTime = 0;
+
+async function getPhysicianNamesPrompt(): Promise<string> {
+  const now = Date.now();
+  if (_physicianNamesCache && now - _physicianNamesCacheTime < VOCAB_TTL_MS) return _physicianNamesCache;
+  try {
+    const sf = getSnowflakeClient();
+    const rows = await sf.executeQuery(
+      `SELECT DISTINCT PHYSICIAN_LAST_NAME FROM CORTEX_TESTING.PUBLIC.SYNTHETIC_PHYSICIAN_CHARS WHERE PHYSICIAN_LAST_NAME IS NOT NULL ORDER BY PHYSICIAN_LAST_NAME LIMIT 100`
+    );
+    const names = (rows as any[]).map((r: any) => r.PHYSICIAN_LAST_NAME as string).filter(Boolean);
+    _physicianNamesCache = names.length > 0 ? `Physician last names in territory: ${names.join(', ')}.` : '';
+    _physicianNamesCacheTime = now;
+  } catch {
+    _physicianNamesCache = _physicianNamesCache ?? '';
+  }
+  return _physicianNamesCache!;
+}
+
 async function getVocabPrompt(): Promise<string> {
   const now = Date.now();
   if (_vocabCache && now - _vocabCacheTime < VOCAB_TTL_MS) return _vocabCache;
@@ -89,7 +110,12 @@ export async function POST(request: NextRequest) {
                : mime.includes('wav') ? 'wav'
                : 'webm';
 
-    const vocab  = await getVocabPrompt();
+    const context = formData.get('context') as string | null;
+    let vocab = await getVocabPrompt();
+    if (context === 'intelligence') {
+      const physNames = await getPhysicianNamesPrompt();
+      if (physNames) vocab = vocab + ' ' + physNames;
+    }
     const groqFd = new FormData();
     groqFd.append('file', audioFile, `audio.${ext}`);
     // whisper-large-v3 (full model) — significantly better at rare vocabulary

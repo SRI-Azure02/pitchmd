@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePhysicianList } from '@/lib/hooks/use-physician-list';
+import { useAccountList } from '@/lib/hooks/use-account-list';
 import { Paginator } from '@/components/ui/paginator';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
@@ -19,9 +20,11 @@ interface FacialAnalysisResult {
   frameCount: number;
 }
 import CallJournal from './call-journal';
+import IntelligenceDrawer from './intelligence-drawer';
+import AccountFlowEditor, { type AccountPhysician } from './account-flow-editor';
 import LoopBack from './loop-back';
 import EngagementPlaybook from './engagement-playbook';
-import { Send, RotateCcw, Square, Volume2, VolumeX, Video, VideoOff, MessageSquare, Search, ChevronDown, X, Check, BarChart2, ArrowUp, ArrowDown, ArrowUpDown, Hash, Mic, BookOpen, NotebookPen, Map, Camera, Monitor, Sparkles, Database, ShieldAlert, Languages, Target, Bell, PhoneOff, Hourglass, ShieldCheck, ToggleLeft, Trash2 } from 'lucide-react';
+import { Send, RotateCcw, Square, Volume2, VolumeX, Video, VideoOff, MessageSquare, Search, ChevronDown, X, Check, BarChart2, ArrowUp, ArrowDown, ArrowUpDown, Hash, Mic, BookOpen, NotebookPen, Map as MapIcon, Camera, Monitor, Sparkles, Database, ShieldAlert, Languages, Target, Bell, PhoneOff, Hourglass, ShieldCheck, ToggleLeft, Trash2, HelpCircle, Brain, History, ListChecks, RefreshCw, Trophy, Link2, ClipboardCheck, GitBranch } from 'lucide-react';
 import { parseEmotion, speakText, stopCurrentAudio } from '@/lib/elevenlabs';
 import { buildCorrector, type Corrector } from '@/lib/product-name-corrector';
 import { getMindsetDescription } from '@/lib/mindset-descriptions';
@@ -95,18 +98,7 @@ function physicianSortValue(p: any, field: string): any {
 
 // ── Roadmap items ────────────────────────────────────────────────────────
 const ROADMAP_ITEMS = [
-  {
-    icon: <Monitor className="w-5 h-5" />,
-    title: 'Screen Content Reader',
-    description: 'Trigger an on-demand screen capture so PitchMD can read and reference what\'s currently on your screen.',
-    status: 'Pending Testing',
-  },
-  {
-    icon: <Camera className="w-5 h-5" />,
-    title: 'Facial & Body Language Feedback',
-    description: 'Use your device camera to analyse facial expressions and body language in real time, with coaching feedback on your non-verbal presentation.',
-    status: 'Planned',
-  },
+  // ── Live ──────────────────────────────────────────────────────────────
   {
     icon: <Sparkles className="w-5 h-5" />,
     title: 'Enhanced Avatar',
@@ -114,16 +106,84 @@ const ROADMAP_ITEMS = [
     status: 'Live',
   },
   {
+    icon: <Languages className="w-5 h-5" />,
+    title: 'Pharmaceutical STT Vocabulary Priming',
+    description: 'Whisper-based speech recognition with pharmaceutical vocabulary priming for accurate transcription of brand names like Venclexta, Brukinsa, and Imbruvica.',
+    status: 'Testing',
+  },
+  {
+    icon: <Monitor className="w-5 h-5" />,
+    title: 'Screen Content Reader',
+    description: 'Trigger an on-demand screen capture so PitchMD can read and reference what\'s currently on your screen — slides, CRM data, or reference docs are instantly available to the physician persona.',
+    status: 'Testing',
+  },
+  {
+    icon: <Camera className="w-5 h-5" />,
+    title: 'Facial & Body Language Feedback',
+    description: 'Device camera captures frames every 20 seconds during the session. Claude Vision analyses confidence, nervousness, and engagement — scores surface in the post-session evaluation panel.',
+    status: 'Live',
+  },
+  {
+    icon: <Brain className="w-5 h-5" />,
+    title: 'Data-Driven Dynamic Personas',
+    description: 'Physician personas are grounded in real Snowflake data — Rx volume, market share, 90-day touchpoint history, open rep commitments, and call notes — injected into every turn of the roleplay.',
+    status: 'Live',
+  },
+  {
+    icon: <ClipboardCheck className="w-5 h-5" />,
+    title: 'In-App Evaluation Engine',
+    description: 'Post-session evaluation triggers automatically via the Snowflake Cortex REPEVAL procedure. Scores across five dimensions (Clinical Knowledge, Objection Handling, Compliance, Trust, Closing) are displayed in the evaluation panel with median trends across recent sessions.',
+    status: 'Live',
+  },
+  {
+    icon: <MapIcon className="w-5 h-5" />,
+    title: 'Territory Intelligence',
+    description: 'Natural language query interface for territory data — ask questions in plain English or by voice and receive adaptive output: tables, trend charts, or stat cards with narrative summaries.',
+    status: 'Testing',
+  },
+  {
+    icon: <History className="w-5 h-5" />,
+    title: 'Recent Engagement History in Playbook',
+    description: 'The engagement playbook shows a 90-day activity timeline for the selected physician — channel, date, and message for each promotional touch — pulled live from Snowflake before every session.',
+    status: 'Testing',
+  },
+  {
+    icon: <Link2 className="w-5 h-5" />,
+    title: 'Persona-Linked Call Notes & To-Dos',
+    description: 'Call notes and open commitments are stamped with the physician ID in Snowflake. The three most recent notes and all open tasks are injected into the physician system prompt so the persona remembers past interactions.',
+    status: 'Live',
+  },
+  // ── Testing ───────────────────────────────────────────────────────────
+  {
+    icon: <MessageSquare className="w-5 h-5" />,
+    title: 'Graceful Speech Continuation',
+    description: 'After auto-submit on a 3-second pause, the mic stays open for 5 more seconds. If the rep continues speaking, the in-flight AI response is cancelled and the continuation is merged into a single coherent turn before re-submitting.',
+    status: 'Testing',
+  },
+  {
     icon: <Database className="w-5 h-5" />,
     title: 'Cross-Session Mindset Persistence',
-    description: 'Assigned HCP mindsets persist across training sessions so the physician persona remembers your history and adapts over time.',
+    description: 'HCP mindset presets (Innovator, Conservative, etc.) are selectable per session. Persistence of assigned mindset across sessions to Snowflake is in progress — currently resets on each new session.',
+    status: 'Testing',
+  },
+  // ── Planned ───────────────────────────────────────────────────────────
+  {
+    icon: <ListChecks className="w-5 h-5" />,
+    title: 'Actionable To-Do List with Auto-Attached Assets',
+    description: 'Scientific follow-up commitments detected in the transcript are automatically matched to the most relevant medical document via RAG, so the rep sees the exact asset to send — not just a plain text reminder.',
     status: 'Planned',
   },
   {
-    icon: <Languages className="w-5 h-5" />,
-    title: 'Vocabulary Enhancement',
-    description: 'Whisper-based speech recognition with pharmaceutical vocabulary priming for accurate transcription of brand names like Venclexta, Brukinsa, and Imbruvica.',
-    status: 'Live',
+    icon: <RefreshCw className="w-5 h-5" />,
+    title: 'Enhanced Post-Call Loopback Pipeline',
+    description: 'Auto-populates CRM interaction logs, sample fulfillment requests, and time-bound reminders directly from the session transcript — eliminating post-call admin work.',
+    status: 'Planned',
+  },
+  {
+    icon: <Trophy className="w-5 h-5" />,
+    title: 'Ideal Rep Simulation & Gap Analysis',
+    description: 'After a session, Claude reviews each rep turn and surfaces the top coaching priorities — what an ideal rep would have said differently, with specific alternative phrasing. Available in the evaluation panel after every session.',
+    status: 'Testing',
   },
   {
     icon: <Target className="w-5 h-5" />,
@@ -336,10 +396,14 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
 
   // ── Physician selection state ─────────────────────────────────────────────
   const [physicianSelectionMode, setPhysicianSelectionMode] = useState(false);
+  const [pitchMode, setPitchMode] = useState<'hcp' | 'account'>('hcp');
+  const [accountSearch, setAccountSearch] = useState('');
+  const [selectedAccount, setSelectedAccount] = useState<{ accountId: string; accountName: string } | null>(null);
   const [selectedPhysician, setSelectedPhysician] = useState<{ name: string; specialty: string | null; segment: string | null } | null>(null);
 
   // ── Physician list hook (lazy — loads only when physician picker is opened) ─
   const physicianHook = usePhysicianList({ lazy: true });
+  const accountHook = useAccountList({ lazy: true });
 
   // ── Physician list filter / sort state ────────────────────────────────────
   const [sortConfig, setSortConfig] = useState<SortConfig>({ field: 'overallScore', dir: 'asc' });
@@ -350,7 +414,12 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
 
   // ── Roadmap state ─────────────────────────────────────────────────────────
   const [roadmapOpen, setRoadmapOpen] = useState(false);
-  const roadmapRef = useRef<HTMLDivElement>(null);
+  const [roadmapFilter, setRoadmapFilter] = useState<'All' | 'Live' | 'Testing' | 'Planned'>('All');
+  const roadmapRef   = useRef<HTMLDivElement>(null);
+  const swipeStartY  = useRef<number | null>(null);
+
+  // ── Territory Intelligence state ──────────────────────────────────────────
+  const [intelligenceOpen, setIntelligenceOpen] = useState(false);
 
   // ── Training completion state ─────────────────────────────────────────────
   const [completionLogged, setCompletionLogged] = useState(false);
@@ -421,10 +490,6 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   // Full physician object stored at selection time; used to build the Claude
   // system prompt for direct-API roleplay (bypasses Snowflake Cortex Agent).
   const selectedPhysicianDataRef = useRef<any>(null);
-  // SSE abort controller — cancelled when rep continues speaking after auto-submit
-  const sseAbortRef                  = useRef<AbortController | null>(null);
-  const pendingContinuationRef       = useRef<string | null>(null);
-  const pendingContinuationHistRef   = useRef<Message[] | null>(null);
   const sendMessageRef = useRef<(text: string, history: Message[]) => Promise<void>>(
     async () => { },
   );
@@ -454,6 +519,8 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   // Compliance session ID — generated at session start, included in every roleplay message call
   const sessionIdRef = useRef<string | null>(null);
   const loadingRef = useRef(false);
+  // Abort controller for the in-flight SSE fetch — cancelled by speech continuation
+  const sseAbortControllerRef = useRef<AbortController | null>(null);
 
   // ── Sync state → refs ─────────────────────────────────────────────────────
   useEffect(() => { inputRef.current = inputValue; }, [inputValue]);
@@ -781,13 +848,13 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
             messages: contextMessages.map((m) => ({ role: m.role, content: m.content })),
           };
 
-      sseAbortRef.current?.abort();
-      sseAbortRef.current = new AbortController();
+      const sseAbort = new AbortController();
+      sseAbortControllerRef.current = sseAbort;
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody),
-        signal: sseAbortRef.current.signal,
+        signal: sseAbort.signal,
       });
 
       if (!response.ok || !response.body) throw new Error('Failed to connect to agent');
@@ -1033,23 +1100,8 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
         setStatusMessage('');
       }
     } catch (error: any) {
-      if (error.name === 'AbortError' && pendingContinuationRef.current !== null) {
-        // Rep kept talking — resend with combined transcript
-        const combinedText = pendingContinuationRef.current;
-        const combinedHist = pendingContinuationHistRef.current ?? [];
-        pendingContinuationRef.current     = null;
-        pendingContinuationHistRef.current = null;
-        setMessages(combinedHist);
-        messagesRef.current = combinedHist;
-        setLoading(false);
-        loadingRef.current = false;
-        setStreamingContent('');
-        streamingContentRef.current = '';
-        setAvatarSpeaking(false);
-        sendMessage(combinedText, combinedHist);
-        return;
-      }
-      if (error.name === 'AbortError') return; // cancelled without continuation — silent
+      // AbortError means the continuation handler intentionally cancelled this stream
+      if (error?.name === 'AbortError') return;
       setMessages((prev) => [
         ...prev,
         {
@@ -1065,11 +1117,63 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
 
   sendMessageRef.current = sendMessage;
 
+  // ── Graceful speech continuation ──────────────────────────────────────────
+  // Fires when the rep keeps talking within 5 s of an auto-submit, before the
+  // AI response has been voiced. Aborts the in-flight SSE, merges the extra
+  // speech into the original turn, and re-sends as one combined message.
+  const handleContinuation = (extraText: string) => {
+    // If the AI is already speaking, drop the continuation — too late to merge.
+    if (avatarSpeakingRef.current) return;
+
+    // Abort the in-flight SSE fetch.
+    sseAbortControllerRef.current?.abort();
+    sseAbortControllerRef.current = null;
+    stopCurrentAudio();
+
+    // Reset streaming / loading state so the UI is clean for the re-send.
+    streamingContentRef.current = '';
+    streamingSentences.current = 0;
+    isStreamingRef.current = false;
+    setStreamingContent('');
+    setLoading(false);
+    setStatusMessage('');
+
+    // Patch the last user message in place: append the continuation text.
+    setMessages((prev) => {
+      const idx = [...prev].reverse().findIndex((m) => m.role === 'user' && !m.internal);
+      if (idx === -1) return prev;
+      const realIdx = prev.length - 1 - idx;
+      const updated = [...prev];
+      updated[realIdx] = {
+        ...updated[realIdx],
+        content: updated[realIdx].content + ' ' + extraText,
+      };
+      // Re-send with the merged text against the history *before* this message.
+      const history = updated.slice(0, realIdx);
+      setTimeout(() => sendMessageRef.current(updated[realIdx].content, history), 0);
+      return updated;
+    });
+  };
+
   // ── Session controls ──────────────────────────────────────────────────────
   const handleStartSession = () => {
     if (hasStarted.current || physicianSelectionMode) return;
     setPhysicianSelectionMode(true);
     physicianHook.load();
+    accountHook.load();
+  };
+
+  const handleStartPitchFromAccount = (physician: AccountPhysician, _context: Array<{ fromPhysicianId: string; propagationIndex: number }>) => {
+    setSelectedAccount(null);
+    const adapted = {
+      PHYSICIAN_ID: physician.physicianId,
+      PHYSICIAN_FIRST_NAME: physician.firstName,
+      PHYSICIAN_LAST_NAME: physician.lastName,
+      PHYSICIAN_SPECIALTY: physician.specialty,
+      PHYSICIAN_CITY: physician.city,
+      PHYSICIAN_STATE: physician.state,
+    };
+    handlePhysicianSelect(adapted);
   };
 
   const handlePhysicianSelect = (physician: any) => {
@@ -1091,22 +1195,8 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
       currentVoiceRef.current = physician.VOICE_MODEL;
     }
 
-    // Enrich physician with call notes, open tasks, and recent activity from Snowflake.
-    // Non-fatal — session proceeds even if the fetch fails.
-    let enrichedPhysician = { ...physician };
-    try {
-      const ctx = await fetch(`/api/physicians/${id}/context`).then(r => r.json());
-      if (!ctx.error) {
-        enrichedPhysician.CALL_NOTES      = ctx.callNotes      ?? [];
-        enrichedPhysician.OPEN_TASKS      = ctx.openTasks      ?? [];
-        enrichedPhysician.RECENT_ACTIVITY = ctx.recentActivity ?? [];
-      }
-    } catch (e) {
-      console.warn('[session] physician context fetch failed — proceeding without enrichment', e);
-    }
-
     // Store full physician object so sendMessage can build the Claude system prompt.
-    selectedPhysicianDataRef.current = enrichedPhysician;
+    selectedPhysicianDataRef.current = physician;
 
     // Capture assigned mindset (if any) for this session — locked in at start.
     const assignedMindset = physicianMindsets[id] ?? null;
@@ -1168,24 +1258,6 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
     if (userTyping || sessionEnded) return;
     const current = inputRef.current.trim();
     if (current && !loading) sendMessage(current, messagesRef.current);
-  };
-
-  const handleContinuation = (continuationText: string) => {
-    if (sessionEnded) return;
-    const msgs = messagesRef.current;
-    // Find the last non-internal user message (the one that was just auto-submitted)
-    let lastUserIdx = -1;
-    for (let i = msgs.length - 1; i >= 0; i--) {
-      if (msgs[i].role === 'user' && !msgs[i].internal) { lastUserIdx = i; break; }
-    }
-    if (lastUserIdx === -1) return;
-    const combined  = msgs[lastUserIdx].content + ' ' + continuationText;
-    const histBefore = msgs.slice(0, lastUserIdx);
-    // Store — picked up in sendMessage's AbortError catch to re-send combined
-    pendingContinuationRef.current     = combined;
-    pendingContinuationHistRef.current = histBefore;
-    stopCurrentAudio();
-    sseAbortRef.current?.abort();
   };
 
   // ── Facial analysis ──────────────────────────────────────────────────────
@@ -1263,6 +1335,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
       if (!res.ok) throw new Error(`facial-analysis API error: ${res.status}`);
       const result: FacialAnalysisResult = await res.json();
       setFacialAnalysis(result);
+      try { localStorage.setItem('pitchmd_facial_last', JSON.stringify(result)); } catch { /* quota */ }
     } catch (err: any) {
       console.error('[facial-analysis] failed:', err?.message);
     } finally {
@@ -1935,6 +2008,17 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
   // ── Pre-session splash ────────────────────────────────────────────────────
   if (!sessionStarted) {
     // Physician selection grid
+    if (physicianSelectionMode && selectedAccount) {
+      return (
+        <AccountFlowEditor
+          accountId={selectedAccount.accountId}
+          accountName={selectedAccount.accountName}
+          onBack={() => setSelectedAccount(null)}
+          onStartPitch={handleStartPitchFromAccount}
+        />
+      );
+    }
+
     if (physicianSelectionMode) {
       return (
         <div className="flex flex-col h-full min-h-0">
@@ -1983,42 +2067,34 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
           {/* ── Header ──────────────────────────────────────────────────── */}
           <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-100 shrink-0">
             <div>
-              <p className="text-xl font-semibold tracking-tight text-slate-900">Select a Physician</p>
-              <p className="text-sm text-slate-400 mt-0.5">Choose who you'd like to practice with today</p>
+              <p className="text-xl font-semibold tracking-tight text-slate-900">
+                {pitchMode === 'hcp' ? 'Select a Physician' : 'Select an Account'}
+              </p>
+              <p className="text-sm text-slate-400 mt-0.5">
+                {pitchMode === 'hcp' ? "Choose who you'd like to practice with today" : 'Choose an account to practice your pitch'}
+              </p>
             </div>
             <div className="flex items-center gap-3">
-              {/* Avatar provider toggle — applies to the next session you start */}
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-medium text-slate-400 flex items-center gap-1">
-                  <Video className="w-3.5 h-3.5" />
-                  Avatar
-                </span>
-                {/* Segmented control: fixed-width segments + sliding white pill */}
-                <div className="relative inline-flex items-center rounded-full bg-slate-300 p-0.5">
-                  {/* Sliding pill — translates one segment-width (w-14 = 3.5rem) on toggle */}
-                  <div
-                    className="absolute top-0.5 bottom-0.5 left-0.5 w-14 rounded-full bg-white shadow-sm"
-                    style={{
-                      transition: 'transform 200ms cubic-bezier(0.34, 1.2, 0.64, 1)',
-                      transform: avatarProvider === AvatarProvider.ANAM
-                        ? 'translateX(3.5rem)'
-                        : 'translateX(0)',
-                    }}
-                  />
-                  {/* Option labels — sit on top of the pill via z-10 */}
-                  {([AvatarProvider.TAVUS, AvatarProvider.ANAM] as const).map((p) => (
-                    <button
-                      key={p}
-                      onClick={() => setAvatarProvider(p)}
-                      className={`relative z-10 w-14 py-1 rounded-full text-xs font-semibold select-none transition-colors duration-150 ${
-                        avatarProvider === p ? 'text-blue-600' : 'text-slate-500 hover:text-slate-700'
-                      }`}
-                      title={`Use ${p === AvatarProvider.TAVUS ? 'Tavus' : 'Anam'} avatars for new sessions`}
-                    >
-                      {p === AvatarProvider.TAVUS ? 'Tavus' : 'Anam'}
-                    </button>
-                  ))}
-                </div>
+              {/* HCP / Account toggle */}
+              <div className="relative inline-flex items-center rounded-full bg-slate-200 p-0.5">
+                <div
+                  className="absolute top-0.5 bottom-0.5 left-0.5 w-16 rounded-full bg-white shadow-sm"
+                  style={{
+                    transition: 'transform 200ms cubic-bezier(0.34, 1.2, 0.64, 1)',
+                    transform: pitchMode === 'account' ? 'translateX(4rem)' : 'translateX(0)',
+                  }}
+                />
+                {(['hcp', 'account'] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    onClick={() => setPitchMode(mode)}
+                    className={`relative z-10 w-16 py-1 text-center rounded-full text-xs font-semibold select-none transition-colors duration-150 ${
+                      pitchMode === mode ? 'text-slate-800' : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    {mode === 'hcp' ? 'HCP' : 'Account'}
+                  </button>
+                ))}
               </div>
               <button onClick={() => setPhysicianSelectionMode(false)} className="text-sm text-slate-400 hover:text-slate-700 px-3 py-1 rounded-full hover:bg-slate-100 transition-colors">
                 Back
@@ -2026,8 +2102,112 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
             </div>
           </div>
 
+          {/* ── Account view ────────────────────────────────────────────── */}
+          {pitchMode === 'account' && (() => {
+            const filtered = accountHook.accounts.filter(a =>
+              !accountSearch ||
+              (a.accountName ?? '').toLowerCase().includes(accountSearch.toLowerCase()) ||
+              (a.city ?? '').toLowerCase().includes(accountSearch.toLowerCase()) ||
+              (a.state ?? '').toLowerCase().includes(accountSearch.toLowerCase()) ||
+              ((a as any).states ?? '').toLowerCase().includes(accountSearch.toLowerCase())
+            );
+
+            return (
+              <>
+                {/* Account filter ribbon */}
+                <div className="shrink-0 px-4 py-2.5 border-b border-slate-200 bg-slate-100/80">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="relative flex-1 min-w-[180px] max-w-xs">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                      <input
+                        type="text"
+                        value={accountSearch}
+                        onChange={e => setAccountSearch(e.target.value)}
+                        placeholder="Search accounts…"
+                        className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 bg-white text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400"
+                      />
+                      {accountSearch && (
+                        <button onClick={() => setAccountSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                    {accountSearch && (
+                      <button onClick={() => setAccountSearch('')} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-sm text-slate-500 hover:text-red-500 hover:bg-red-50 border border-transparent hover:border-red-200 transition-colors">
+                        <X className="w-3 h-3" /> Clear
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1.5">
+                    {accountHook.loading ? 'Loading…' : `${filtered.length} account${filtered.length !== 1 ? 's' : ''}${accountSearch ? ' match your search' : ' in your territory'}`}
+                  </p>
+                </div>
+
+                {/* Account table */}
+                <div className="shrink-0 h-px" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.14) 0%, transparent 100%)', height: '8px', pointerEvents: 'none' }} />
+                <div className="flex-1 overflow-auto">
+                  {accountHook.loading ? (
+                    <div className="flex items-center justify-center h-40 gap-2 text-slate-400">
+                      <Spinner className="w-4 h-4" />
+                      <span className="text-sm">Loading accounts...</span>
+                    </div>
+                  ) : accountHook.error ? (
+                    <div className="flex flex-col items-center justify-center h-40 gap-2 text-slate-400">
+                      <p className="text-sm font-medium text-red-500">Failed to load accounts.</p>
+                      <p className="text-xs text-slate-400">{accountHook.error}</p>
+                    </div>
+                  ) : filtered.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-40 gap-2 text-slate-400">
+                      <p className="text-sm font-medium">No accounts match your search.</p>
+                      <button onClick={() => setAccountSearch('')} className="text-xs text-blue-500 hover:underline">Clear search</button>
+                    </div>
+                  ) : (
+                    <table className="w-full text-base border-collapse min-w-[600px]">
+                      <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_0_0_#e2e8f0]">
+                        <tr>
+                          {(['Account', 'Location', 'Specialty Mix', '# HCPs'] as const).map(label => (
+                            <th key={label} className="px-4 py-2.5 text-left text-sm font-semibold uppercase tracking-wide text-slate-400">
+                              {label}
+                            </th>
+                          ))}
+                          <th className="sticky right-0 bg-white px-4 py-2.5 w-36 shadow-[-1px_0_0_0_#e2e8f0]" />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filtered.map((acct) => (
+                          <tr key={acct.accountId} className="group border-b border-slate-100 hover:bg-slate-100/70 transition-colors">
+                            <td className="px-4 py-3 font-semibold text-slate-900 whitespace-nowrap">
+                              {acct.accountName || <span className="text-slate-300">—</span>}
+                            </td>
+                            <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
+                              {(acct as any).states || [acct.city, acct.state].filter(Boolean).join(', ') || <span className="text-slate-300">—</span>}
+                            </td>
+                            <td className="px-4 py-3 text-slate-600 max-w-[240px] truncate">
+                              {acct.specialtyMix || <span className="text-slate-300">—</span>}
+                            </td>
+                            <td className="px-4 py-3 text-slate-600 text-center">
+                              {acct.hcpCount}
+                            </td>
+                            <td className="sticky right-0 bg-white px-3 py-3 shadow-[-1px_0_0_0_#e2e8f0] opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
+                                onClick={() => setSelectedAccount({ accountId: acct.accountId, accountName: acct.accountName })}
+                                className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-700 text-white text-xs font-medium transition-colors whitespace-nowrap"
+                              >
+                                Select Account
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </>
+            );
+          })()}
+
           {/* ── Filter ribbon ───────────────────────────────────────────── */}
-          <div className="shrink-0 px-4 py-2.5 border-b border-slate-200 bg-slate-100/80">
+          {pitchMode === 'hcp' && <><div className="shrink-0 px-4 py-2.5 border-b border-slate-200 bg-slate-100/80">
             <div className="flex flex-wrap items-center gap-2">
               {/* Search */}
               <div className="relative flex-1 min-w-[180px] max-w-xs">
@@ -2305,8 +2485,9 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
             total={physicianHook.totalCount}
             onPageChange={physicianHook.setPage}
           />
+          </>}
 
-          <EvaluationPanel open={evalOpen} onClose={() => setEvalOpen(false)} content="" username={username} physicianId={evalPhysicianId} facialAnalysis={facialAnalysis} facialAnalysisRunning={facialAnalysisRunning} />
+          <EvaluationPanel open={evalOpen} onClose={() => setEvalOpen(false)} content="" username={username} physicianId={evalPhysicianId} sessionId={sessionIdRef.current} messages={messagesRef.current} facialAnalysis={facialAnalysis} facialAnalysisRunning={facialAnalysisRunning} />
 
           {/* Fixed-position column header tooltip */}
           {tableTooltip && (
@@ -2541,11 +2722,26 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
       );
     };
 
+    const handleSwipeStart = (y: number) => { swipeStartY.current = y; };
+    const handleSwipeEnd   = (y: number) => {
+      if (swipeStartY.current === null) return;
+      const dy = swipeStartY.current - y;
+      if (dy > 60)  setIntelligenceOpen(true);
+      if (dy < -60) setIntelligenceOpen(false);
+      swipeStartY.current = null;
+    };
+
     return (
-      <div className="relative flex flex-col h-full items-center justify-center px-6 py-6">
+      <div
+        className="relative flex flex-col h-full items-center justify-center px-6 py-6"
+        onTouchStart={e => handleSwipeStart(e.touches[0].clientY)}
+        onTouchEnd={e   => handleSwipeEnd(e.changedTouches[0].clientY)}
+        onPointerDown={e => { if (e.pointerType !== 'mouse') handleSwipeStart(e.clientY); }}
+        onPointerUp={e   => { if (e.pointerType !== 'mouse') handleSwipeEnd(e.clientY); }}
+      >
 
         {/* ── Roadmap — bottom-left of home screen only ─────────────────── */}
-        <div className="absolute bottom-4 left-4 z-20" ref={roadmapRef}>
+        <div className="absolute bottom-4 left-4 z-20 flex items-center gap-2" ref={roadmapRef}>
           <button
             onClick={() => setRoadmapOpen(prev => !prev)}
             title="Product Roadmap"
@@ -2555,23 +2751,56 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                 : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700'
             }`}
           >
-            <Map className="w-3.5 h-3.5" />
+            <MapIcon className="w-3.5 h-3.5" />
             Roadmap
           </button>
 
+          {/* Avatar provider toggle */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-medium text-slate-400 flex items-center gap-1">
+              <Video className="w-3.5 h-3.5" />
+              Avatar
+            </span>
+            <div className="relative inline-flex items-center rounded-full bg-slate-200 p-0.5">
+              <div
+                className="absolute top-0.5 bottom-0.5 left-0.5 w-14 rounded-full bg-white shadow-sm"
+                style={{
+                  transition: 'transform 200ms cubic-bezier(0.34, 1.2, 0.64, 1)',
+                  transform: avatarProvider === AvatarProvider.ANAM ? 'translateX(3.5rem)' : 'translateX(0)',
+                }}
+              />
+              {([AvatarProvider.TAVUS, AvatarProvider.ANAM] as const).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setAvatarProvider(p)}
+                  className={`relative z-10 w-14 py-1 rounded-full text-xs font-semibold select-none transition-colors duration-150 ${
+                    avatarProvider === p ? 'text-blue-600' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                  title={`Use ${p === AvatarProvider.TAVUS ? 'Tavus' : 'Anam'} avatars`}
+                >
+                  {p === AvatarProvider.TAVUS ? 'Tavus' : 'Anam'}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {roadmapOpen && (
-            <div className="absolute bottom-full left-0 mb-2 w-[480px] bg-white rounded-xl shadow-xl border border-slate-100 z-50 overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+            <div className="absolute bottom-full left-0 mb-2 w-[480px] bg-white rounded-xl shadow-xl border border-slate-100 z-50 overflow-hidden flex flex-col" style={{ maxHeight: '520px' }}>
+              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 shrink-0">
                 <div>
                   <p className="text-sm font-semibold text-slate-800">Product Roadmap</p>
-                  <p className="text-xs text-slate-400 mt-0.5">Features coming soon</p>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {roadmapFilter === 'All'
+                      ? `${ROADMAP_ITEMS.length} features`
+                      : `${ROADMAP_ITEMS.filter(r => r.status === roadmapFilter).length} ${roadmapFilter.toLowerCase()} feature${ROADMAP_ITEMS.filter(r => r.status === roadmapFilter).length !== 1 ? 's' : ''}`}
+                  </p>
                 </div>
                 <button onClick={() => setRoadmapOpen(false)} className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
                   <X className="w-3.5 h-3.5" />
                 </button>
               </div>
-              <div className="divide-y divide-slate-50 overflow-y-auto max-h-96">
-                {ROADMAP_ITEMS.map((item, i) => (
+              <div className="divide-y divide-slate-50 overflow-y-auto flex-1">
+                {ROADMAP_ITEMS.filter(r => roadmapFilter === 'All' || r.status === roadmapFilter).map((item, i) => (
                   <div key={i} className="flex items-start gap-3 px-4 py-3.5">
                     <div className="mt-0.5 shrink-0 p-1.5 rounded-lg bg-slate-100 text-slate-500">{item.icon}</div>
                     <div className="flex-1 min-w-0">
@@ -2580,7 +2809,7 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                         <span className={`shrink-0 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${
                           item.status === 'Live'
                             ? 'text-emerald-700 bg-emerald-50 border-emerald-100'
-                            : item.status === 'Pending Testing'
+                            : item.status === 'Testing'
                               ? 'text-blue-600 bg-blue-50 border-blue-100'
                               : 'text-amber-600 bg-amber-50 border-amber-100'
                         }`}>{item.status}</span>
@@ -2589,19 +2818,54 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
                     </div>
                   </div>
                 ))}
+                {ROADMAP_ITEMS.filter(r => roadmapFilter === 'All' || r.status === roadmapFilter).length === 0 && (
+                  <div className="py-10 text-center text-xs text-slate-400">No {roadmapFilter.toLowerCase()} features</div>
+                )}
+              </div>
+              {/* Filter pills */}
+              <div className="shrink-0 flex items-center gap-1.5 px-4 py-2.5 border-t border-slate-100 bg-slate-50">
+                {(['All', 'Live', 'Testing', 'Planned'] as const).map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setRoadmapFilter(f)}
+                    className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border transition-colors ${
+                      roadmapFilter === f
+                        ? f === 'Live'    ? 'bg-emerald-600 text-white border-emerald-600'
+                        : f === 'Testing' ? 'bg-blue-600 text-white border-blue-600'
+                        : f === 'Planned' ? 'bg-amber-500 text-white border-amber-500'
+                        : 'bg-slate-700 text-white border-slate-700'
+                        : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300 hover:text-slate-700'
+                    }`}
+                  >
+                    {f}
+                    {f !== 'All' && (
+                      <span className={`ml-1 opacity-70`}>
+                        {ROADMAP_ITEMS.filter(r => r.status === f).length}
+                      </span>
+                    )}
+                  </button>
+                ))}
               </div>
             </div>
           )}
         </div>
 
         {/* ── Three-row layout ──────────────────────────────────────────── */}
-        <div className="flex flex-col gap-4 w-full max-w-4xl">
+        <div
+          className="flex flex-col gap-4 w-full max-w-4xl"
+          style={{
+            transform: intelligenceOpen ? 'translateY(-55vh)' : 'translateY(0)',
+            transition: 'transform 0.4s cubic-bezier(0.32, 0.72, 0, 1)',
+          }}
+        >
 
           {/* Row 1 — Pre-Field */}
           <div className="flex gap-4">
             {splashTile(
               'Practice Your Pitch',
-              'Simulate a live sales call with a physician and get real-time coaching.',
+              pitchMode === 'hcp'
+                ? 'Simulate a live sales call with a physician and get real-time coaching.'
+                : 'Select an account and physician to practice your pitch.',
               <Mic className="w-7 h-7" />,
               'Pre-Field',
               handleStartSession,
@@ -2656,16 +2920,62 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
 
         </div>
 
+        {/* ── Ask Your Data — centered below bento rows, outside translating div ── */}
+        <div className="flex flex-col items-center gap-2 mt-12 mb-4">
+          {/* Swipe hint */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, opacity: 0.35, pointerEvents: 'none' }}>
+            <svg width={16} height={10} viewBox="0 0 16 10" fill="none" style={{ animation: 'swipeHintBounce 1.8s ease-in-out infinite' }}>
+              <path d="M2 7 L8 2 L14 7" stroke="#64748b" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <svg width={16} height={10} viewBox="0 0 16 10" fill="none" style={{ animation: 'swipeHintBounce 1.8s ease-in-out infinite 0.15s', opacity: 0.5 }}>
+              <path d="M2 7 L8 2 L14 7" stroke="#64748b" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+          <button
+            onClick={() => setIntelligenceOpen(true)}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLButtonElement).style.background = 'linear-gradient(135deg, #C47B42, #C49868, #45A8C8)';
+              (e.currentTarget as HTMLButtonElement).style.color = 'white';
+              (e.currentTarget as HTMLButtonElement).style.borderColor = 'transparent';
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLButtonElement).style.background = '#F1EFE9';
+              (e.currentTarget as HTMLButtonElement).style.color = '';
+              (e.currentTarget as HTMLButtonElement).style.borderColor = '';
+            }}
+            style={{
+              width: '56px',
+              height: '56px',
+              borderRadius: '50%',
+              background: '#F1EFE9',
+              border: '1px solid #e2ddd6',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              boxShadow: '0 1px 4px rgba(0,0,0,0.05), 0 4px 16px rgba(0,0,0,0.04)',
+              transition: 'background 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s',
+              color: '#64748b',
+            }}
+            title="Ask Your Data"
+          >
+            <HelpCircle className="w-6 h-6" />
+          </button>
+        </div>
+
         <EvaluationPanel
           open={evalOpen}
           onClose={() => setEvalOpen(false)}
           content=""
           username={username}
           physicianId={evalPhysicianId}
+          sessionId={sessionIdRef.current}
+          messages={messagesRef.current}
           facialAnalysis={facialAnalysis}
           facialAnalysisRunning={facialAnalysisRunning}
         />
 
+        <IntelligenceDrawer open={intelligenceOpen} onClose={() => setIntelligenceOpen(false)} />
 
       </div>
     );
@@ -3158,6 +3468,8 @@ export default function ChatInterface({ username = 'Rep' }: { username?: string 
         content=""
         username={username}
         physicianId={evalPhysicianId}
+        sessionId={sessionIdRef.current}
+        messages={messagesRef.current}
         generating={evalGenerating}
         refreshTrigger={evalRefreshTrigger}
         facialAnalysis={facialAnalysis}
