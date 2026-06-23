@@ -1211,6 +1211,105 @@ describe('compliance-filter', () => {
       expect(result.status).toBe('clean');
     });
 
+    describe('fair_balance rule testing with hasEfficacyClaim guard', () => {
+      // Test the fix from rule 24: fair-balance rules must only fire when an efficacy claim is present.
+      // This prevents benign physician responses (questions, neutral bridging) from triggering rewrites.
+
+      const rule: ComplianceRule = {
+        RULE_ID: 'fb-test',
+        RULE_CODE: 'FAIR_BALANCE_CLL_EFFICACY',
+        RULE_NAME: 'CLL efficacy balance test',
+        RULE_TYPE: 'fair_balance',
+        SEVERITY: 'warning',
+        DESCRIPTION: JSON.stringify({
+          triggers: ['venclexta', 'venetoclax'],
+        }),
+        ACTIVE: true,
+      };
+
+      it('should be clean when mentioning drug name without efficacy claim', () => {
+        const benignResponses = [
+          'Venclexta is a BCL2 inhibitor approved for CLL',
+          'Tell me about your experience with Venclexta',
+          'Have you considered venetoclax for this patient?',
+          'Let me share the Venclexta Prescribing Information',
+        ];
+
+        benignResponses.forEach(text => {
+          const result = checkOutput(text, [rule]);
+          expect(result.status).toBe('clean',
+            `Benign mention should not trigger rewrite: "${text}"`);
+        });
+      });
+
+      it('should require rewrite when making efficacy claims', () => {
+        const efficacyClaims = [
+          'Venclexta achieves response rates exceeding 80%',
+          'The MURANO trial showed venetoclax superior results',
+          'Venetoclax provides significant overall survival benefit',
+          'Venetoclax demonstrated efficacy in treatment-naive patients',
+        ];
+
+        efficacyClaims.forEach(text => {
+          const result = checkOutput(text, [rule]);
+          expect(result.status).toBe('rewrite_needed',
+            `Efficacy claim should trigger rewrite: "${text}"`);
+        });
+      });
+
+      it('should be clean when efficacy claims include balance keywords', () => {
+        const balancedClaims = [
+          'Response rates are excellent but TLS is a boxed warning',
+          'Superior results though neutropenia requires monitoring',
+          'Overall survival benefit with tumor lysis boxed warning',
+          'Demonstrated efficacy with dose ramp-up and TLS precautions',
+        ];
+
+        balancedClaims.forEach(text => {
+          const result = checkOutput(text, [rule]);
+          expect(result.status).toBe('clean',
+            `Balanced efficacy claim should be clean: "${text}"`);
+        });
+      });
+
+      it('should test multiple products with same rule', () => {
+        const multiProductRule: ComplianceRule = {
+          RULE_ID: 'fb-combo',
+          RULE_CODE: 'FAIR_BALANCE_CLL_EFFICACY',
+          RULE_NAME: 'Multi-product CLL efficacy',
+          RULE_TYPE: 'fair_balance',
+          SEVERITY: 'warning',
+          DESCRIPTION: JSON.stringify({
+            triggers: ['venetoclax', 'obinutuzumab', 'rituximab', 'azacitidine'],
+          }),
+          ACTIVE: true,
+        };
+
+        // Mentioning product names requires balance (drug names are efficacy claim markers)
+        // Without balance keywords, should trigger rewrite
+        expect(checkOutput('Tell me about obinutuzumab', [multiProductRule]).status).toBe('rewrite_needed');
+        expect(checkOutput('Rituximab is FDA approved', [multiProductRule]).status).toBe('rewrite_needed');
+
+        // With 2+ balance keywords should be clean
+        expect(checkOutput('Obinutuzumab discussed with TLS boxed warning and dose ramp-up', [multiProductRule]).status)
+          .toBe('clean');
+        expect(checkOutput('Rituximab use requires neutropenia and TLS monitoring', [multiProductRule]).status)
+          .toBe('clean');
+
+        // Efficacy claims also require balance
+        expect(checkOutput('Obinutuzumab demonstrated superior efficacy', [multiProductRule]).status)
+          .toBe('rewrite_needed');
+        expect(checkOutput('Rituximab shows excellent response rate', [multiProductRule]).status)
+          .toBe('rewrite_needed');
+
+        // With sufficient balance keywords should be clean
+        expect(checkOutput('Superior efficacy with TLS boxed warning and ramp-up dosing', [multiProductRule]).status)
+          .toBe('clean');
+        expect(checkOutput('Strong benefit with tumor lysis and neutropenia monitoring', [multiProductRule]).status)
+          .toBe('clean');
+      });
+    });
+
     describe('block rules (hard-stop violations)', () => {
       it('should return blocked for PII rule with severity=block', () => {
         const rules: ComplianceRule[] = [
