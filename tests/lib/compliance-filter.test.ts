@@ -1694,5 +1694,180 @@ describe('compliance-filter', () => {
         });
       });
     });
+
+    describe('trigger matching behavior: substring vs verbatim vs semantic paraphrasing', () => {
+      // This test suite documents EXACT matching behavior:
+      // 1. Substring matching (keyword present anywhere in text) = TRIGGERS
+      // 2. Case-insensitive substring matching = TRIGGERS
+      // 3. Semantic paraphrases WITHOUT keywords = DOES NOT TRIGGER (limitation)
+
+      it('should trigger on substring match (not requiring verbatim/exact match)', () => {
+        const rule: ComplianceRule = {
+          RULE_ID: 'trigger-test-1',
+          RULE_CODE: 'TEST_RESPONSE_RATE',
+          RULE_NAME: 'Response rate test',
+          RULE_TYPE: 'off_label',
+          SEVERITY: 'block',
+          DESCRIPTION: JSON.stringify({
+            trigger_keywords: ['response rate'],
+            redirect_message: 'Blocked'
+          }),
+          ACTIVE: true,
+        };
+
+        // All these should TRIGGER because they contain the substring "response rate"
+        expect(checkInput('The response rate is 80%', [rule]).status).toBe('blocked');
+        expect(checkInput('Response rate in MURANO was 85%', [rule]).status).toBe('blocked');
+        expect(checkInput('We achieved response rate of 90%', [rule]).status).toBe('blocked');
+        expect(checkInput('Higher response rate than competitors', [rule]).status).toBe('blocked');
+      });
+
+      it('should trigger on case-insensitive substring (e.g., RESPONSE RATE vs response rate)', () => {
+        const rule: ComplianceRule = {
+          RULE_ID: 'trigger-test-2',
+          RULE_CODE: 'TEST_CASE_INSENSITIVE',
+          RULE_NAME: 'Case test',
+          RULE_TYPE: 'off_label',
+          SEVERITY: 'block',
+          DESCRIPTION: JSON.stringify({
+            trigger_keywords: ['tumor lysis', 'TLS'],
+            redirect_message: 'Blocked'
+          }),
+          ACTIVE: true,
+        };
+
+        // Should all trigger regardless of case
+        expect(checkInput('Tumor lysis syndrome warning', [rule]).status).toBe('blocked');
+        expect(checkInput('TUMOR LYSIS monitoring required', [rule]).status).toBe('blocked');
+        expect(checkInput('Tumor Lysis Syndrome (TLS) concern', [rule]).status).toBe('blocked');
+        expect(checkInput('TLS monitoring required', [rule]).status).toBe('blocked');
+        expect(checkInput('tls risk mitigation', [rule]).status).toBe('blocked');
+      });
+
+      it('should NOT trigger on semantic paraphrasing without the keyword (limitation)', () => {
+        const rule: ComplianceRule = {
+          RULE_ID: 'trigger-test-3',
+          RULE_CODE: 'TEST_SEMANTIC_GAP',
+          RULE_NAME: 'Semantic gap test',
+          RULE_TYPE: 'off_label',
+          SEVERITY: 'block',
+          DESCRIPTION: JSON.stringify({
+            trigger_keywords: ['response rate', 'efficacy', 'benefit'],
+            redirect_message: 'Blocked'
+          }),
+          ACTIVE: true,
+        };
+
+        // These are SEMANTICALLY similar to efficacy but DON'T use the keywords
+        // Result: NOT BLOCKED (potential gap in coverage)
+        expect(checkInput('This drug works really well', [rule]).status).toBe('clean');
+        expect(checkInput('Patient outcomes are excellent', [rule]).status).toBe('clean');
+        expect(checkInput('Highly effective treatment option', [rule]).status).toBe('clean');
+        expect(checkInput('Superior to all other options', [rule]).status).toBe('clean');
+        expect(checkInput('Patients do much better on this regimen', [rule]).status).toBe('clean');
+      });
+
+      it('should require exact keyword substring match (words matter)', () => {
+        const rule: ComplianceRule = {
+          RULE_ID: 'trigger-test-4',
+          RULE_CODE: 'TEST_WORD_BOUNDARY',
+          RULE_NAME: 'Word boundary test',
+          RULE_TYPE: 'off_label',
+          SEVERITY: 'block',
+          DESCRIPTION: JSON.stringify({
+            trigger_keywords: ['skip the ramp-up', 'skip titration'],
+            redirect_message: 'Blocked'
+          }),
+          ACTIVE: true,
+        };
+
+        // Exact substring match: TRIGGERS
+        expect(checkInput('Can we skip the ramp-up?', [rule]).status).toBe('blocked');
+        expect(checkInput('Should we skip titration?', [rule]).status).toBe('blocked');
+
+        // Missing words in between: DOES NOT TRIGGER (substring not found)
+        expect(checkInput('Skip all the ramp-up steps', [rule]).status).toBe('clean');
+        expect(checkInput('Skip the dose ramp-up', [rule]).status).toBe('clean');
+        expect(checkInput('Skip any titration today', [rule]).status).toBe('clean');
+
+        // Similar concept but different wording: DOES NOT TRIGGER
+        expect(checkInput('Bypass the dose increase', [rule]).status).toBe('clean');
+        expect(checkInput('Do not ramp up dosing', [rule]).status).toBe('clean');
+      });
+
+      it('should document fair_balance efficacy markers coverage', () => {
+        // This test documents which specific markers are in EFFICACY_CLAIM_MARKERS
+        // and the gaps in coverage
+
+        const rule: ComplianceRule = {
+          RULE_ID: 'fb-coverage-test',
+          RULE_CODE: 'FAIR_BALANCE_CLL_EFFICACY',
+          RULE_NAME: 'Efficacy coverage test',
+          RULE_TYPE: 'fair_balance',
+          SEVERITY: 'block',
+          DESCRIPTION: JSON.stringify({
+            triggers: ['venclexta', 'venetoclax'],
+            required_balance: 'TLS boxed warning'
+          }),
+          ACTIVE: true,
+        };
+
+        // These SHOULD NOT trigger efficacy claim (no markers)
+        // = Safe, benign mentions that don't require balance
+        const noEfficacyMarkers = [
+          'Venclexta is approved for CLL',
+          'Let me tell you about Venclexta',
+          'Do you have questions about venetoclax?',
+          'The drug is administered intravenously',
+        ];
+
+        noEfficacyMarkers.forEach(text => {
+          const result = checkOutput(text, [rule]);
+          expect(result.status).toBe('clean',
+            `Should NOT detect efficacy claim in: "${text}"`);
+        });
+      });
+
+      it('should show vulnerability: efficacy claim without marker keyword', () => {
+        const rule: ComplianceRule = {
+          RULE_ID: 'fb-vulnerability',
+          RULE_CODE: 'FAIR_BALANCE_CLL_EFFICACY',
+          RULE_NAME: 'Vulnerability test',
+          RULE_TYPE: 'fair_balance',
+          SEVERITY: 'block',
+          DESCRIPTION: JSON.stringify({
+            triggers: ['venclexta', 'venetoclax'],
+          }),
+          ACTIVE: true,
+        };
+
+        // These are CLEAR efficacy claims but DON'T contain EFFICACY_CLAIM_MARKERS
+        // Result: NOT caught by fair_balance filter (VULNERABILITY)
+        const undetectedClaims = [
+          'Venclexta is far superior to all competing therapies',
+          'Venetoclax works incredibly well for CLL patients',
+          'This drug outperforms everything else on the market',
+          'Venclexta is the gold standard for CLL treatment',
+          'Best results we have seen in decades of practice',
+        ];
+
+        // None of these contain specific efficacy markers like "response rate", "superior", etc.
+        // They rely on words like "superior", "better", which ARE in EFFICACY_CLAIM_MARKERS
+        // Actually "superior" IS in the markers, so these WILL trigger...
+        // Let me use claims that truly don't have markers:
+
+        const truelyUndetected = [
+          'Venclexta really helps CLL patients feel better',
+          'Patients are happier on venetoclax than before',
+          'This is what patients need for CLL',
+        ];
+
+        truelyUndetected.forEach(text => {
+          const result = checkOutput(text, [rule]);
+          expect(result.status).toBe('clean',
+            `Gap: Claims benefit without markers: "${text}"`);
+        });
+      });
+    });
   });
 });
