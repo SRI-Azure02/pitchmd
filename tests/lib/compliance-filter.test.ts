@@ -1443,5 +1443,256 @@ describe('compliance-filter', () => {
       });
 
     });
+
+    describe('off-label indication testing (VENCLEXTA approved for CLL/SLL only)', () => {
+      // Test the 5 off-label rules from SYNTHETIC_COMPLIANCE_RULES_seed.sql
+      // All 5 are severity: 'block' — unapproved indications are hard stops
+
+      it('should block multiple myeloma claims (mortality signal)', () => {
+        const rules: ComplianceRule[] = [
+          {
+            RULE_ID: 'off-label-myeloma',
+            RULE_CODE: 'OFF_LABEL_MYELOMA',
+            RULE_NAME: 'VENCLEXTA Multiple Myeloma — BLOCKED (increased mortality signal)',
+            RULE_TYPE: 'off_label',
+            SEVERITY: 'block',
+            DESCRIPTION: JSON.stringify({
+              trigger_keywords: ['multiple myeloma', 'myeloma', 't(11;14)', 'MM venetoclax'],
+              redirect_message: 'VENCLEXTA is not approved for multiple myeloma. A clinical study showed increased mortality in the non-t(11;14) population. Please contact Medical Affairs.',
+            }),
+            ACTIVE: true,
+          },
+        ];
+
+        // Should block when MM is mentioned
+        expect(checkInput('What about multiple myeloma patients?', rules).status).toBe('blocked');
+        expect(checkInput('Can we use it for t(11;14) myeloma?', rules).status).toBe('blocked');
+        expect(checkInput('Myeloma venetoclax combinations?', rules).status).toBe('blocked');
+
+        // Should be clean when MM is not mentioned
+        expect(checkInput('Tell me about CLL applications', rules).status).toBe('clean');
+      });
+
+      it('should block mantle cell lymphoma claims', () => {
+        const rules: ComplianceRule[] = [
+          {
+            RULE_ID: 'off-label-mcl',
+            RULE_CODE: 'OFF_LABEL_MCL',
+            RULE_NAME: 'VENCLEXTA Mantle Cell Lymphoma — BLOCKED (not approved)',
+            RULE_TYPE: 'off_label',
+            SEVERITY: 'block',
+            DESCRIPTION: JSON.stringify({
+              trigger_keywords: ['mantle cell lymphoma', 'MCL', 'venetoclax MCL', 'venetoclax mantle'],
+              redirect_message: 'VENCLEXTA is not approved for mantle cell lymphoma. I can only discuss FDA-approved CLL/SLL indications.',
+            }),
+            ACTIVE: true,
+          },
+        ];
+
+        // Should block MCL mentions
+        expect(checkInput('Is Venclexta used in mantle cell lymphoma?', rules).status).toBe('blocked');
+        expect(checkInput('MCL venetoclax regimens?', rules).status).toBe('blocked');
+        expect(checkInput('Venetoclax for MCL patients', rules).status).toBe('blocked');
+
+        // Should be clean for CLL/SLL
+        expect(checkInput('CLL treatment options?', rules).status).toBe('clean');
+      });
+
+      it('should block follicular lymphoma claims', () => {
+        const rules: ComplianceRule[] = [
+          {
+            RULE_ID: 'off-label-fl',
+            RULE_CODE: 'OFF_LABEL_FL',
+            RULE_NAME: 'VENCLEXTA Follicular Lymphoma — BLOCKED (not approved)',
+            RULE_TYPE: 'off_label',
+            SEVERITY: 'block',
+            DESCRIPTION: JSON.stringify({
+              trigger_keywords: ['follicular lymphoma', 'FL', 'venetoclax follicular', 'venetoclax FL'],
+              redirect_message: 'VENCLEXTA is not approved for follicular lymphoma. I can only discuss FDA-approved CLL/SLL indications.',
+            }),
+            ACTIVE: true,
+          },
+        ];
+
+        // Should block FL mentions
+        expect(checkInput('What about follicular lymphoma?', rules).status).toBe('blocked');
+        expect(checkInput('FL patients and venetoclax', rules).status).toBe('blocked');
+        expect(checkInput('Venetoclax for FL treatment', rules).status).toBe('blocked');
+
+        // Should be clean for approved indications
+        expect(checkInput('SLL is the indication', rules).status).toBe('clean');
+      });
+
+      it('should block pediatric use claims (adults only)', () => {
+        const rules: ComplianceRule[] = [
+          {
+            RULE_ID: 'off-label-pediatric',
+            RULE_CODE: 'OFF_LABEL_PEDIATRIC',
+            RULE_NAME: 'VENCLEXTA Pediatric Use — BLOCKED (adults only)',
+            RULE_TYPE: 'off_label',
+            SEVERITY: 'block',
+            DESCRIPTION: JSON.stringify({
+              trigger_keywords: ['pediatric', 'children', 'child patient', 'infant', 'adolescent venetoclax'],
+              redirect_message: 'VENCLEXTA is approved for adult patients only. There is no pediatric indication.',
+            }),
+            ACTIVE: true,
+          },
+        ];
+
+        // Should block pediatric mentions
+        expect(checkInput('Can pediatric CLL patients take Venclexta?', rules).status).toBe('blocked');
+        expect(checkInput('Child patients with CLL', rules).status).toBe('blocked');
+        expect(checkInput('Adolescent venetoclax therapy', rules).status).toBe('blocked');
+
+        // Should be clean for adult context
+        expect(checkInput('Adult CLL patient considerations', rules).status).toBe('clean');
+      });
+
+      it('should block dose modifications outside PI protocol (safety critical)', () => {
+        const rules: ComplianceRule[] = [
+          {
+            RULE_ID: 'off-label-dose',
+            RULE_CODE: 'OFF_LABEL_DOSE_OUTSIDE_PI',
+            RULE_NAME: 'Dose Modification Outside PI Protocol — BLOCKED (safety critical)',
+            RULE_TYPE: 'off_label',
+            SEVERITY: 'block',
+            DESCRIPTION: JSON.stringify({
+              trigger_keywords: [
+                'skip the ramp-up', 'start at 400', 'no need to ramp', 'bypass titration',
+                'full dose from day one', 'skip titration'
+              ],
+              redirect_message: 'The VENCLEXTA Prescribing Information requires the 5-week dose ramp-up schedule for all CLL/SLL patients per the Boxed Warning.',
+            }),
+            ACTIVE: true,
+          },
+        ];
+
+        // Should block off-protocol dosing
+        expect(checkInput('Can we skip the ramp-up for this patient?', rules).status).toBe('blocked');
+        expect(checkInput('Start at 400 mg from day one', rules).status).toBe('blocked');
+        expect(checkInput('No need to ramp up', rules).status).toBe('blocked');
+        expect(checkInput('Let us bypass titration here', rules).status).toBe('blocked');
+        expect(checkInput('Full dose from day one?', rules).status).toBe('blocked');
+
+        // Should be clean for PI-compliant dosing
+        expect(checkInput('Follow the 5-week dose ramp-up as indicated', rules).status).toBe('clean');
+        expect(checkInput('Weekly dose increases per protocol', rules).status).toBe('clean');
+      });
+
+      it('should test multiple off-label rules together (first block wins)', () => {
+        const rules: ComplianceRule[] = [
+          {
+            RULE_ID: 'off-label-myeloma',
+            RULE_CODE: 'OFF_LABEL_MYELOMA',
+            RULE_NAME: 'Myeloma',
+            RULE_TYPE: 'off_label',
+            SEVERITY: 'block',
+            DESCRIPTION: JSON.stringify({
+              trigger_keywords: ['multiple myeloma', 'myeloma'],
+              redirect_message: 'Not approved for myeloma'
+            }),
+            ACTIVE: true,
+          },
+          {
+            RULE_ID: 'off-label-mcl',
+            RULE_CODE: 'OFF_LABEL_MCL',
+            RULE_NAME: 'MCL',
+            RULE_TYPE: 'off_label',
+            SEVERITY: 'block',
+            DESCRIPTION: JSON.stringify({
+              trigger_keywords: ['mantle cell', 'MCL'],
+              redirect_message: 'Not approved for MCL'
+            }),
+            ACTIVE: true,
+          },
+        ];
+
+        const result = checkInput('What about multiple myeloma patients?', rules);
+        expect(result.status).toBe('blocked');
+        // First rule (myeloma) should match and be returned
+        expect(result.violations[0].rule_code).toBe('OFF_LABEL_MYELOMA');
+        expect(result.violations).toHaveLength(1); // Only first block is returned
+      });
+
+      it('should be clean for approved CLL/SLL discussions', () => {
+        const allOffLabelRules: ComplianceRule[] = [
+          {
+            RULE_ID: 'off-label-myeloma',
+            RULE_CODE: 'OFF_LABEL_MYELOMA',
+            RULE_NAME: 'Myeloma',
+            RULE_TYPE: 'off_label',
+            SEVERITY: 'block',
+            DESCRIPTION: JSON.stringify({
+              trigger_keywords: ['multiple myeloma', 'myeloma'],
+            }),
+            ACTIVE: true,
+          },
+          {
+            RULE_ID: 'off-label-mcl',
+            RULE_CODE: 'OFF_LABEL_MCL',
+            RULE_NAME: 'MCL',
+            RULE_TYPE: 'off_label',
+            SEVERITY: 'block',
+            DESCRIPTION: JSON.stringify({
+              trigger_keywords: ['mantle cell lymphoma', 'MCL'],
+            }),
+            ACTIVE: true,
+          },
+          {
+            RULE_ID: 'off-label-fl',
+            RULE_CODE: 'OFF_LABEL_FL',
+            RULE_NAME: 'FL',
+            RULE_TYPE: 'off_label',
+            SEVERITY: 'block',
+            DESCRIPTION: JSON.stringify({
+              trigger_keywords: ['follicular lymphoma', 'FL'],
+            }),
+            ACTIVE: true,
+          },
+          {
+            RULE_ID: 'off-label-pediatric',
+            RULE_CODE: 'OFF_LABEL_PEDIATRIC',
+            RULE_NAME: 'Pediatric',
+            RULE_TYPE: 'off_label',
+            SEVERITY: 'block',
+            DESCRIPTION: JSON.stringify({
+              trigger_keywords: ['pediatric', 'children'],
+            }),
+            ACTIVE: true,
+          },
+          {
+            RULE_ID: 'off-label-dose',
+            RULE_CODE: 'OFF_LABEL_DOSE_OUTSIDE_PI',
+            RULE_NAME: 'Dose',
+            RULE_TYPE: 'off_label',
+            SEVERITY: 'block',
+            DESCRIPTION: JSON.stringify({
+              trigger_keywords: ['skip the ramp-up', 'start at 400'],
+            }),
+            ACTIVE: true,
+          },
+        ];
+
+        // All these should pass through without blocking
+        const approvedTopics = [
+          'VENCLEXTA is approved for CLL and SLL',
+          'Chronic lymphocytic leukemia treatment',
+          'Small lymphocytic lymphoma indications',
+          'MURANO trial in treatment-naive CLL',
+          'CLL14 trial with obinutuzumab',
+          'AMPLIFY trial all-oral regimen',
+          'Adult CLL patients and VENCLEXTA',
+          'Dose ramp-up schedule per PI',
+          'TLS monitoring in CLL patients',
+          'Fixed-duration therapy for SLL',
+        ];
+
+        approvedTopics.forEach(topic => {
+          const result = checkInput(topic, allOffLabelRules);
+          expect(result.status).toBe('clean',
+            `Should be clean for approved topic: "${topic}"`);
+        });
+      });
+    });
   });
 });
